@@ -1143,8 +1143,8 @@ function Index() {
 
       // Squash/stretch + idle breathing
       const idleBob = player.onGround && Math.abs(player.vx) < 0.3 ? Math.sin(time * 0.08) * 0.03 : 0;
-      const sq = (player.crouching ? player.squash * 1.4 : player.squash) + idleBob;
-      const st = (player.crouching ? player.stretch * 1.15 : player.stretch) - idleBob;
+      const sq = (player.crouching ? player.squash * 0.6 : player.squash) + idleBob;
+      const st = (player.crouching ? player.stretch * 1.2 : player.stretch) - idleBob;
       ctx.scale(f * st * CHAR_SCALE, sq * CHAR_SCALE);
       ctx.translate(-BW / 2, -BH);
 
