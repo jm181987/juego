@@ -434,19 +434,21 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     }
   });
 
-  // Parent the sword to the right hand bone so it follows the hand rigidly —
-  // no more "sword floating on its own" while the arm swings elsewhere.
-  const swordAttached = useRef(false);
+  // Each frame: drive the sword's transform from the right-hand bone's world
+  // matrix (converted into the hero group's local space) so the sword follows
+  // the hand rigidly, without inheriting the skeleton's internal bone scale
+  // (which would make the sword invisible or huge if we reparented it).
+  const tmpMat = useRef(new THREE.Matrix4()).current;
+  const tmpPos = useRef(new THREE.Vector3()).current;
+  const tmpQuat = useRef(new THREE.Quaternion()).current;
+  const tmpScale = useRef(new THREE.Vector3()).current;
+  const handOffsetPos = useRef(new THREE.Vector3(0, 0.05, 0)).current;
+  const handOffsetQuat = useRef(
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, -Math.PI / 2)),
+  ).current;
+
   useFrame(() => {
     const b = bonesRef.current;
-    if (!swordAttached.current && b.rightHand && swordRef.current) {
-      b.rightHand.add(swordRef.current);
-      // Local transform inside the hand: grip at origin, blade extending along
-      // the fingers. Mixamo right hand's +X runs down the fingers.
-      swordRef.current.position.set(0.02, 0.02, 0);
-      swordRef.current.rotation.set(0, Math.PI / 2, -Math.PI / 2);
-      swordAttached.current = true;
-    }
 
     if (b.rightArm && !b.base.rightArm) b.base.rightArm = b.rightArm.rotation.clone();
     if (b.rightForeArm && !b.base.rightForeArm) b.base.rightForeArm = b.rightForeArm.rotation.clone();
@@ -465,12 +467,20 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     }
     if (b.rightForeArm && b.base.rightForeArm) {
       const base = b.base.rightForeArm;
-      // Bend the elbow with the chop so the sword swings THROUGH, not floats.
       b.rightForeArm.rotation.set(base.x - s * 0.6, base.y - s * 1.0, base.z);
     }
     if (b.spine1 && b.base.spine1) {
       const base = b.base.spine1;
       b.spine1.rotation.set(base.x + s * 0.12, base.y - s * 0.3, base.z);
+    }
+
+    // Snap sword to hand each frame.
+    if (b.rightHand && swordRef.current && group.current) {
+      b.rightHand.updateWorldMatrix(true, false);
+      tmpMat.copy(group.current.matrixWorld).invert().multiply(b.rightHand.matrixWorld);
+      tmpMat.decompose(tmpPos, tmpQuat, tmpScale);
+      swordRef.current.position.copy(tmpPos).add(handOffsetPos.clone().applyQuaternion(tmpQuat));
+      swordRef.current.quaternion.copy(tmpQuat).multiply(handOffsetQuat);
     }
   });
 
@@ -478,8 +488,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   return (
     <group ref={group} scale={1.05}>
       <primitive object={cloned} />
-      {/* Sword — mounted at the hero group initially, then reparented into the
-          right hand bone on first frame so it swings with the hand naturally. */}
+      {/* Sword — its transform is driven each frame from the right-hand bone. */}
       <group ref={swordRef}>
         <mesh position={[0, -0.15, 0]} castShadow>
           <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
