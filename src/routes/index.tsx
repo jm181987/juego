@@ -1121,22 +1121,32 @@ function Index() {
         ctx.fillRect(px, py - 30, player.w, 30);
       }
 
+      // Base sprite is drawn in a 22x30 virtual space, then scaled up.
+      const BW = 22, BH = 30;
+      const CHAR_SCALE = 1.5;
+
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
 
-      // Ground-pound spin
+      // Ground-pound spin / dive tilt / subtle idle sway
       let rot = 0;
       if (player.groundPound === 1) rot = (time * 0.6) % (Math.PI * 2);
       if (player.diving) rot = f * 0.9;
+      if (!player.onGround && player.groundPound === 0 && !player.diving) {
+        rot += Math.max(-0.35, Math.min(0.35, player.vx * 0.04));
+      }
       ctx.rotate(rot);
 
-      // Squash/stretch — crouch = flatter
-      const sq = player.crouching ? player.squash * 1.4 : player.squash;
-      const st = player.crouching ? player.stretch * 1.15 : player.stretch;
-      ctx.scale(f * st, sq);
-      ctx.translate(-player.w / 2, -player.h);
+      // Squash/stretch — crouch = flatter, plus subtle idle breathing
+      const idleBob = player.onGround && Math.abs(player.vx) < 0.3 ? Math.sin(time * 0.08) * 0.03 : 0;
+      const sq = (player.crouching ? player.squash * 1.4 : player.squash) + idleBob;
+      const st = (player.crouching ? player.stretch * 1.15 : player.stretch) - idleBob;
+      ctx.scale(f * st * CHAR_SCALE, sq * CHAR_SCALE);
+      ctx.translate(-BW / 2, -BH);
 
-      const walking = player.onGround && Math.abs(player.vx) > 0.3;
+      const speed = Math.abs(player.vx);
+      const walking = player.onGround && speed > 0.3;
+      const walkPhase = player.anim * 0.55;
       const walkFrame = Math.floor(player.anim) % 4;
       const airborne = !player.onGround;
       const crouched = player.crouching;
