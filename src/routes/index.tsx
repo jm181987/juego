@@ -162,10 +162,10 @@ function buildWorld(stageIdx: number) {
       else if (ch === "L") hazards.push({ x, y: y + 8, w: TILE, h: TILE - 8, kind: "lava" });
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
       else if (ch === "G") enemies.push({
-        x, y: y + 4, w: 28, h: 28, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+        x, y: y - 10, w: 38, h: 38, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
       });
       else if (ch === "K") enemies.push({
-        x, y, w: 28, h: 24, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+        x, y, w: 38, h: 32, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
       });
       else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
     }
@@ -549,7 +549,7 @@ function Index() {
 
 
     const player = {
-      x: world.spawn.x, y: world.spawn.y, w: 22, h: 30,
+      x: world.spawn.x, y: world.spawn.y, w: 33, h: 45,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
       crouching: false, groundPound: 0, gpCharge: 0,
@@ -1121,23 +1121,33 @@ function Index() {
         ctx.fillRect(px, py - 30, player.w, 30);
       }
 
+      // Base sprite is drawn in a 22x30 virtual space, then scaled up.
+      const BW = 22, BH = 30;
+      const CHAR_SCALE = 1.5;
+
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
 
-      // Ground-pound spin
+      // Ground-pound spin / dive tilt / subtle idle sway
       let rot = 0;
       if (player.groundPound === 1) rot = (time * 0.6) % (Math.PI * 2);
       if (player.diving) rot = f * 0.9;
+      if (!player.onGround && player.groundPound === 0 && !player.diving) {
+        rot += Math.max(-0.35, Math.min(0.35, player.vx * 0.04));
+      }
       ctx.rotate(rot);
 
-      // Squash/stretch — crouch = flatter
-      const sq = player.crouching ? player.squash * 1.4 : player.squash;
-      const st = player.crouching ? player.stretch * 1.15 : player.stretch;
-      ctx.scale(f * st, sq);
-      ctx.translate(-player.w / 2, -player.h);
+      // Squash/stretch — crouch = flatter, plus subtle idle breathing
+      const idleBob = player.onGround && Math.abs(player.vx) < 0.3 ? Math.sin(time * 0.08) * 0.03 : 0;
+      const sq = (player.crouching ? player.squash * 1.4 : player.squash) + idleBob;
+      const st = (player.crouching ? player.stretch * 1.15 : player.stretch) - idleBob;
+      ctx.scale(f * st * CHAR_SCALE, sq * CHAR_SCALE);
+      ctx.translate(-BW / 2, -BH);
 
-      const walking = player.onGround && Math.abs(player.vx) > 0.3;
-      const walkFrame = Math.floor(player.anim) % 4;
+      const speed = Math.abs(player.vx);
+      const walking = player.onGround && speed > 0.3;
+      const walkPhase = player.anim * 0.55;
+      const walkFrame = Math.floor(player.anim) % 4; void walkFrame;
       const airborne = !player.onGround;
       const crouched = player.crouching;
       const attacking = player.attack > 0;
@@ -1218,13 +1228,16 @@ function Index() {
       } else if (wallSliding) {
         ctx.fillRect(18, 12, 5, 6); ctx.fillRect(-1, 18, 4, 5);
       } else if (walking) {
-        const armSwing = walkFrame % 2 === 0 ? 0 : 2;
+        const armSwing = Math.sin(walkPhase) * 2.2;
         ctx.fillRect(-1, 15 + armSwing, 4, 7);
         ctx.fillRect(19, 15 - armSwing, 4, 7);
       } else if (airborne) {
-        ctx.fillRect(-2, 11, 4, 7); ctx.fillRect(20, 11, 4, 7);
+        const t = Math.min(1, Math.abs(player.vy) / 10);
+        const up = player.vy < 0 ? 2 * t : 0;
+        ctx.fillRect(-2, 11 - up, 4, 7); ctx.fillRect(20, 11 - up, 4, 7);
       } else {
-        ctx.fillRect(-1, 16, 4, 7); ctx.fillRect(19, 16, 4, 7);
+        const breath = Math.sin(time * 0.08) * 0.4;
+        ctx.fillRect(-1, 16 + breath, 4, 7); ctx.fillRect(19, 16 + breath, 4, 7);
       }
 
       // Gloves (white)
@@ -1249,8 +1262,9 @@ function Index() {
         ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
         ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       } else if (walking) {
-        const back = walkFrame === 0 || walkFrame === 2 ? 0 : 2;
-        const front = walkFrame === 0 || walkFrame === 2 ? 2 : 0;
+        const s = Math.sin(walkPhase);
+        const back = Math.max(0, s) * 2.5;
+        const front = Math.max(0, -s) * 2.5;
         ctx.fillRect(3, 24 - back, 8, 6); ctx.fillRect(11, 24 - front, 8, 6);
         ctx.fillStyle = "#2a1408";
         ctx.fillRect(2, 27 - back, 10, 3); ctx.fillRect(10, 27 - front, 10, 3);
@@ -1280,26 +1294,33 @@ function Index() {
     }
 
     function drawGoomba(e: Enemy) {
-      const x = Math.round(e.x - cameraX);
-      const y = Math.round(e.y - cameraY);
+      const s = e.w / 28;
+      const scrX = Math.round(e.x - cameraX);
+      const scrY = Math.round(e.y - cameraY);
       if (!e.alive) {
         if (e.squashT > 0) {
-          ctx.fillStyle = "#5a2f14"; ctx.fillRect(x, y + e.h - 6, e.w, 6);
-          ctx.fillStyle = "#8b4513"; ctx.fillRect(x + 4, y + e.h - 12, e.w - 8, 6);
+          ctx.fillStyle = "#5a2f14"; ctx.fillRect(scrX, scrY + e.h - 6, e.w, 6);
+          ctx.fillStyle = "#8b4513"; ctx.fillRect(scrX + 4, scrY + e.h - 12, e.w - 8, 6);
         }
         return;
       }
-      const bounce = Math.sin(e.anim) * 1.2;
+      ctx.save();
+      ctx.translate(scrX, scrY);
+      ctx.scale(s, s);
+      const x = 0, y = 0;
+      const EW = 28;
+      const bounce = Math.sin(e.anim * 0.6) * 1.4;
+      const EH = 28;
       ctx.fillStyle = "rgba(0,0,0,0.25)";
       ctx.beginPath();
-      ctx.ellipse(x + e.w / 2, y + e.h + 2, e.w * 0.5, 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + EW / 2, y + EH + 2, EW * 0.5, 3, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      const capGrad = ctx.createRadialGradient(x + e.w / 2, y + 6 - bounce, 3, x + e.w / 2, y + 12 - bounce, 18);
+      const capGrad = ctx.createRadialGradient(x + EW / 2, y + 6 - bounce, 3, x + EW / 2, y + 12 - bounce, 18);
       capGrad.addColorStop(0, "#c96a2a"); capGrad.addColorStop(1, "#5a2a08");
       ctx.fillStyle = capGrad;
-      ctx.beginPath(); ctx.arc(x + e.w / 2, y + 12 - bounce, 14, Math.PI, 0); ctx.fill();
-      ctx.fillRect(x, y + 12 - bounce, e.w, 10);
+      ctx.beginPath(); ctx.arc(x + EW / 2, y + 12 - bounce, 14, Math.PI, 0); ctx.fill();
+      ctx.fillRect(x, y + 12 - bounce, EW, 10);
       ctx.fillStyle = "rgba(255,220,180,0.35)";
       ctx.beginPath(); ctx.arc(x + 10, y + 8 - bounce, 4, 0, Math.PI * 2); ctx.fill();
 
@@ -1315,27 +1336,33 @@ function Index() {
       ctx.fillStyle = "#3a1408";
       ctx.fillRect(x + 5, y + 14 - bounce, 8, 2); ctx.fillRect(x + 15, y + 14 - bounce, 8, 2);
 
-      const step = Math.floor(e.anim) % 2;
+      const legPhase = Math.sin(e.anim * 0.9);
       ctx.fillStyle = "#2a1408";
-      ctx.fillRect(x + 2, y + 22 + (step ? 0 : 1), 8, 6);
-      ctx.fillRect(x + 18, y + 22 + (step ? 1 : 0), 8, 6);
+      ctx.fillRect(x + 2, y + 22 + Math.max(0, legPhase) * 1.5, 8, 6);
+      ctx.fillRect(x + 18, y + 22 + Math.max(0, -legPhase) * 1.5, 8, 6);
+      ctx.restore();
     }
 
     function drawFlyer(e: Enemy) {
-      const x = Math.round(e.x - cameraX);
-      const y = Math.round(e.y - cameraY);
+      const s = e.w / 28;
+      const scrX = Math.round(e.x - cameraX);
+      const scrY = Math.round(e.y - cameraY);
       if (!e.alive) {
         if (e.squashT > 0) {
-          ctx.fillStyle = "#5c6270"; ctx.fillRect(x + 4, y + e.h - 6, e.w - 8, 6);
+          ctx.fillStyle = "#5c6270"; ctx.fillRect(scrX + 4, scrY + e.h - 6, e.w - 8, 6);
         }
         return;
       }
+      ctx.save();
+      ctx.translate(scrX, scrY);
+      ctx.scale(s, s);
+      const x = 0, y = 0, EW = 28;
       const flap = Math.sin(e.anim * 2) * 6;
       // Body
-      const g = ctx.createRadialGradient(x + e.w / 2, y + 12, 4, x + e.w / 2, y + 12, 14);
+      const g = ctx.createRadialGradient(x + EW / 2, y + 12, 4, x + EW / 2, y + 12, 14);
       g.addColorStop(0, "#e05c8a"); g.addColorStop(1, "#8b2a4a");
       ctx.fillStyle = g;
-      ctx.beginPath(); ctx.ellipse(x + e.w / 2, y + 12, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + EW / 2, y + 12, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
       // Wings
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       ctx.beginPath();
@@ -1344,9 +1371,9 @@ function Index() {
       ctx.lineTo(x + 4, y + 14);
       ctx.closePath(); ctx.fill();
       ctx.beginPath();
-      ctx.moveTo(x + e.w - 4, y + 8);
-      ctx.lineTo(x + e.w + 6, y + 8 - flap);
-      ctx.lineTo(x + e.w - 4, y + 14);
+      ctx.moveTo(x + EW - 4, y + 8);
+      ctx.lineTo(x + EW + 6, y + 8 - flap);
+      ctx.lineTo(x + EW - 4, y + 14);
       ctx.closePath(); ctx.fill();
       // Eyes
       ctx.fillStyle = "#fff";
@@ -1357,10 +1384,11 @@ function Index() {
       // Beak
       ctx.fillStyle = "#ffd94a";
       ctx.beginPath();
-      ctx.moveTo(x + e.w / 2 - 2, y + 16);
-      ctx.lineTo(x + e.w / 2 + 2, y + 16);
-      ctx.lineTo(x + e.w / 2, y + 20);
+      ctx.moveTo(x + EW / 2 - 2, y + 16);
+      ctx.lineTo(x + EW / 2 + 2, y + 16);
+      ctx.lineTo(x + EW / 2, y + 20);
       ctx.closePath(); ctx.fill();
+      ctx.restore();
     }
 
     function drawCoin(c: Coin) {
