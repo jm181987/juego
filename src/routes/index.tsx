@@ -694,38 +694,6 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
         </mesh>
       </group>
 
-      {/* Female overlays — head-bone-locked long hair + hips-bone-locked skirt. */}
-      <group ref={hairRef} visible={isFemale}>
-        {/* Back hair mass */}
-        <mesh castShadow position={[0, -0.02, -0.08]}>
-          <sphereGeometry args={[0.16, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.75]} />
-          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
-        </mesh>
-        {/* Ponytail down the back */}
-        <mesh castShadow position={[0, -0.25, -0.14]}>
-          <capsuleGeometry args={[0.055, 0.35, 4, 8]} />
-          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
-        </mesh>
-        {/* Side locks */}
-        <mesh castShadow position={[-0.13, -0.1, 0.02]}>
-          <boxGeometry args={[0.06, 0.28, 0.09]} />
-          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
-        </mesh>
-        <mesh castShadow position={[0.13, -0.1, 0.02]}>
-          <boxGeometry args={[0.06, 0.28, 0.09]} />
-          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
-        </mesh>
-      </group>
-      <group ref={skirtRef} visible={isFemale}>
-        <mesh castShadow position={[0, -0.28, 0]}>
-          <coneGeometry args={[0.42, 0.55, 16, 1, true]} />
-          <meshStandardMaterial color={appearance.clothTint} roughness={0.95} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh position={[0, -0.54, 0]}>
-          <torusGeometry args={[0.4, 0.02, 6, 20]} />
-          <meshStandardMaterial color={appearance.accentTint} metalness={0.5} roughness={0.5} />
-        </mesh>
-      </group>
     </group>
   );
 }
