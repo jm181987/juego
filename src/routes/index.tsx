@@ -1042,7 +1042,7 @@ function Index() {
             backdropFilter: "blur(4px)",
           }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#a080ff", marginBottom: 6, letterSpacing: 1 }}>
-              {world.name} · Nv.{st.level}
+              {world.name} · Nv.{st.level} · Mundo {worldIdx + 1}/{WORLDS.length} · Dif ×{world.difficulty.toFixed(1)}
             </div>
             <Bar value={st.hp} max={st.maxHp} color="#e04040" label="HP" />
             <Bar value={st.mp} max={st.maxMp} color="#4080ff" label="MP" />
