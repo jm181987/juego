@@ -190,13 +190,22 @@ function buildWorld(stageIdx: number) {
 
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [status, setStatus] = useState<"playing" | "win" | "dead" | "stageClear">("playing");
+  const [status, setStatus] = useState<"playing" | "win" | "dead" | "stageClear" | "levelUp">("playing");
   const [score, setScore] = useState(0);
   const [coinsCount, setCoinsCount] = useState(0);
   const [lives, setLives] = useState(3);
   const [stageIdx, setStageIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(STAGES[0].timeLimit);
   const [resetKey, setResetKey] = useState(0);
+  // RPG stats — persist across stage transitions via refs
+  const statsRef = useRef({
+    level: 1, xp: 0, xpNext: 30,
+    hp: 20, maxHp: 20, mp: 10, maxMp: 10,
+    str: 3, def: 1, gold: 0,
+    hpPotions: 2, mpPotions: 1,
+  });
+  const [, forceHudTick] = useState(0);
+  const hudTick = () => forceHudTick((n) => n + 1);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
