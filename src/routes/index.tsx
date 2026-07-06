@@ -1804,7 +1804,58 @@ function Index() {
       }
     }
 
-    function drawFlag() {
+    function drawLoot() {
+      for (const l of loot) {
+        if (l.taken) continue;
+        const x = Math.round(l.x - cameraX);
+        const y = Math.round(l.y - cameraY);
+        const bob = Math.sin(l.t) * 2;
+        const fade = l.life < 90 ? (l.life % 10 < 5 ? 0.35 : 1) : 1;
+        ctx.globalAlpha = fade;
+        if (l.kind === "gold") {
+          const g = ctx.createRadialGradient(x, y + bob, 1, x, y + bob, 8);
+          g.addColorStop(0, "#fff2a8"); g.addColorStop(0.5, "#ffd94a"); g.addColorStop(1, "#c07500");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y + bob, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#7a4400"; ctx.lineWidth = 1; ctx.stroke();
+        } else if (l.kind === "gem") {
+          ctx.save(); ctx.translate(x, y + bob); ctx.rotate(l.t * 0.4);
+          const g = ctx.createLinearGradient(-6, -6, 6, 6);
+          g.addColorStop(0, "#e0a8ff"); g.addColorStop(1, "#7a2acc");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 0); ctx.lineTo(0, 8); ctx.lineTo(-7, 0); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 0.8; ctx.stroke();
+          ctx.restore();
+        } else if (l.kind === "hpPotion" || l.kind === "mpPotion") {
+          const col = l.kind === "hpPotion" ? "#e63946" : "#4ac1ff";
+          const glow = l.kind === "hpPotion" ? "#ff8888" : "#8fe3ff";
+          // Bottle
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fillRect(x - 3, y - 8 + bob, 6, 3);
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.ellipse(x, y + 2 + bob, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = glow;
+          ctx.beginPath(); ctx.ellipse(x - 1.5, y + bob, 1.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.ellipse(x, y + 2 + bob, 5, 7, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawEnemyHpBar(e: Enemy) {
+      if (!e.alive || e.hp >= e.maxHp) return;
+      const x = Math.round(e.x - cameraX);
+      const y = Math.round(e.y - cameraY) - 8;
+      const w = e.w;
+      ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(x, y, w, 4);
+      const pct = Math.max(0, e.hp / e.maxHp);
+      ctx.fillStyle = pct > 0.5 ? "#7ee085" : pct > 0.25 ? "#ffd94a" : "#ff5c5c";
+      ctx.fillRect(x + 1, y + 1, (w - 2) * pct, 2);
+    }
+
+
       if (!world.flag.x) return;
       const x = Math.round(world.flag.x - cameraX);
       const y = world.flag.y - cameraY;
