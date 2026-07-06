@@ -318,7 +318,6 @@ export const useGame = create<Store>()(
         bestiary: s.bestiary,
         inventory: s.inventory,
         saves: s.saves,
-        playtime: s.playtime,
       }),
     },
   ),
