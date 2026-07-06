@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
+import michelleAsset from "@/assets/michelle.glb.asset.json";
 
 import { playSwing, playDeath, genderFor } from "@/lib/sfx";
 import { useGame, type SaveSlot } from "@/game/store";
