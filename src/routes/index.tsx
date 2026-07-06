@@ -1983,6 +1983,12 @@ function Index() {
   const restart = () => {
     setScore(0); setCoinsCount(0); setLives(3); setStageIdx(0);
     setTimeLeft(STAGES[0].timeLimit);
+    statsRef.current = {
+      level: 1, xp: 0, xpNext: 30,
+      hp: 20, maxHp: 20, mp: 10, maxMp: 10,
+      str: 3, def: 1, gold: 0,
+      hpPotions: 2, mpPotions: 1,
+    };
     setStatus("playing"); setResetKey((k) => k + 1);
   };
 
