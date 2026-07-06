@@ -75,17 +75,14 @@ export function QuestCompass({
         ctx.stroke();
       }
 
-      // marks
+      // marks — player-forward in world = (sin(facing), cos(facing))
+      // so world direction angle uses atan2(dx, dz) to align 0 = "in front".
       for (const m of marksRef.current) {
         const dx = m.x - p.x;
         const dz = m.z - p.z;
-        const worldAngle = Math.atan2(dx, -dz); // 0 = north (+z toward camera? Using standard three-y-up)
-        // The game uses facing = camYaw+PI where player position updates via world axes.
-        // Empirically: player-forward vector in world is (-sin(facing), 0, -cos(facing)) ... use same convention:
-        const targetAngle = Math.atan2(-dx, -dz);
+        const targetAngle = Math.atan2(dx, dz);
         const px = project(targetAngle);
         const dist = Math.hypot(dx, dz);
-        // draw label always if in arc; else clamp
         if (px != null) {
           ctx.fillStyle = m.color;
           ctx.shadowColor = m.color;
@@ -97,9 +94,8 @@ export function QuestCompass({
           ctx.fillStyle = "#eee";
           ctx.fillText(`${m.label} · ${Math.round(dist)}m`, px, h - 6);
         }
-        // suppress unused warning
-        void worldAngle;
       }
+
       raf = requestAnimationFrame(draw);
     };
     raf = requestAnimationFrame(draw);
