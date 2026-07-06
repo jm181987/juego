@@ -2251,6 +2251,7 @@ function Index() {
   const marksRef = useRef<CompassMark[]>([]);
 
   useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { useGame.getState().optimizeForStartup(); }, []);
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
 
   // Rebuild minimap blips + compass marks each ~150ms (cheap, no per-frame React work)
