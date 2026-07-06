@@ -613,6 +613,7 @@ function Scene({
   const rerender = () => force((v) => v + 1);
   const coyoteTimer = useRef(0);
   const jumpBuffer = useRef(0);
+  const jumpHeld = useRef(false);
 
   const diff = world.difficulty;
   const enemies = useRef<Enemy[]>(
