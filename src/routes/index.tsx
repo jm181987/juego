@@ -411,15 +411,27 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
   const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
 
+  // Cache each mesh's original base color so appearance tint can be recomputed
+  // live without permanently darkening the material.
+  const matCacheRef = useRef<{ mat: THREE.MeshStandardMaterial; base: THREE.Color; role: "cloth" | "skin" | "hair" | "accent" }[]>([]);
+
   useEffect(() => {
+    matCacheRef.current = [];
     cloned.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.castShadow = true;
         m.receiveShadow = true;
-        const mat = m.material as THREE.MeshStandardMaterial | undefined;
-        if (mat && "color" in mat && mat.color) {
-          mat.color.multiplyScalar(0.85);
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        for (const raw of mats) {
+          const mat = raw as THREE.MeshStandardMaterial | undefined;
+          if (!mat || !("color" in mat) || !mat.color) continue;
+          const name = (mat.name || m.name || "").toLowerCase();
+          let role: "cloth" | "skin" | "hair" | "accent" = "cloth";
+          if (name.includes("skin") || name.includes("body") || name.includes("face") || name.includes("head")) role = "skin";
+          else if (name.includes("hair") || name.includes("beard")) role = "hair";
+          else if (name.includes("metal") || name.includes("gem") || name.includes("trim") || name.includes("accent")) role = "accent";
+          matCacheRef.current.push({ mat, base: mat.color.clone(), role });
         }
       }
       const name = (o.name || "").replace(/[:_]/g, "");
@@ -429,8 +441,25 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
       else if (name === "mixamorigLeftHand") bonesRef.current.leftHand = o;
     });
-
   }, [cloned]);
+
+  // Live re-tint whenever appearance changes.
+  const appearance = useGame((s) => s.appearance);
+  useEffect(() => {
+    const tintFor = (role: "cloth" | "skin" | "hair" | "accent") =>
+      role === "skin" ? appearance.skinTint
+      : role === "hair" ? appearance.hairTint
+      : role === "accent" ? appearance.accentTint
+      : appearance.clothTint;
+    const tmp = new THREE.Color();
+    for (const rec of matCacheRef.current) {
+      tmp.set(tintFor(rec.role));
+      // Blend original toward tint (70% tint, 30% original) then darken slightly.
+      rec.mat.color.copy(rec.base).lerp(tmp, 0.7).multiplyScalar(0.9);
+    }
+  }, [appearance, cloned]);
+
+
 
 
   const { actions } = useAnimations(gltf.animations, cloned);
