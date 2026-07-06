@@ -1482,16 +1482,23 @@ function Index() {
         )}
       </div>
 
-      <div className="flex justify-between w-full max-w-[800px] gap-3 md:hidden">
+      <div className="flex justify-between items-end w-full max-w-[800px] gap-2 md:hidden">
         <div className="flex gap-2">
-          <button {...holdKey("ArrowLeft")} className="w-16 h-16 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">◀</button>
-          <button {...holdKey("ArrowRight")} className="w-16 h-16 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▶</button>
+          <button {...holdKey("ArrowLeft")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">◀</button>
+          <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▶</button>
+          <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/90 rounded-full text-xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▼</button>
         </div>
-        <button {...holdKey("Space")} className="w-20 h-20 bg-red-500 text-white rounded-full text-xl font-black shadow-[0_4px_0_#000] active:translate-y-1">SALTAR</button>
+        <div className="flex gap-2 items-end">
+          <button {...holdKey("KeyZ")} className="w-14 h-14 bg-yellow-400 text-black rounded-full text-sm font-black shadow-[0_4px_0_#000] active:translate-y-1">PUÑO</button>
+          <button {...holdKey("KeyX")} className="w-14 h-14 bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_#000] active:translate-y-1 leading-tight">POUND</button>
+          <button {...holdKey("ShiftLeft")} className="w-14 h-14 bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_#000] active:translate-y-1">RUN</button>
+          <button {...holdKey("Space")} className="w-18 h-18 min-w-[68px] min-h-[68px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_#000] active:translate-y-1">SALTAR</button>
+        </div>
       </div>
 
-      <p className="text-white/90 text-xs md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000]">
-        ← → moverse · SHIFT correr · ESPACIO / ↑ saltar · 20 monedas = 1UP · cuidado con el tiempo
+      <p className="text-white/90 text-[11px] md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000] max-w-[800px]">
+        ← → moverse · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
+        Combos: doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
       </p>
     </main>
   );
