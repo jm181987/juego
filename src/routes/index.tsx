@@ -1308,7 +1308,6 @@ function Index() {
       ctx.translate(scrX, scrY);
       ctx.scale(s, s);
       const x = 0, y = 0;
-      e.w; // keep locals; drawing uses local 28-space
       const EW = 28;
       const bounce = Math.sin(e.anim * 0.6) * 1.4;
       const EH = 28;
