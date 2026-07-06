@@ -582,12 +582,17 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       spotRef.current.target = spotTargetRef.current;
     }
   }, []);
+  const flashlightOn = useGame((s) => s.flashlightOn);
+  const battery = useGame((s) => s.battery);
+  const lightActive = flashlightOn && battery > 0;
+  const lightIntensity = lightActive ? 16 * Math.min(1, battery / 30) : 0;
 
   return (
-    <group ref={group} scale={1.05}>
+    <group ref={group} scale={[1.05 * appearance.build, 1.05 * appearance.height, 1.05 * appearance.build]}>
       <primitive object={cloned} />
       {/* Linterna sujeta por la mano izquierda: cuerpo + haz de luz hacia adelante */}
-      <group ref={flashlightRef}>
+      <group ref={flashlightRef} visible={lightActive}>
+
         {/* mango */}
         <mesh castShadow position={[0, 0, 0]}>
           <cylinderGeometry args={[0.035, 0.04, 0.22, 14]} />
