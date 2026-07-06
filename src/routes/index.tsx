@@ -572,351 +572,508 @@ type LimbRefs = {
   head: React.MutableRefObject<THREE.Group>;
 };
 
-/** Goblin: small wiry raider, greenish skin, loincloth, rusty dagger, fangs. */
+/** Ghoul (was "goblin"): emaciated undead, exposed ribs, bloodied jaw, glowing red eyes. */
 function GoblinBody({ s, leftArm, rightArm, leftLeg, rightLeg, head }: LimbRefs) {
-  const skin = "#6b7a4a";
-  const skinDark = "#4a5732";
-  const cloth = "#3a2818";
-  const iron = "#4a4038";
-  const hipY = s * 1.2;
-  const shoulderY = s * 1.85;
-  const headY = s * 2.15;
-  const legY = s * 0.75;
+  const flesh = "#5a4838";
+  const fleshDark = "#3a2a20";
+  const bone = "#d8ccb4";
+  const blood = "#4a0808";
+  const iron = "#2a2018";
+  const hipY = s * 1.15;
+  const shoulderY = s * 1.9;
+  const headY = s * 2.2;
+  const legY = s * 0.85;
+  const eyeRef = useRef<THREE.PointLight>(null!);
+  useFrame((state) => {
+    if (eyeRef.current) {
+      eyeRef.current.intensity = 0.6 + Math.sin(state.clock.elapsedTime * 8) * 0.25;
+    }
+  });
   return (
     <group>
-      <group ref={leftLeg} position={[-0.18 * s, hipY, 0]}>
-        <mesh castShadow position={[0, -legY / 2, 0]}>
-          <capsuleGeometry args={[0.11 * s, legY * 0.7, 4, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.85} />
+      {/* Legs — thin, veiny, bloodstained shins */}
+      <group ref={leftLeg} position={[-0.16 * s, hipY, 0]}>
+        <mesh castShadow position={[0, -legY * 0.35, 0]}>
+          <capsuleGeometry args={[0.08 * s, legY * 0.5, 4, 8]} />
+          <meshStandardMaterial color={flesh} roughness={0.95} />
         </mesh>
-        <mesh castShadow position={[0, -legY + 0.05, 0.07 * s]}>
-          <boxGeometry args={[0.22 * s, 0.1 * s, 0.3 * s]} />
-          <meshStandardMaterial color={cloth} roughness={1} />
+        <mesh castShadow position={[0, -legY * 0.85, 0]}>
+          <capsuleGeometry args={[0.07 * s, legY * 0.45, 4, 8]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
         </mesh>
-      </group>
-      <group ref={rightLeg} position={[0.18 * s, hipY, 0]}>
-        <mesh castShadow position={[0, -legY / 2, 0]}>
-          <capsuleGeometry args={[0.11 * s, legY * 0.7, 4, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.85} />
-        </mesh>
-        <mesh castShadow position={[0, -legY + 0.05, 0.07 * s]}>
-          <boxGeometry args={[0.22 * s, 0.1 * s, 0.3 * s]} />
-          <meshStandardMaterial color={cloth} roughness={1} />
+        <mesh position={[0, -legY * 0.6, 0.04 * s]}>
+          <boxGeometry args={[0.14 * s, 0.08 * s, 0.02 * s]} />
+          <meshStandardMaterial color={blood} roughness={1} emissive={blood} emissiveIntensity={0.25} />
         </mesh>
       </group>
-      <mesh position={[0, hipY - 0.05, 0]} castShadow>
-        <cylinderGeometry args={[0.28 * s, 0.32 * s, 0.35 * s, 8]} />
-        <meshStandardMaterial color={cloth} roughness={1} />
+      <group ref={rightLeg} position={[0.16 * s, hipY, 0]}>
+        <mesh castShadow position={[0, -legY * 0.35, 0]}>
+          <capsuleGeometry args={[0.08 * s, legY * 0.5, 4, 8]} />
+          <meshStandardMaterial color={flesh} roughness={0.95} />
+        </mesh>
+        <mesh castShadow position={[0, -legY * 0.85, 0]}>
+          <capsuleGeometry args={[0.07 * s, legY * 0.45, 4, 8]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
+        </mesh>
+      </group>
+      {/* Loincloth of torn cloth */}
+      <mesh position={[0, hipY - 0.1 * s, 0]} castShadow>
+        <cylinderGeometry args={[0.22 * s, 0.28 * s, 0.3 * s, 8]} />
+        <meshStandardMaterial color={iron} roughness={1} />
       </mesh>
-      <mesh position={[0, (hipY + shoulderY) / 2, -0.05 * s]} rotation={[0.25, 0, 0]} castShadow>
-        <capsuleGeometry args={[0.28 * s, 0.55 * s, 4, 8]} />
-        <meshStandardMaterial color={skinDark} roughness={0.9} />
-      </mesh>
-      <group ref={leftArm} position={[-0.32 * s, shoulderY, 0]}>
-        <mesh castShadow position={[0, -0.28 * s, 0]}>
-          <capsuleGeometry args={[0.08 * s, 0.55 * s, 4, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.85} />
+      {/* Torso — hunched, exposed ribcage as bone slats */}
+      <group position={[0, (hipY + shoulderY) / 2, -0.08 * s]} rotation={[0.35, 0, 0]}>
+        <mesh castShadow>
+          <capsuleGeometry args={[0.22 * s, 0.55 * s, 4, 10]} />
+          <meshStandardMaterial color={fleshDark} roughness={0.95} />
         </mesh>
-        <mesh castShadow position={[0, -0.62 * s, 0]}>
-          <sphereGeometry args={[0.09 * s, 6, 6]} />
-          <meshStandardMaterial color={skin} />
+        {/* Ribs */}
+        {[0.2, 0.08, -0.04, -0.16].map((y, i) => (
+          <mesh key={i} position={[0, y * s, 0.2 * s]} rotation={[0, 0, 0]}>
+            <torusGeometry args={[0.18 * s, 0.018 * s, 4, 10, Math.PI]} />
+            <meshStandardMaterial color={bone} roughness={0.8} />
+          </mesh>
+        ))}
+        {/* Sternum */}
+        <mesh position={[0, 0.05 * s, 0.22 * s]}>
+          <boxGeometry args={[0.03 * s, 0.35 * s, 0.02 * s]} />
+          <meshStandardMaterial color={bone} />
         </mesh>
       </group>
-      <group ref={rightArm} position={[0.32 * s, shoulderY, 0]}>
-        <mesh castShadow position={[0, -0.28 * s, 0]}>
-          <capsuleGeometry args={[0.08 * s, 0.55 * s, 4, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.85} />
+      {/* Arms — long, clawed */}
+      <group ref={leftArm} position={[-0.3 * s, shoulderY, 0]}>
+        <mesh castShadow position={[0, -0.3 * s, 0]}>
+          <capsuleGeometry args={[0.07 * s, 0.55 * s, 4, 8]} />
+          <meshStandardMaterial color={flesh} roughness={0.95} />
         </mesh>
-        <group position={[0, -0.6 * s, 0.05]} rotation={[0.4, 0, 0]}>
-          <mesh castShadow>
-            <boxGeometry args={[0.06 * s, 0.08 * s, 0.12 * s]} />
-            <meshStandardMaterial color="#2a1a10" />
+        <mesh castShadow position={[0, -0.72 * s, 0]}>
+          <capsuleGeometry args={[0.055 * s, 0.4 * s, 4, 8]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
+        </mesh>
+        {/* Claws */}
+        {[-0.04, 0, 0.04].map((x, i) => (
+          <mesh key={i} position={[x * s, -0.98 * s, 0.02]} rotation={[0.4, 0, 0]}>
+            <coneGeometry args={[0.012 * s, 0.11 * s, 5]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.5} />
           </mesh>
-          <mesh castShadow position={[0, 0, 0.2 * s]}>
-            <boxGeometry args={[0.04 * s, 0.02 * s, 0.35 * s]} />
-            <meshStandardMaterial color={iron} metalness={0.6} roughness={0.5} />
-          </mesh>
-        </group>
+        ))}
       </group>
+      <group ref={rightArm} position={[0.3 * s, shoulderY, 0]}>
+        <mesh castShadow position={[0, -0.3 * s, 0]}>
+          <capsuleGeometry args={[0.07 * s, 0.55 * s, 4, 8]} />
+          <meshStandardMaterial color={flesh} roughness={0.95} />
+        </mesh>
+        <mesh castShadow position={[0, -0.72 * s, 0]}>
+          <capsuleGeometry args={[0.055 * s, 0.4 * s, 4, 8]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
+        </mesh>
+        {[-0.04, 0, 0.04].map((x, i) => (
+          <mesh key={i} position={[x * s, -0.98 * s, 0.02]} rotation={[0.4, 0, 0]}>
+            <coneGeometry args={[0.012 * s, 0.11 * s, 5]} />
+            <meshStandardMaterial color="#1a1a1a" roughness={0.5} />
+          </mesh>
+        ))}
+      </group>
+      {/* Head — skull-like, sunken cheeks, glowing eyes, jagged jaw */}
       <group ref={head} position={[0, headY, 0]}>
         <mesh castShadow>
-          <sphereGeometry args={[0.24 * s, 12, 10]} />
-          <meshStandardMaterial color={skin} roughness={0.9} />
+          <sphereGeometry args={[0.22 * s, 14, 12]} />
+          <meshStandardMaterial color={flesh} roughness={0.95} />
         </mesh>
-        <mesh position={[-0.24 * s, 0.02, 0]} rotation={[0, 0, 0.7]} castShadow>
-          <coneGeometry args={[0.06 * s, 0.22 * s, 4]} />
-          <meshStandardMaterial color={skin} />
+        {/* Cheekbone shadows */}
+        <mesh position={[-0.13 * s, -0.03 * s, 0.16 * s]}>
+          <sphereGeometry args={[0.05 * s, 8, 6]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
         </mesh>
-        <mesh position={[0.24 * s, 0.02, 0]} rotation={[0, 0, -0.7]} castShadow>
-          <coneGeometry args={[0.06 * s, 0.22 * s, 4]} />
-          <meshStandardMaterial color={skin} />
+        <mesh position={[0.13 * s, -0.03 * s, 0.16 * s]}>
+          <sphereGeometry args={[0.05 * s, 8, 6]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
         </mesh>
-        <mesh position={[0, -0.02 * s, 0.22 * s]}>
-          <coneGeometry args={[0.05 * s, 0.15 * s, 5]} />
-          <meshStandardMaterial color={skinDark} />
+        {/* Bald cranium darkening */}
+        <mesh position={[0, 0.12 * s, 0]}>
+          <sphereGeometry args={[0.22 * s, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.45]} />
+          <meshStandardMaterial color={fleshDark} roughness={1} />
         </mesh>
-        <mesh position={[0, -0.14 * s, 0.16 * s]}>
-          <boxGeometry args={[0.22 * s, 0.06 * s, 0.1 * s]} />
-          <meshStandardMaterial color={skinDark} />
+        {/* Eye sockets (dark) */}
+        <mesh position={[-0.08 * s, 0.03 * s, 0.19 * s]}>
+          <sphereGeometry args={[0.045 * s, 8, 6]} />
+          <meshStandardMaterial color="#000" />
         </mesh>
-        <mesh position={[-0.05 * s, -0.15 * s, 0.22 * s]}>
-          <coneGeometry args={[0.015 * s, 0.06 * s, 4]} />
-          <meshStandardMaterial color="#e8e0c8" />
+        <mesh position={[0.08 * s, 0.03 * s, 0.19 * s]}>
+          <sphereGeometry args={[0.045 * s, 8, 6]} />
+          <meshStandardMaterial color="#000" />
         </mesh>
-        <mesh position={[0.05 * s, -0.15 * s, 0.22 * s]}>
-          <coneGeometry args={[0.015 * s, 0.06 * s, 4]} />
-          <meshStandardMaterial color="#e8e0c8" />
+        {/* Glowing eyes */}
+        <mesh position={[-0.08 * s, 0.03 * s, 0.22 * s]}>
+          <sphereGeometry args={[0.022 * s, 6, 6]} />
+          <meshBasicMaterial color="#ff2010" />
         </mesh>
-        <mesh position={[-0.09 * s, 0.05 * s, 0.2 * s]}>
-          <sphereGeometry args={[0.035 * s, 6, 6]} />
-          <meshStandardMaterial color="#f4d040" emissive="#c08010" emissiveIntensity={0.8} />
+        <mesh position={[0.08 * s, 0.03 * s, 0.22 * s]}>
+          <sphereGeometry args={[0.022 * s, 6, 6]} />
+          <meshBasicMaterial color="#ff2010" />
         </mesh>
-        <mesh position={[0.09 * s, 0.05 * s, 0.2 * s]}>
-          <sphereGeometry args={[0.035 * s, 6, 6]} />
-          <meshStandardMaterial color="#f4d040" emissive="#c08010" emissiveIntensity={0.8} />
+        <pointLight ref={eyeRef} color="#ff3010" intensity={0.7} distance={1.6} position={[0, 0.03 * s, 0.25 * s]} />
+        {/* Bared jaw with teeth */}
+        <mesh position={[0, -0.14 * s, 0.13 * s]}>
+          <boxGeometry args={[0.18 * s, 0.06 * s, 0.12 * s]} />
+          <meshStandardMaterial color={fleshDark} />
+        </mesh>
+        {[-0.06, -0.03, 0, 0.03, 0.06].map((x, i) => (
+          <mesh key={i} position={[x * s, -0.17 * s, 0.19 * s]}>
+            <coneGeometry args={[0.012 * s, 0.05 * s, 4]} />
+            <meshStandardMaterial color="#e8e0c8" />
+          </mesh>
+        ))}
+        {/* Blood dripping from mouth */}
+        <mesh position={[0.02 * s, -0.2 * s, 0.18 * s]}>
+          <boxGeometry args={[0.02 * s, 0.08 * s, 0.005]} />
+          <meshStandardMaterial color={blood} emissive={blood} emissiveIntensity={0.4} />
         </mesh>
       </group>
     </group>
   );
 }
 
-/** Wraith: tall hooded figure, torn robe, gaunt pale face, glowing hollow eyes. */
+/** Wraith: tall spectral figure, torn robe, hollow skull face, cyan hellfire eyes. */
 function WraithBody({ s, leftArm, rightArm, leftLeg, rightLeg, head, id }: LimbRefs & { id: number }) {
-  const robe = "#181420";
-  const robeDark = "#0c0a12";
-  const flesh = "#c8c0b0";
+  const robe = "#0e0a14";
+  const robeDark = "#050308";
+  const bone = "#c8bfa8";
+  const boneDark = "#7a6f5a";
   const legY = s * 1.0;
   const hipY = s * 1.4;
-  const shoulderY = s * 2.15;
-  const headY = s * 2.5;
+  const shoulderY = s * 2.2;
+  const headY = s * 2.55;
   const capeRef = useRef<THREE.Group>(null!);
+  const eyeRef = useRef<THREE.PointLight>(null!);
+  const bodyRef = useRef<THREE.Group>(null!);
   useFrame((state) => {
-    if (capeRef.current) capeRef.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.7 + id) * 0.15;
+    const t = state.clock.elapsedTime;
+    if (capeRef.current) capeRef.current.rotation.x = Math.sin(t * 0.7 + id) * 0.2;
+    if (eyeRef.current) eyeRef.current.intensity = 0.9 + Math.sin(t * 6 + id) * 0.4;
+    if (bodyRef.current) bodyRef.current.position.y = Math.sin(t * 1.4 + id) * 0.08;
   });
   return (
-    <group>
-      <group ref={leftLeg} position={[-0.15 * s, hipY, 0]}>
+    <group ref={bodyRef}>
+      {/* Ghostly legs disappearing into vapor */}
+      <group ref={leftLeg} position={[-0.14 * s, hipY, 0]}>
         <mesh castShadow position={[0, -legY / 2, 0]}>
-          <capsuleGeometry args={[0.09 * s, legY * 0.7, 4, 6]} />
-          <meshStandardMaterial color={robeDark} roughness={1} />
+          <capsuleGeometry args={[0.07 * s, legY * 0.7, 4, 6]} />
+          <meshStandardMaterial color={robeDark} roughness={1} transparent opacity={0.85} />
         </mesh>
       </group>
-      <group ref={rightLeg} position={[0.15 * s, hipY, 0]}>
+      <group ref={rightLeg} position={[0.14 * s, hipY, 0]}>
         <mesh castShadow position={[0, -legY / 2, 0]}>
-          <capsuleGeometry args={[0.09 * s, legY * 0.7, 4, 6]} />
-          <meshStandardMaterial color={robeDark} roughness={1} />
+          <capsuleGeometry args={[0.07 * s, legY * 0.7, 4, 6]} />
+          <meshStandardMaterial color={robeDark} roughness={1} transparent opacity={0.85} />
         </mesh>
       </group>
+      {/* Tattered robe skirt */}
       <mesh position={[0, hipY - 0.35 * s, 0]} castShadow>
-        <cylinderGeometry args={[0.35 * s, 0.75 * s, 1.4 * s, 10, 1, true]} />
+        <cylinderGeometry args={[0.32 * s, 0.8 * s, 1.5 * s, 12, 1, true]} />
         <meshStandardMaterial color={robe} roughness={1} side={THREE.DoubleSide} />
       </mesh>
+      {/* Torso robe */}
       <mesh position={[0, (hipY + shoulderY) / 2, 0]} castShadow>
         <capsuleGeometry args={[0.3 * s, 0.6 * s, 4, 8]} />
         <meshStandardMaterial color={robe} roughness={1} />
       </mesh>
-      <group ref={capeRef} position={[0, shoulderY, -0.15 * s]}>
+      {/* Long torn cape */}
+      <group ref={capeRef} position={[0, shoulderY, -0.18 * s]}>
         <mesh castShadow>
-          <planeGeometry args={[1.1 * s, 1.6 * s]} />
+          <planeGeometry args={[1.3 * s, 1.9 * s, 3, 4]} />
           <meshStandardMaterial color={robeDark} side={THREE.DoubleSide} roughness={1} />
         </mesh>
+        {/* Torn bottom fringe */}
+        {[-0.4, -0.15, 0.1, 0.35].map((x, i) => (
+          <mesh key={i} position={[x * s, -1.05 * s, 0]}>
+            <planeGeometry args={[0.2 * s, 0.35 * s]} />
+            <meshStandardMaterial color={robeDark} side={THREE.DoubleSide} roughness={1} />
+          </mesh>
+        ))}
       </group>
+      {/* Skeletal arms in torn sleeves */}
       <group ref={leftArm} position={[-0.35 * s, shoulderY, 0]}>
-        <mesh castShadow position={[0, -0.35 * s, 0]}>
-          <capsuleGeometry args={[0.09 * s, 0.6 * s, 4, 6]} />
+        <mesh castShadow position={[0, -0.3 * s, 0]}>
+          <capsuleGeometry args={[0.09 * s, 0.5 * s, 4, 6]} />
           <meshStandardMaterial color={robe} roughness={1} />
         </mesh>
-        <mesh castShadow position={[0, -0.72 * s, 0]}>
-          <sphereGeometry args={[0.08 * s, 6, 6]} />
-          <meshStandardMaterial color={flesh} roughness={0.7} />
+        <mesh castShadow position={[0, -0.65 * s, 0]}>
+          <cylinderGeometry args={[0.035 * s, 0.04 * s, 0.35 * s, 6]} />
+          <meshStandardMaterial color={bone} roughness={0.7} />
         </mesh>
-        {[-0.03, 0, 0.03].map((x, i) => (
-          <mesh key={i} position={[x * s, -0.82 * s, 0.02]} rotation={[0.3, 0, 0]}>
-            <coneGeometry args={[0.012 * s, 0.09 * s, 4]} />
-            <meshStandardMaterial color="#302020" />
+        <mesh castShadow position={[0, -0.85 * s, 0]}>
+          <sphereGeometry args={[0.07 * s, 8, 6]} />
+          <meshStandardMaterial color={bone} roughness={0.7} />
+        </mesh>
+        {[-0.045, -0.02, 0.01, 0.04].map((x, i) => (
+          <mesh key={i} position={[x * s, -0.96 * s, 0.02]} rotation={[0.3, 0, 0]}>
+            <coneGeometry args={[0.008 * s, 0.09 * s, 4]} />
+            <meshStandardMaterial color={boneDark} />
           </mesh>
         ))}
       </group>
       <group ref={rightArm} position={[0.35 * s, shoulderY, 0]}>
-        <mesh castShadow position={[0, -0.35 * s, 0]}>
-          <capsuleGeometry args={[0.09 * s, 0.6 * s, 4, 6]} />
+        <mesh castShadow position={[0, -0.3 * s, 0]}>
+          <capsuleGeometry args={[0.09 * s, 0.5 * s, 4, 6]} />
           <meshStandardMaterial color={robe} roughness={1} />
         </mesh>
-        <mesh castShadow position={[0, -0.72 * s, 0]}>
-          <sphereGeometry args={[0.08 * s, 6, 6]} />
-          <meshStandardMaterial color={flesh} roughness={0.7} />
+        <mesh castShadow position={[0, -0.65 * s, 0]}>
+          <cylinderGeometry args={[0.035 * s, 0.04 * s, 0.35 * s, 6]} />
+          <meshStandardMaterial color={bone} roughness={0.7} />
         </mesh>
-        {[-0.03, 0, 0.03].map((x, i) => (
-          <mesh key={i} position={[x * s, -0.82 * s, 0.02]} rotation={[0.3, 0, 0]}>
-            <coneGeometry args={[0.012 * s, 0.09 * s, 4]} />
-            <meshStandardMaterial color="#302020" />
+        {/* Scythe held in right hand */}
+        <group position={[0, -0.85 * s, 0.02]} rotation={[0.2, 0, 0.15]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.025 * s, 0.025 * s, 1.6 * s, 6]} />
+            <meshStandardMaterial color="#1a1208" roughness={0.9} />
           </mesh>
-        ))}
+          <mesh castShadow position={[0.28 * s, 0.75 * s, 0]} rotation={[0, 0, -0.4]}>
+            <torusGeometry args={[0.28 * s, 0.02 * s, 6, 14, Math.PI * 0.8]} />
+            <meshStandardMaterial color="#b8bcc4" metalness={0.9} roughness={0.2} emissive="#3a4658" emissiveIntensity={0.2} />
+          </mesh>
+        </group>
       </group>
+      {/* Head — skeletal skull under torn hood */}
       <group ref={head} position={[0, headY, 0]}>
+        {/* Hood */}
         <mesh castShadow position={[0, 0.05, -0.02 * s]}>
-          <sphereGeometry args={[0.32 * s, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.75]} />
+          <sphereGeometry args={[0.34 * s, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.72]} />
           <meshStandardMaterial color={robeDark} roughness={1} side={THREE.DoubleSide} />
         </mesh>
-        <mesh position={[0, -0.02, 0.1 * s]}>
-          <sphereGeometry args={[0.2 * s, 10, 10]} />
-          <meshStandardMaterial color={flesh} roughness={0.9} />
+        {/* Skull */}
+        <mesh position={[0, -0.02, 0.08 * s]}>
+          <sphereGeometry args={[0.19 * s, 12, 12]} />
+          <meshStandardMaterial color={bone} roughness={0.85} />
         </mesh>
-        <mesh position={[0, -0.16 * s, 0.15 * s]}>
-          <boxGeometry args={[0.18 * s, 0.08 * s, 0.1 * s]} />
-          <meshStandardMaterial color="#8a8272" />
+        {/* Nasal cavity */}
+        <mesh position={[0, -0.05 * s, 0.22 * s]}>
+          <coneGeometry args={[0.025 * s, 0.06 * s, 4]} />
+          <meshBasicMaterial color="#000" />
         </mesh>
-        <mesh position={[-0.07 * s, 0.02 * s, 0.22 * s]}>
-          <sphereGeometry args={[0.035 * s, 6, 6]} />
-          <meshBasicMaterial color="#a0f0ff" />
+        {/* Eye sockets (deep black) */}
+        <mesh position={[-0.07 * s, 0.03 * s, 0.19 * s]}>
+          <sphereGeometry args={[0.045 * s, 8, 6]} />
+          <meshBasicMaterial color="#000" />
         </mesh>
-        <mesh position={[0.07 * s, 0.02 * s, 0.22 * s]}>
-          <sphereGeometry args={[0.035 * s, 6, 6]} />
-          <meshBasicMaterial color="#a0f0ff" />
+        <mesh position={[0.07 * s, 0.03 * s, 0.19 * s]}>
+          <sphereGeometry args={[0.045 * s, 8, 6]} />
+          <meshBasicMaterial color="#000" />
         </mesh>
-        <pointLight color="#80e0ff" intensity={0.6} distance={2} position={[0, 0, 0.25]} />
+        {/* Cyan hellfire pupils */}
+        <mesh position={[-0.07 * s, 0.03 * s, 0.22 * s]}>
+          <sphereGeometry args={[0.025 * s, 6, 6]} />
+          <meshBasicMaterial color="#80f0ff" />
+        </mesh>
+        <mesh position={[0.07 * s, 0.03 * s, 0.22 * s]}>
+          <sphereGeometry args={[0.025 * s, 6, 6]} />
+          <meshBasicMaterial color="#80f0ff" />
+        </mesh>
+        <pointLight ref={eyeRef} color="#60d8ff" intensity={1.0} distance={2.5} position={[0, 0.03 * s, 0.28 * s]} />
+        {/* Skeletal grin */}
+        {[-0.075, -0.045, -0.015, 0.015, 0.045, 0.075].map((x, i) => (
+          <mesh key={i} position={[x * s, -0.11 * s, 0.2 * s]}>
+            <boxGeometry args={[0.022 * s, 0.05 * s, 0.02 * s]} />
+            <meshStandardMaterial color={bone} />
+          </mesh>
+        ))}
       </group>
     </group>
   );
 }
 
-/** Brute: massive armored warrior with horned helm and war-hammer. */
+/** Brute: massive infernal warrior — horned skull, spiked plate, warhammer, hellfire eyes. */
 function BruteBody({ s, leftArm, rightArm, leftLeg, rightLeg, head }: LimbRefs) {
-  const skin = "#8a5a44";
-  const plate = "#2a2a30";
-  const plateHi = "#4a4a54";
-  const leather = "#2a1a10";
-  const iron = "#3a3a42";
-  const gold = "#8a6a2a";
+  const skin = "#4a2418";
+  const skinHi = "#6a3820";
+  const plate = "#1a1a20";
+  const plateHi = "#2a2a34";
+  const leather = "#1a1008";
+  const iron = "#2a2a30";
+  const gold = "#a8802a";
+  const emberRef = useRef<THREE.PointLight>(null!);
+  useFrame((state) => {
+    if (emberRef.current) emberRef.current.intensity = 1.2 + Math.sin(state.clock.elapsedTime * 5) * 0.4;
+  });
   const legY = s * 1.0;
   const hipY = s * 1.3;
-  const shoulderY = s * 2.15;
-  const headY = s * 2.55;
+  const shoulderY = s * 2.2;
+  const headY = s * 2.65;
   return (
     <group>
-      <group ref={leftLeg} position={[-0.24 * s, hipY, 0]}>
+      {/* Legs — plated with spikes */}
+      <group ref={leftLeg} position={[-0.26 * s, hipY, 0]}>
         <mesh castShadow position={[0, -legY / 2, 0]}>
-          <capsuleGeometry args={[0.16 * s, legY * 0.65, 4, 6]} />
-          <meshStandardMaterial color={plate} metalness={0.5} roughness={0.6} />
+          <capsuleGeometry args={[0.17 * s, legY * 0.65, 4, 8]} />
+          <meshStandardMaterial color={plate} metalness={0.6} roughness={0.5} />
         </mesh>
-        <mesh castShadow position={[0, -legY + 0.05, 0.08 * s]}>
-          <boxGeometry args={[0.3 * s, 0.14 * s, 0.4 * s]} />
+        {/* Knee spike */}
+        <mesh position={[0, -legY * 0.45, 0.14 * s]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.05 * s, 0.18 * s, 5]} />
+          <meshStandardMaterial color={iron} metalness={0.7} />
+        </mesh>
+        <mesh castShadow position={[0, -legY + 0.05, 0.09 * s]}>
+          <boxGeometry args={[0.32 * s, 0.15 * s, 0.42 * s]} />
           <meshStandardMaterial color={leather} roughness={1} />
         </mesh>
       </group>
-      <group ref={rightLeg} position={[0.24 * s, hipY, 0]}>
+      <group ref={rightLeg} position={[0.26 * s, hipY, 0]}>
         <mesh castShadow position={[0, -legY / 2, 0]}>
-          <capsuleGeometry args={[0.16 * s, legY * 0.65, 4, 6]} />
-          <meshStandardMaterial color={plate} metalness={0.5} roughness={0.6} />
+          <capsuleGeometry args={[0.17 * s, legY * 0.65, 4, 8]} />
+          <meshStandardMaterial color={plate} metalness={0.6} roughness={0.5} />
         </mesh>
-        <mesh castShadow position={[0, -legY + 0.05, 0.08 * s]}>
-          <boxGeometry args={[0.3 * s, 0.14 * s, 0.4 * s]} />
+        <mesh position={[0, -legY * 0.45, 0.14 * s]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.05 * s, 0.18 * s, 5]} />
+          <meshStandardMaterial color={iron} metalness={0.7} />
+        </mesh>
+        <mesh castShadow position={[0, -legY + 0.05, 0.09 * s]}>
+          <boxGeometry args={[0.32 * s, 0.15 * s, 0.42 * s]} />
           <meshStandardMaterial color={leather} roughness={1} />
         </mesh>
       </group>
+      {/* Belt with skull buckle */}
       <mesh position={[0, hipY, 0]} castShadow>
-        <cylinderGeometry args={[0.42 * s, 0.42 * s, 0.2 * s, 8]} />
+        <cylinderGeometry args={[0.44 * s, 0.44 * s, 0.22 * s, 10]} />
         <meshStandardMaterial color={leather} roughness={1} />
       </mesh>
-      <mesh position={[0, hipY, 0.4 * s]}>
-        <boxGeometry args={[0.15 * s, 0.15 * s, 0.05 * s]} />
-        <meshStandardMaterial color={gold} metalness={0.7} roughness={0.4} />
+      <mesh position={[0, hipY, 0.42 * s]} castShadow>
+        <sphereGeometry args={[0.1 * s, 10, 8]} />
+        <meshStandardMaterial color={gold} metalness={0.8} roughness={0.35} />
       </mesh>
+      {/* Massive breastplate with center rune */}
       <mesh position={[0, (hipY + shoulderY) / 2 + 0.05, 0]} castShadow>
-        <boxGeometry args={[0.85 * s, 0.9 * s, 0.55 * s]} />
-        <meshStandardMaterial color={plate} metalness={0.6} roughness={0.5} />
+        <boxGeometry args={[0.95 * s, 0.95 * s, 0.6 * s]} />
+        <meshStandardMaterial color={plate} metalness={0.7} roughness={0.4} />
       </mesh>
-      <mesh position={[0, (hipY + shoulderY) / 2 + 0.15, 0.28 * s]}>
-        <boxGeometry args={[0.05 * s, 0.7 * s, 0.02 * s]} />
-        <meshStandardMaterial color={gold} metalness={0.8} roughness={0.3} />
+      <mesh position={[0, (hipY + shoulderY) / 2 + 0.1, 0.31 * s]}>
+        <ringGeometry args={[0.1 * s, 0.16 * s, 6]} />
+        <meshStandardMaterial color="#ff3010" emissive="#ff2010" emissiveIntensity={1.2} />
       </mesh>
-      <mesh position={[-0.5 * s, shoulderY + 0.05, 0]} castShadow>
-        <sphereGeometry args={[0.28 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={plateHi} metalness={0.7} roughness={0.4} />
+      {/* Spiked pauldrons */}
+      <mesh position={[-0.55 * s, shoulderY + 0.05, 0]} castShadow>
+        <sphereGeometry args={[0.3 * s, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={plateHi} metalness={0.75} roughness={0.4} />
       </mesh>
-      <mesh position={[0.5 * s, shoulderY + 0.05, 0]} castShadow>
-        <sphereGeometry args={[0.28 * s, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={plateHi} metalness={0.7} roughness={0.4} />
+      <mesh position={[0.55 * s, shoulderY + 0.05, 0]} castShadow>
+        <sphereGeometry args={[0.3 * s, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={plateHi} metalness={0.75} roughness={0.4} />
       </mesh>
-      <mesh position={[-0.5 * s, shoulderY + 0.28 * s, 0]}>
-        <coneGeometry args={[0.06 * s, 0.2 * s, 6]} />
-        <meshStandardMaterial color={iron} metalness={0.6} />
-      </mesh>
-      <group ref={leftArm} position={[-0.5 * s, shoulderY - 0.05, 0]}>
+      {[[-0.55, 0.32, -0.18], [-0.55, 0.32, 0.18], [0.55, 0.32, -0.18], [0.55, 0.32, 0.18]].map((p, i) => (
+        <mesh key={i} position={[p[0] * s, shoulderY + p[1] * s, p[2] * s]} rotation={[0, 0, 0]}>
+          <coneGeometry args={[0.05 * s, 0.22 * s, 5]} />
+          <meshStandardMaterial color={iron} metalness={0.7} />
+        </mesh>
+      ))}
+      {/* Arms — muscular with vambraces */}
+      <group ref={leftArm} position={[-0.55 * s, shoulderY - 0.05, 0]}>
         <mesh castShadow position={[0, -0.32 * s, 0]}>
-          <capsuleGeometry args={[0.15 * s, 0.5 * s, 4, 6]} />
+          <capsuleGeometry args={[0.16 * s, 0.5 * s, 4, 8]} />
           <meshStandardMaterial color={skin} roughness={0.85} />
         </mesh>
         <mesh castShadow position={[0, -0.7 * s, 0]}>
-          <capsuleGeometry args={[0.14 * s, 0.35 * s, 4, 6]} />
-          <meshStandardMaterial color={plate} metalness={0.6} roughness={0.5} />
+          <capsuleGeometry args={[0.15 * s, 0.35 * s, 4, 8]} />
+          <meshStandardMaterial color={plate} metalness={0.65} roughness={0.5} />
         </mesh>
-        <mesh castShadow position={[0, -0.95 * s, 0]}>
-          <boxGeometry args={[0.16 * s, 0.12 * s, 0.18 * s]} />
+        {/* Vambrace spike */}
+        <mesh position={[0, -0.7 * s, 0.16 * s]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.04 * s, 0.16 * s, 5]} />
+          <meshStandardMaterial color={iron} metalness={0.7} />
+        </mesh>
+        <mesh castShadow position={[0, -0.98 * s, 0]}>
+          <boxGeometry args={[0.18 * s, 0.13 * s, 0.2 * s]} />
           <meshStandardMaterial color={leather} />
         </mesh>
       </group>
-      <group ref={rightArm} position={[0.5 * s, shoulderY - 0.05, 0]}>
+      <group ref={rightArm} position={[0.55 * s, shoulderY - 0.05, 0]}>
         <mesh castShadow position={[0, -0.32 * s, 0]}>
-          <capsuleGeometry args={[0.15 * s, 0.5 * s, 4, 6]} />
+          <capsuleGeometry args={[0.16 * s, 0.5 * s, 4, 8]} />
           <meshStandardMaterial color={skin} roughness={0.85} />
         </mesh>
         <mesh castShadow position={[0, -0.7 * s, 0]}>
-          <capsuleGeometry args={[0.14 * s, 0.35 * s, 4, 6]} />
-          <meshStandardMaterial color={plate} metalness={0.6} roughness={0.5} />
+          <capsuleGeometry args={[0.15 * s, 0.35 * s, 4, 8]} />
+          <meshStandardMaterial color={plate} metalness={0.65} roughness={0.5} />
         </mesh>
-        <group position={[0, -0.95 * s, 0.05]} rotation={[0.3, 0, 0]}>
+        {/* Warhammer */}
+        <group position={[0, -0.98 * s, 0.05]} rotation={[0.3, 0, 0]}>
           <mesh castShadow>
-            <cylinderGeometry args={[0.04 * s, 0.04 * s, 0.9 * s, 6]} />
+            <cylinderGeometry args={[0.045 * s, 0.045 * s, 1.0 * s, 8]} />
             <meshStandardMaterial color={leather} />
           </mesh>
-          <mesh castShadow position={[0, 0.55 * s, 0]}>
-            <boxGeometry args={[0.35 * s, 0.28 * s, 0.28 * s]} />
-            <meshStandardMaterial color={iron} metalness={0.7} roughness={0.4} />
+          <mesh castShadow position={[0, 0.6 * s, 0]}>
+            <boxGeometry args={[0.4 * s, 0.32 * s, 0.32 * s]} />
+            <meshStandardMaterial color={iron} metalness={0.75} roughness={0.4} />
           </mesh>
-          <mesh position={[0, 0.55 * s, 0.2 * s]}>
-            <coneGeometry args={[0.05 * s, 0.12 * s, 4]} />
-            <meshStandardMaterial color={iron} metalness={0.8} />
+          {/* Hammer spikes */}
+          <mesh position={[0.24 * s, 0.6 * s, 0]} rotation={[0, 0, -Math.PI / 2]}>
+            <coneGeometry args={[0.06 * s, 0.16 * s, 5]} />
+            <meshStandardMaterial color={iron} metalness={0.85} />
+          </mesh>
+          <mesh position={[-0.24 * s, 0.6 * s, 0]} rotation={[0, 0, Math.PI / 2]}>
+            <coneGeometry args={[0.06 * s, 0.16 * s, 5]} />
+            <meshStandardMaterial color={iron} metalness={0.85} />
+          </mesh>
+          {/* Ember glow on hammer head */}
+          <mesh position={[0, 0.6 * s, 0.17 * s]}>
+            <sphereGeometry args={[0.04 * s, 6, 6]} />
+            <meshBasicMaterial color="#ff5020" />
           </mesh>
         </group>
       </group>
+      {/* Head — horned demonic skull-helm */}
       <group ref={head} position={[0, headY, 0]}>
-        <mesh position={[0, -0.2 * s, 0]}>
-          <cylinderGeometry args={[0.11 * s, 0.14 * s, 0.18 * s, 6]} />
-          <meshStandardMaterial color={skin} roughness={0.85} />
+        {/* Neck */}
+        <mesh position={[0, -0.22 * s, 0]}>
+          <cylinderGeometry args={[0.12 * s, 0.15 * s, 0.2 * s, 6]} />
+          <meshStandardMaterial color={skinHi} roughness={0.9} />
         </mesh>
+        {/* Helm dome */}
         <mesh castShadow>
-          <sphereGeometry args={[0.28 * s, 12, 10]} />
-          <meshStandardMaterial color={plate} metalness={0.7} roughness={0.4} />
+          <sphereGeometry args={[0.3 * s, 14, 12]} />
+          <meshStandardMaterial color={plate} metalness={0.75} roughness={0.35} />
         </mesh>
-        <mesh position={[0, -0.02 * s, 0.26 * s]}>
-          <boxGeometry args={[0.28 * s, 0.05 * s, 0.02 * s]} />
+        {/* Faceplate slit */}
+        <mesh position={[0, -0.05 * s, 0.27 * s]}>
+          <boxGeometry args={[0.3 * s, 0.05 * s, 0.02 * s]} />
           <meshBasicMaterial color="#000" />
         </mesh>
-        <mesh position={[-0.07 * s, -0.02 * s, 0.28 * s]}>
-          <sphereGeometry args={[0.02 * s, 6, 6]} />
-          <meshBasicMaterial color="#ff2020" />
+        {/* Hellfire eyes inside slit */}
+        <mesh position={[-0.08 * s, -0.05 * s, 0.3 * s]}>
+          <sphereGeometry args={[0.025 * s, 6, 6]} />
+          <meshBasicMaterial color="#ff3010" />
         </mesh>
-        <mesh position={[0.07 * s, -0.02 * s, 0.28 * s]}>
-          <sphereGeometry args={[0.02 * s, 6, 6]} />
-          <meshBasicMaterial color="#ff2020" />
+        <mesh position={[0.08 * s, -0.05 * s, 0.3 * s]}>
+          <sphereGeometry args={[0.025 * s, 6, 6]} />
+          <meshBasicMaterial color="#ff3010" />
         </mesh>
-        <mesh position={[-0.22 * s, 0.15 * s, 0]} rotation={[0, 0, -0.8]} castShadow>
-          <coneGeometry args={[0.06 * s, 0.35 * s, 6]} />
-          <meshStandardMaterial color={iron} metalness={0.6} roughness={0.5} />
+        <pointLight ref={emberRef} color="#ff4020" intensity={1.2} distance={2.5} position={[0, -0.05 * s, 0.32 * s]} />
+        {/* Ram horns curving out and down */}
+        <mesh position={[-0.24 * s, 0.12 * s, 0]} rotation={[0.3, 0, -0.9]} castShadow>
+          <torusGeometry args={[0.14 * s, 0.04 * s, 6, 14, Math.PI]} />
+          <meshStandardMaterial color={iron} metalness={0.6} roughness={0.55} />
         </mesh>
-        <mesh position={[0.22 * s, 0.15 * s, 0]} rotation={[0, 0, 0.8]} castShadow>
-          <coneGeometry args={[0.06 * s, 0.35 * s, 6]} />
-          <meshStandardMaterial color={iron} metalness={0.6} roughness={0.5} />
+        <mesh position={[0.24 * s, 0.12 * s, 0]} rotation={[0.3, 0, 0.9 + Math.PI]} castShadow>
+          <torusGeometry args={[0.14 * s, 0.04 * s, 6, 14, Math.PI]} />
+          <meshStandardMaterial color={iron} metalness={0.6} roughness={0.55} />
         </mesh>
-        <mesh position={[0, 0.24 * s, 0]}>
-          <boxGeometry args={[0.05 * s, 0.08 * s, 0.5 * s]} />
-          <meshStandardMaterial color={gold} metalness={0.7} roughness={0.4} />
+        {/* Crest */}
+        <mesh position={[0, 0.28 * s, 0]}>
+          <boxGeometry args={[0.05 * s, 0.1 * s, 0.55 * s]} />
+          <meshStandardMaterial color={gold} metalness={0.75} roughness={0.35} />
+        </mesh>
+        {/* Tusks jutting from lower edge */}
+        <mesh position={[-0.11 * s, -0.16 * s, 0.22 * s]} rotation={[Math.PI, 0, -0.2]}>
+          <coneGeometry args={[0.022 * s, 0.11 * s, 5]} />
+          <meshStandardMaterial color="#e8e0c8" />
+        </mesh>
+        <mesh position={[0.11 * s, -0.16 * s, 0.22 * s]} rotation={[Math.PI, 0, 0.2]}>
+          <coneGeometry args={[0.022 * s, 0.11 * s, 5]} />
+          <meshStandardMaterial color="#e8e0c8" />
         </mesh>
       </group>
     </group>
   );
 }
+
 
 /* ---------------- LAVA ---------------- */
 function LavaPool({ pos, size }: { pos: Vec3; size: [number, number] }) {
