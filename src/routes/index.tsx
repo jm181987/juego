@@ -1310,17 +1310,18 @@ function Index() {
       const x = 0, y = 0;
       e.w; // keep locals; drawing uses local 28-space
       const EW = 28;
-      const bounce = Math.sin(e.anim) * 1.2;
+      const bounce = Math.sin(e.anim * 0.6) * 1.4;
+      const EH = 28;
       ctx.fillStyle = "rgba(0,0,0,0.25)";
       ctx.beginPath();
-      ctx.ellipse(x + e.w / 2, y + e.h + 2, e.w * 0.5, 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + EW / 2, y + EH + 2, EW * 0.5, 3, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      const capGrad = ctx.createRadialGradient(x + e.w / 2, y + 6 - bounce, 3, x + e.w / 2, y + 12 - bounce, 18);
+      const capGrad = ctx.createRadialGradient(x + EW / 2, y + 6 - bounce, 3, x + EW / 2, y + 12 - bounce, 18);
       capGrad.addColorStop(0, "#c96a2a"); capGrad.addColorStop(1, "#5a2a08");
       ctx.fillStyle = capGrad;
-      ctx.beginPath(); ctx.arc(x + e.w / 2, y + 12 - bounce, 14, Math.PI, 0); ctx.fill();
-      ctx.fillRect(x, y + 12 - bounce, e.w, 10);
+      ctx.beginPath(); ctx.arc(x + EW / 2, y + 12 - bounce, 14, Math.PI, 0); ctx.fill();
+      ctx.fillRect(x, y + 12 - bounce, EW, 10);
       ctx.fillStyle = "rgba(255,220,180,0.35)";
       ctx.beginPath(); ctx.arc(x + 10, y + 8 - bounce, 4, 0, Math.PI * 2); ctx.fill();
 
@@ -1336,10 +1337,11 @@ function Index() {
       ctx.fillStyle = "#3a1408";
       ctx.fillRect(x + 5, y + 14 - bounce, 8, 2); ctx.fillRect(x + 15, y + 14 - bounce, 8, 2);
 
-      const step = Math.floor(e.anim) % 2;
+      const legPhase = Math.sin(e.anim * 0.9);
       ctx.fillStyle = "#2a1408";
-      ctx.fillRect(x + 2, y + 22 + (step ? 0 : 1), 8, 6);
-      ctx.fillRect(x + 18, y + 22 + (step ? 1 : 0), 8, 6);
+      ctx.fillRect(x + 2, y + 22 + Math.max(0, legPhase) * 1.5, 8, 6);
+      ctx.fillRect(x + 18, y + 22 + Math.max(0, -legPhase) * 1.5, 8, 6);
+      ctx.restore();
     }
 
     function drawFlyer(e: Enemy) {
