@@ -2050,7 +2050,7 @@ function Scene({
       {/* Goal */}
       <Goal pos={world.goal} />
       {/* Mage */}
-      <Mage posRef={pos} facingRef={facing} attackingRef={attackTimer} walkPhaseRef={walkPhase} />
+      <MageMemo posRef={pos} facingRef={facing} attackingRef={attackTimer} walkPhaseRef={walkPhase} />
       {/* Floating texts */}
       {floats.current.map((f) => (
         <FloatingText key={f.id} ft={f} />
