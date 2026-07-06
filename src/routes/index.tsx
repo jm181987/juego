@@ -249,8 +249,11 @@ function buildWorlds(): WorldDef[] {
 const WORLDS: WorldDef[] = buildWorlds();
 
 const GRAVITY = -30;
-const JUMP_V = 12;
-const MOVE_SPEED = 7;
+const JUMP_V = 17;
+const MOVE_SPEED = 10;
+const AIR_CONTROL = 1.0;
+const COYOTE_TIME = 0.12;
+const JUMP_BUFFER = 0.12;
 const ATTACK_RANGE = 2.6;
 const ATTACK_COOLDOWN = 0.4;
 
