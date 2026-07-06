@@ -565,7 +565,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       attach(leg, mkCap(0.14 * U, legLen, skinMat));
       if (foot) {
         const boot = new THREE.Mesh(new THREE.BoxGeometry(0.2 * U, 0.12 * U, 0.42 * U), clothMat);
-        boot.position.set(0, 0.06 * U, 0.14 * U);
+        boot.position.set(0, 0.06 * U, -0.14 * U);
         boot.castShadow = true;
         attach(foot, boot);
       }
@@ -600,9 +600,9 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       chest.position.y = 0.09 * U;
       chest.castShadow = true;
       attach(b.spine2, chest);
-      attach(b.spine2, mkSphere(0.13 * U, clothMat, [-0.13 * U, 0.18 * U, 0.22 * U]));
-      attach(b.spine2, mkSphere(0.13 * U, clothMat, [0.13 * U, 0.18 * U, 0.22 * U]));
-      attach(b.spine2, mkBox(0.035 * U, 0.44 * U, 0.006 * U, accentMat, [0, 0.14 * U, 0.26 * U]));
+      attach(b.spine2, mkSphere(0.13 * U, clothMat, [-0.13 * U, 0.18 * U, -0.22 * U]));
+      attach(b.spine2, mkSphere(0.13 * U, clothMat, [0.13 * U, 0.18 * U, -0.22 * U]));
+      attach(b.spine2, mkBox(0.035 * U, 0.44 * U, 0.006 * U, accentMat, [0, 0.14 * U, -0.26 * U]));
     }
 
     // Arms
@@ -646,25 +646,25 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
         new THREE.SphereGeometry(0.3 * U, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.75),
         hairMat,
       );
-      backHair.position.set(0, 0.18 * U, -0.03 * U);
+      backHair.position.set(0, 0.18 * U, 0.03 * U);
       backHair.castShadow = true;
       attach(b.head, backHair);
-      attach(b.head, mkBox(0.4 * U, 0.11 * U, 0.09 * U, hairMat, [0, 0.34 * U, 0.2 * U]));
-      attach(b.head, mkBox(0.09 * U, 0.4 * U, 0.14 * U, hairMat, [-0.22 * U, 0.09 * U, 0.07 * U]));
-      attach(b.head, mkBox(0.09 * U, 0.4 * U, 0.14 * U, hairMat, [0.22 * U, 0.09 * U, 0.07 * U]));
+      attach(b.head, mkBox(0.4 * U, 0.11 * U, 0.09 * U, hairMat, [0, 0.34 * U, -0.2 * U]));
+      attach(b.head, mkBox(0.09 * U, 0.4 * U, 0.14 * U, hairMat, [-0.22 * U, 0.09 * U, -0.07 * U]));
+      attach(b.head, mkBox(0.09 * U, 0.4 * U, 0.14 * U, hairMat, [0.22 * U, 0.09 * U, -0.07 * U]));
       const pony = new THREE.Mesh(new THREE.CapsuleGeometry(0.08 * U, 0.6 * U, 4, 8), hairMat);
-      pony.position.set(0, -0.18 * U, -0.22 * U);
-      pony.rotation.x = 0.35;
+      pony.position.set(0, -0.18 * U, 0.22 * U);
+      pony.rotation.x = -0.35;
       pony.castShadow = true;
       attach(b.head, pony);
-      attach(b.head, mkSphere(0.033 * U, eyeWhite, [-0.09 * U, 0.2 * U, 0.2 * U]));
-      attach(b.head, mkSphere(0.033 * U, eyeWhite, [0.09 * U, 0.2 * U, 0.2 * U]));
-      attach(b.head, mkSphere(0.016 * U, eyePupil, [-0.09 * U, 0.2 * U, 0.23 * U]));
-      attach(b.head, mkSphere(0.016 * U, eyePupil, [0.09 * U, 0.2 * U, 0.23 * U]));
-      attach(b.head, mkBox(0.09 * U, 0.024 * U, 0.03 * U, lipMat, [0, 0.07 * U, 0.24 * U]));
+      attach(b.head, mkSphere(0.033 * U, eyeWhite, [-0.09 * U, 0.2 * U, -0.2 * U]));
+      attach(b.head, mkSphere(0.033 * U, eyeWhite, [0.09 * U, 0.2 * U, -0.2 * U]));
+      attach(b.head, mkSphere(0.016 * U, eyePupil, [-0.09 * U, 0.2 * U, -0.23 * U]));
+      attach(b.head, mkSphere(0.016 * U, eyePupil, [0.09 * U, 0.2 * U, -0.23 * U]));
+      attach(b.head, mkBox(0.09 * U, 0.024 * U, 0.03 * U, lipMat, [0, 0.07 * U, -0.24 * U]));
       const nose = new THREE.Mesh(new THREE.ConeGeometry(0.022 * U, 0.07 * U, 6), skinMat);
-      nose.position.set(0, 0.14 * U, 0.24 * U);
-      nose.rotation.x = Math.PI / 2;
+      nose.position.set(0, 0.14 * U, -0.24 * U);
+      nose.rotation.x = -Math.PI / 2;
       attach(b.head, nose);
     }
 
