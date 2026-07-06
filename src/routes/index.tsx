@@ -549,7 +549,7 @@ function Index() {
 
 
     const player = {
-      x: world.spawn.x, y: world.spawn.y, w: 33, h: 45,
+      x: world.spawn.x, y: world.spawn.y, w: 44, h: 60,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
       crouching: false, groundPound: 0, gpCharge: 0,
