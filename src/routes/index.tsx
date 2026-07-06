@@ -608,9 +608,12 @@ function Index() {
     }
 
     function respawn() {
-      player.x = world.spawn.x; player.y = world.spawn.y;
+      // Respawn at last reached checkpoint if any
+      const last = [...world.checkpoints].reverse().find((c) => c.reached);
+      if (last) { player.x = last.x - player.w / 2; player.y = last.y - player.h; }
+      else { player.x = world.spawn.x; player.y = world.spawn.y; cameraX = 0; }
       player.vx = 0; player.vy = 0;
-      player.invuln = 120; cameraX = 0;
+      player.invuln = 120;
     }
 
     function die() {
