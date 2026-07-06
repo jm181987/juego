@@ -416,6 +416,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   // Priority 1: run AFTER the animation mixer so our bone offsets aren't
   // overwritten by the clip evaluator.
   useFrame(() => {
+
     if (!group.current) return;
 
     group.current.position.set(posRef.current.x, posRef.current.y, posRef.current.z);
@@ -430,7 +431,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     } else {
       switchTo("Idle", 0.22, 1);
     }
-  }, 0);
+  });
 
   useFrame(() => {
     const b = bonesRef.current;
@@ -441,40 +442,32 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     const atk = Math.max(0, Math.min(1, attackingRef.current));
     const s = atk > 0 ? Math.sin((1 - atk) * Math.PI) : 0;
 
-    if (b.rightArm) {
-      const base = b.base.rightArm!;
+    if (b.rightArm && b.base.rightArm) {
+      const base = b.base.rightArm;
       b.rightArm.rotation.set(base.x - s * 1.6, base.y, base.z + s * 0.4);
     }
-    if (b.rightForeArm) {
-      const base = b.base.rightForeArm!;
+    if (b.rightForeArm && b.base.rightForeArm) {
+      const base = b.base.rightForeArm;
       b.rightForeArm.rotation.set(base.x, base.y - s * 1.2, base.z);
     }
-    if (b.spine1) {
-      const base = b.base.spine1!;
+    if (b.spine1 && b.base.spine1) {
+      const base = b.base.spine1;
       b.spine1.rotation.set(base.x + s * 0.15, base.y - s * 0.35, base.z);
     }
 
-    // Make the sword follow the right-hand bone in world space.
-    if (b.rightHand && swordRef.current && group.current) {
-      b.rightHand.updateWorldMatrix(true, false);
-      const hand = b.rightHand.matrixWorld;
-      // Convert hand world matrix into local space of the hero group.
-      group.current.updateWorldMatrix(true, false);
-      const invParent = group.current.matrixWorld.clone().invert();
-      const local = invParent.multiply(hand);
-      local.decompose(swordRef.current.position, swordRef.current.quaternion, swordRef.current.scale);
-      // Offset so the grip sits in the hand.
-      swordRef.current.translateY(0.05);
-      swordRef.current.rotateX(Math.PI / 2);
+    // Sword swings alongside the arm — static offset from the hero group.
+    if (swordRef.current) {
+      swordRef.current.rotation.z = -0.6 - s * 1.6;
+      swordRef.current.rotation.x = s * 1.2;
     }
-  }, 1);
+  });
 
 
   return (
     <group ref={group} scale={1.05}>
       <primitive object={cloned} />
-      {/* Sword — reparented to the right-hand bone in the effect above. */}
-      <group ref={swordRef}>
+      {/* Heroic sword bolted to the hero group (right side). */}
+      <group ref={swordRef} position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
         <mesh position={[0, -0.15, 0]} castShadow>
           <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
           <meshStandardMaterial color="#1a0f08" roughness={0.9} />
@@ -495,6 +488,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     </group>
   );
 }
+
 
 
 
