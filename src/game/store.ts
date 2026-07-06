@@ -63,9 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
   sfxVol: 0.85,
   brightness: 1.0,
   fov: 60,
-  quality: "high",
-  shadows: true,
-  postFx: true,
+  quality: "medium",
+  shadows: false,
+  postFx: false,
   hudVisible: true,
 };
 
@@ -207,6 +207,32 @@ const seedQuests = (): Quest[] => [
   },
 ];
 
+const MAX_SAVE_SCREENSHOT_CHARS = 180_000;
+
+const sanitizePersistedState = (persisted: unknown) => {
+  if (!persisted || typeof persisted !== "object") return persisted;
+  const state = persisted as Partial<Store>;
+  const settings = { ...DEFAULT_SETTINGS, ...(state.settings ?? {}) };
+  const safeSettings: Settings = {
+    ...settings,
+    // Heavy effects were causing startup hangs on weaker/mobile previews.
+    quality: settings.quality === "low" ? "low" : "medium",
+    shadows: false,
+    postFx: false,
+  };
+  const saves = Array.isArray(state.saves)
+    ? state.saves.slice(0, 6).map((slot) => ({
+        ...slot,
+        screenshot:
+          typeof slot.screenshot === "string" && slot.screenshot.length <= MAX_SAVE_SCREENSHOT_CHARS
+            ? slot.screenshot
+            : undefined,
+      }))
+    : [];
+
+  return { ...state, settings: safeSettings, saves };
+};
+
 export const useGame = create<Store>()(
   persist(
     (set, get) => ({
@@ -310,6 +336,8 @@ export const useGame = create<Store>()(
     }),
     {
       name: "arcane-realms-store",
+      version: 2,
+      migrate: sanitizePersistedState,
       partialize: (s) => ({
         appearance: s.appearance,
         settings: s.settings,

@@ -2381,7 +2381,7 @@ function Bar({ value, max, color, label }: { value: number; max: number; color: 
 /* ---------------- ROOT ---------------- */
 function Index() {
   const [worldIdx, setWorldIdx] = useState(0);
-  const [status, setStatus] = useState<"play" | "dead" | "win" | "victory" | "menu">("play");
+  const [status, setStatus] = useState<"play" | "dead" | "win" | "victory" | "menu">("menu");
   const [mounted, setMounted] = useState(false);
   const [, setHudTick] = useState(0);
   const statsRef = useRef<Stats>(initialStats());
@@ -2477,6 +2477,7 @@ function Index() {
   const st = statsRef.current;
 
   const startGame = () => {
+    setMenu(null);
     statsRef.current = initialStats();
     setWorldIdx(0);
     checkpointRef.current = WORLDS[0].spawn;
@@ -2486,7 +2487,16 @@ function Index() {
   // Save / load helpers
   const captureShot = () => {
     const cv = document.querySelector("canvas") as HTMLCanvasElement | null;
-    try { return cv?.toDataURL("image/jpeg", 0.5); } catch { return undefined; }
+    if (!cv) return undefined;
+    try {
+      const shot = document.createElement("canvas");
+      shot.width = 320;
+      shot.height = 180;
+      const ctx = shot.getContext("2d");
+      if (!ctx) return undefined;
+      ctx.drawImage(cv, 0, 0, shot.width, shot.height);
+      return shot.toDataURL("image/jpeg", 0.35);
+    } catch { return undefined; }
   };
   const doSave = (slotId: number) => {
     saveToSlot(slotId, {
@@ -2530,9 +2540,15 @@ function Index() {
       {mounted && status !== "menu" && (
         <Canvas
           key={sceneKey}
-          shadows={settings.shadows}
+          shadows={settings.shadows && settings.quality === "high"}
           camera={{ position: [0, 6, 10], fov: settings.fov }}
-          gl={{ toneMappingExposure: settings.brightness }}
+          dpr={[1, 1.25]}
+          gl={{
+            toneMappingExposure: settings.brightness,
+            antialias: settings.quality === "high",
+            powerPreference: "high-performance",
+            stencil: false,
+          }}
           style={{ width: "100vw", height: "100vh" }}
         >
           <Suspense fallback={null}>
