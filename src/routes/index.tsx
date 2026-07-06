@@ -1459,6 +1459,7 @@ function Scene({
             spawnFloat(e.pos, `-${dmg}`, "#ffe040");
             if (e.hp <= 0) {
               e.alive = false;
+              playDeath(genderFor(e.kind));
               const xp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 40 : 25;
               const gold = e.kind === "brute" ? 20 : e.kind === "wraith" ? 12 : 6;
               st.xp += xp; st.gold += gold;
