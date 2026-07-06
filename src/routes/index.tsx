@@ -1127,7 +1127,7 @@ function Index() {
 
       // Sprite is drawn in a 44x60 virtual space with smooth shapes and gradients.
       const BW = 44, BH = 60;
-      const CHAR_SCALE = 1;
+      const CHAR_SCALE = 1.4;
 
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
