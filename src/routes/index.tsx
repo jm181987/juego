@@ -527,19 +527,19 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           <meshStandardMaterial color="#141416" metalness={0.7} roughness={0.35} />
         </mesh>
         {/* cabezal */}
-        <mesh castShadow position={[0, 0.16, 0]}>
+        <mesh castShadow position={[0, -0.16, 0]}>
           <cylinderGeometry args={[0.06, 0.045, 0.1, 16]} />
           <meshStandardMaterial color="#2a2a2e" metalness={0.85} roughness={0.25} />
         </mesh>
         {/* lente brillante */}
-        <mesh position={[0, 0.215, 0]}>
+        <mesh position={[0, -0.215, 0]}>
           <cylinderGeometry args={[0.055, 0.055, 0.01, 20]} />
           <meshStandardMaterial color="#fff2c8" emissive="#fff2c8" emissiveIntensity={2.2} roughness={0.15} />
         </mesh>
         {/* haz principal */}
         <spotLight
           ref={spotRef}
-          position={[0, 0.22, 0]}
+          position={[0, -0.22, 0]}
           angle={0.55}
           penumbra={0.7}
           intensity={16}
@@ -548,11 +548,12 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           color="#fff2c8"
           castShadow={false}
         />
-        {/* target lejano en el eje +Y local de la linterna (dirección del cabezal) */}
-        <object3D ref={spotTargetRef} position={[0, 12, 0]} />
+        {/* target lejano en el eje -Y local (dirección del cabezal) */}
+        <object3D ref={spotTargetRef} position={[0, -12, 0]} />
         {/* halo cercano para no dejar el cuerpo a oscuras */}
-        <pointLight position={[0, 0.24, 0]} color="#ffd89a" intensity={0.9} distance={2.2} decay={2} />
+        <pointLight position={[0, -0.24, 0]} color="#ffd89a" intensity={0.9} distance={2.2} decay={2} />
       </group>
+
       {/* Sword — its transform is driven each frame from the right-hand bone. */}
       <group ref={swordRef}>
         <mesh position={[0, -0.15, 0]} castShadow>
