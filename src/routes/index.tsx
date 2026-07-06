@@ -1721,7 +1721,8 @@ function Bar({ value, max, color, label }: { value: number; max: number; color: 
 /* ---------------- ROOT ---------------- */
 function Index() {
   const [worldIdx, setWorldIdx] = useState(0);
-  const [status, setStatus] = useState<"play" | "dead" | "win" | "victory" | "menu">("menu");
+  const [status, setStatus] = useState<"play" | "dead" | "win" | "victory" | "menu">("play");
+  const [mounted, setMounted] = useState(false);
   const [, setHudTick] = useState(0);
   const statsRef = useRef<Stats>(initialStats());
   const keysRef = useKeys();
@@ -1729,6 +1730,7 @@ function Index() {
   useAmbientMusic(status === "play", worldIdx, world.difficulty);
   const checkpointRef = useRef<Vec3>(world.spawn);
 
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
 
   const onDeath = () => {
@@ -1788,7 +1790,7 @@ function Index() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", overflow: "hidden", fontFamily: "system-ui" }}>
-      {status !== "menu" && (
+      {mounted && status !== "menu" && (
         <Canvas
           key={sceneKey}
           shadows
