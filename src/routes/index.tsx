@@ -609,25 +609,6 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       flashlightRef.current.rotation.set(Math.PI / 2, 0, 0);
     }
 
-    // Female overlays: hair follows the head bone, skirt follows the hips.
-    if (b.head && hairRef.current && group.current) {
-      b.head.getWorldPosition(tmpPos);
-      b.head.getWorldQuaternion(tmpQuat);
-      group.current.worldToLocal(tmpPos);
-      group.current.getWorldQuaternion(tmpParentQuat).invert();
-      tmpQuat.premultiply(tmpParentQuat);
-      hairRef.current.position.copy(tmpPos);
-      hairRef.current.quaternion.copy(tmpQuat);
-    }
-    if (b.hips && skirtRef.current && group.current) {
-      b.hips.getWorldPosition(tmpPos);
-      b.hips.getWorldQuaternion(tmpQuat);
-      group.current.worldToLocal(tmpPos);
-      group.current.getWorldQuaternion(tmpParentQuat).invert();
-      tmpQuat.premultiply(tmpParentQuat);
-      skirtRef.current.position.copy(tmpPos);
-      skirtRef.current.quaternion.copy(tmpQuat);
-    }
   });
 
 
