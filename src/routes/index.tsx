@@ -431,7 +431,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     } else {
       switchTo("Idle", 0.22, 1);
     }
-  }, 0);
+  });
 
   useFrame(() => {
     const b = bonesRef.current;
