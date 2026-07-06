@@ -9,12 +9,12 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Juego de plataformas 2D estilo Mario Bros con gráficos pixel art. Salta, esquiva enemigos y recolecta monedas.",
+          "Juego de plataformas 2D con 3 mundos distintos: pradera, caverna y cielo nocturno.",
       },
       { property: "og:title", content: "Super Plumber Adventure" },
       {
         property: "og:description",
-        content: "Plataformas pixel art clásicas en tu navegador.",
+        content: "Aventura pixel art con 3 mundos únicos: cada uno con su ambiente, enemigos y desafíos.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -22,79 +22,165 @@ export const Route = createFileRoute("/")({
   }),
 });
 
-const LEVEL = [
-  "................................................................................................",
-  "................................................................................................",
-  "................................................................................................",
-  "................................................................................................",
-  "..........CCC...................................................................................",
-  "................................................................................................",
-  ".......?BB?B.................CCCC...............................................................",
-  "................................................................................................",
-  ".............................BBBBB..................?B?B?......................................",
-  "................................................................................................",
-  ".................................................C..C..C.......................................",
-  "................................................................................................",
-  ".......................Pp......................................................S...............",
-  "....G.................PPpp................G............G......................SS......F.........",
-  "================================================================================================",
-  "################################################################################################",
-  "################################################################################################",
+// ---------- STAGES ----------
+// Legend:
+//  # ground   = grass-top   B brick   ? question   P/p pipe   S stone
+//  C coin     G goomba      F fish/spike enemy    K flyer (only sky)
+//  L lava/water (deadly)   H spike (deadly static)
+//  * platform (floating)   > flag
+// Sky level uses "cloud" for = tiles visually.
+
+const STAGES: {
+  name: string;
+  theme: "grass" | "cave" | "sky";
+  timeLimit: number;
+  rows: string[];
+}[] = [
+  {
+    name: "1-1 Pradera Verde",
+    theme: "grass",
+    timeLimit: 120,
+    rows: [
+      "................................................................................................",
+      "................................................................................................",
+      "................................................................................................",
+      "................................................................................................",
+      "..........CCC...................................................................................",
+      "................................................................................................",
+      ".......?BB?B.................CCCC..................C.C.C.......................................",
+      "................................................................................................",
+      ".............................BBBBB..................?B?B?...............CCC....................",
+      "................................................................................................",
+      "..................C..............................................*****.........................",
+      "................................................................................................",
+      ".......................Pp......................................................S...............",
+      "....G.................PPpp................G............G......................SS......>........",
+      "================================================================================================",
+      "################################################################################################",
+      "################################################################################################",
+    ],
+  },
+  {
+    name: "1-2 Cavernas de Cobre",
+    theme: "cave",
+    timeLimit: 100,
+    rows: [
+      "################################################################################################",
+      "#..............................................................................................#",
+      "#..............................................................................................#",
+      "#.....CCC......................................................................................#",
+      "#..............................................................................................#",
+      "#....BBBB..........?B?..............................C.C.C......................................#",
+      "#..................................................BBBBB......................................#",
+      "#..............................................................................................#",
+      "#.........C..............*****................HHH..............................................#",
+      "#........................................................*****................C.C.C...........#",
+      "#..............*****....G..............G..............................*****...................#",
+      "#..............................................................................................#",
+      "#............S....S..HHH...........S.......HHH................HHH...........S.....S.......>...#",
+      "#..G........SSSS...........G......SSSS..........G............SSSS.........SSSS...SSSS...........#",
+      "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+      "################################################################################################",
+      "################################################################################################",
+    ],
+  },
+  {
+    name: "1-3 Cielo Estrellado",
+    theme: "sky",
+    timeLimit: 140,
+    rows: [
+      "................................................................................................",
+      "................................................................................................",
+      "..........C........K............................................................K...............",
+      ".........CCC.....................C.C.C..............K..........................................",
+      "..........C.....................*****.........................C.C.C............................",
+      "................................................................*****..........................",
+      "....*****......................................................................................",
+      ".............K...........*****......................*****...........*****......................",
+      "................................................................................................",
+      "........?BB?...........................C.C.C....K.................................*****........",
+      "......===========.............===========......................===========......................",
+      "................................................................................................",
+      "....K........................*****....................*****....................................",
+      "....................===============...........................................===============.>",
+      "==============..................................===============................................",
+      "................................................................................................",
+      "................................................................................................",
+    ],
+  },
 ];
 
 const TILE = 32;
-const LEVEL_W = LEVEL[0].length * TILE;
-const LEVEL_H = LEVEL.length * TILE;
-
 type Rect = { x: number; y: number; w: number; h: number };
-type Enemy = Rect & { vx: number; vy: number; alive: boolean; squashT: number; anim: number };
+type Enemy = Rect & {
+  vx: number; vy: number; alive: boolean; squashT: number; anim: number;
+  kind: "goomba" | "flyer";
+  baseY?: number;
+};
 type Coin = { x: number; y: number; taken: boolean; t: number; pop: number };
+type Hazard = Rect & { kind: "spike" | "lava" };
 type Block = Rect & {
-  type: "ground" | "grass" | "brick" | "question" | "pipe" | "stone";
-  used?: boolean;
-  bump?: number;
-  pipeTop?: boolean;
-  pipeLeft?: boolean;
+  type: "ground" | "grass" | "brick" | "question" | "pipe" | "stone" | "platform" | "cloud";
+  used?: boolean; bump?: number; pipeTop?: boolean; pipeLeft?: boolean;
 };
 type Particle = {
   x: number; y: number; vx: number; vy: number; life: number; maxLife: number;
   color: string; size: number; gravity: number; shape?: "square" | "circle" | "star";
 };
 
-function buildWorld() {
+function buildWorld(stageIdx: number) {
+  const stage = STAGES[stageIdx];
+  const LEVEL = stage.rows;
+  const LEVEL_W = LEVEL[0].length * TILE;
+  const LEVEL_H = LEVEL.length * TILE;
+
   const blocks: Block[] = [];
   const coins: Coin[] = [];
   const enemies: Enemy[] = [];
+  const hazards: Hazard[] = [];
   let flag = { x: 0, y: 0 };
+  let spawn = { x: 60, y: 100 };
+
+  const isCloud = stage.theme === "sky";
+
   for (let r = 0; r < LEVEL.length; r++) {
     for (let c = 0; c < LEVEL[r].length; c++) {
       const ch = LEVEL[r][c];
       const x = c * TILE;
       const y = r * TILE;
-      if (ch === "#") blocks.push({ x, y, w: TILE, h: TILE, type: "ground" });
-      else if (ch === "=") blocks.push({ x, y, w: TILE, h: TILE, type: "grass" });
+      if (ch === "#") blocks.push({ x, y, w: TILE, h: TILE, type: stage.theme === "cave" ? "stone" : "ground" });
+      else if (ch === "=") blocks.push({ x, y, w: TILE, h: TILE, type: isCloud ? "cloud" : "grass" });
+      else if (ch === "*") blocks.push({ x, y, w: TILE, h: 14, type: isCloud ? "cloud" : "platform" });
       else if (ch === "B") blocks.push({ x, y, w: TILE, h: TILE, type: "brick" });
       else if (ch === "?") blocks.push({ x, y, w: TILE, h: TILE, type: "question" });
       else if (ch === "P" || ch === "p") {
         const above = LEVEL[r - 1]?.[c];
         const pipeTop = above !== "P" && above !== "p";
         blocks.push({ x, y, w: TILE, h: TILE, type: "pipe", pipeTop, pipeLeft: ch === "P" });
-      }
-      else if (ch === "S") blocks.push({ x, y, w: TILE, h: TILE, type: "stone" });
+      } else if (ch === "S") blocks.push({ x, y, w: TILE, h: TILE, type: "stone" });
+      else if (ch === "H") hazards.push({ x: x + 4, y: y + 16, w: TILE - 8, h: TILE - 16, kind: "spike" });
+      else if (ch === "L") hazards.push({ x, y: y + 8, w: TILE, h: TILE - 8, kind: "lava" });
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
-      else if (ch === "G") enemies.push({ x, y: y + 4, w: 28, h: 28, vx: -0.6, vy: 0, alive: true, squashT: 0, anim: 0 });
-      else if (ch === "F") flag = { x: x + 12, y };
+      else if (ch === "G") enemies.push({
+        x, y: y + 4, w: 28, h: 28, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+      });
+      else if (ch === "K") enemies.push({
+        x, y, w: 28, h: 24, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+      });
+      else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
     }
   }
-  return { blocks, coins, enemies, flag };
+  return { blocks, coins, enemies, hazards, flag, spawn, LEVEL_W, LEVEL_H, stage };
 }
 
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [status, setStatus] = useState<"playing" | "win" | "dead">("playing");
+  const [status, setStatus] = useState<"playing" | "win" | "dead" | "stageClear">("playing");
   const [score, setScore] = useState(0);
   const [coinsCount, setCoinsCount] = useState(0);
   const [lives, setLives] = useState(3);
+  const [stageIdx, setStageIdx] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(STAGES[0].timeLimit);
   const [resetKey, setResetKey] = useState(0);
 
   useEffect(() => {
@@ -102,21 +188,39 @@ function Index() {
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
 
-    const world = buildWorld();
+    const world = buildWorld(stageIdx);
+    const { LEVEL_W, LEVEL_H, stage } = world;
+
     const keys: Record<string, boolean> = {};
     let cameraX = 0;
     let cameraY = 0;
     let cameraShake = 0;
     let running = true;
-    let localScore = 0;
-    let localCoins = 0;
+    let localScore = score;
+    let localCoins = coinsCount;
     let localLives = lives;
+    let localTime = stage.timeLimit;
     let particles: Particle[] = [];
     let floatTexts: { x: number; y: number; text: string; life: number; color: string }[] = [];
     let time = 0;
+    let timerAccum = 0;
+    let stageCompleted = false;
+
+    // Stars for sky theme
+    const stars: { x: number; y: number; s: number; tw: number }[] = [];
+    if (stage.theme === "sky") {
+      for (let i = 0; i < 120; i++) {
+        stars.push({
+          x: Math.random() * LEVEL_W,
+          y: Math.random() * canvas.height * 0.7,
+          s: Math.random() * 2 + 0.5,
+          tw: Math.random() * Math.PI * 2,
+        });
+      }
+    }
 
     const player = {
-      x: 60, y: 100, w: 22, h: 30,
+      x: world.spawn.x, y: world.spawn.y, w: 22, h: 30,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
     };
@@ -165,11 +269,13 @@ function Index() {
     }
 
     function respawn() {
-      player.x = 60; player.y = 100; player.vx = 0; player.vy = 0;
+      player.x = world.spawn.x; player.y = world.spawn.y;
+      player.vx = 0; player.vy = 0;
       player.invuln = 120; cameraX = 0;
     }
 
     function die() {
+      if (player.invuln > 0) return;
       localLives -= 1;
       setLives(localLives);
       cameraShake = 12;
@@ -183,8 +289,40 @@ function Index() {
       floatTexts.push({ x, y, text, life: 45, color });
     }
 
+    function completeStage() {
+      if (stageCompleted) return;
+      stageCompleted = true;
+      const timeBonus = Math.max(0, Math.floor(localTime)) * 10;
+      localScore += timeBonus;
+      setScore(localScore);
+      floatText(world.flag.x, world.flag.y - 40, `TIME +${timeBonus}`, "#7ee085");
+      for (let i = 0; i < 80; i++) {
+        addParticles(world.flag.x, world.flag.y - 200 + i * 4, 1, {
+          color: ["#ffd94a", "#ff5c8a", "#4ac1ff", "#7ee085"][i % 4],
+          size: 4, life: 70, speed: 5, gravity: 0.15, shape: "star",
+        });
+      }
+      setTimeout(() => {
+        if (stageIdx + 1 >= STAGES.length) {
+          setStatus("win");
+          running = false;
+        } else {
+          setStatus("stageClear");
+          running = false;
+        }
+      }, 900);
+    }
+
     function update() {
       time++;
+      timerAccum++;
+      if (timerAccum >= 60) {
+        timerAccum = 0;
+        localTime -= 1;
+        setTimeLeft(localTime);
+        if (localTime <= 0) die();
+      }
+
       const left = keys["ArrowLeft"] || keys["KeyA"];
       const right = keys["ArrowRight"] || keys["KeyD"];
       const jump = keys["ArrowUp"] || keys["Space"] || keys["KeyW"];
@@ -211,27 +349,42 @@ function Index() {
       }
       if (!jump && player.vy < -4) player.vy = -4;
 
-      player.vy += 0.55;
+      // Sky theme = lower gravity, higher jumps feel floaty
+      const grav = stage.theme === "sky" ? 0.42 : 0.55;
+      player.vy += grav;
       if (player.vy > 13) player.vy = 13;
 
+      // X move
       player.x += player.vx;
       if (player.x < 0) { player.x = 0; player.vx = 0; }
       if (player.x + player.w > LEVEL_W) player.x = LEVEL_W - player.w;
       for (const b of collideBlocks(player)) {
+        // Platforms are one-way (no side collision)
+        if (b.type === "platform" || b.type === "cloud") continue;
         if (player.vx > 0) player.x = b.x - player.w;
         else if (player.vx < 0) player.x = b.x + b.w;
         player.vx = 0;
       }
       if (player.onGround && Math.abs(player.vx) > 2 && time % 5 === 0) {
         addParticles(player.x + 11 - player.facing * 6, player.y + player.h - 2, 1, {
-          color: "#d9cfb5", size: 3, life: 18, vy: -0.5, vx: -player.facing * 0.6, gravity: 0.05,
+          color: stage.theme === "cave" ? "#6b6b6b" : "#d9cfb5",
+          size: 3, life: 18, vy: -0.5, vx: -player.facing * 0.6, gravity: 0.05,
         });
       }
 
+      // Y move
       const wasOnGround = player.onGround;
       player.y += player.vy;
       player.onGround = false;
       for (const b of collideBlocks(player)) {
+        // Platform: only land from above
+        if (b.type === "platform" || b.type === "cloud") {
+          const prevBottom = player.y - player.vy + player.h;
+          if (player.vy > 0 && prevBottom <= b.y + 1) {
+            player.y = b.y - player.h; player.vy = 0; player.onGround = true;
+          }
+          continue;
+        }
         if (player.vy > 0) { player.y = b.y - player.h; player.vy = 0; player.onGround = true; }
         else if (player.vy < 0) {
           player.y = b.y + b.h; player.vy = 0;
@@ -261,6 +414,15 @@ function Index() {
       if (player.invuln > 0) player.invuln--;
       if (Math.abs(player.vx) > 0.2 && player.onGround) player.anim += Math.abs(player.vx) * 0.25;
 
+      // Hazards
+      for (const h of world.hazards) {
+        if (
+          player.x < h.x + h.w && player.x + player.w > h.x &&
+          player.y < h.y + h.h && player.y + player.h > h.y
+        ) die();
+      }
+
+      // Camera
       const target = player.x - 260;
       cameraX += (target - cameraX) * 0.12;
       const targetY = Math.max(0, Math.min(LEVEL_H - canvas.height, player.y - canvas.height * 0.6));
@@ -269,38 +431,59 @@ function Index() {
       if (cameraX > LEVEL_W - canvas.width) cameraX = LEVEL_W - canvas.width;
       if (cameraShake > 0) cameraShake *= 0.85;
 
+      // Enemies
       for (const e of world.enemies) {
         if (!e.alive) { if (e.squashT > 0) e.squashT--; continue; }
-        e.anim += Math.abs(e.vx) * 0.15;
-        e.x += e.vx;
-        e.vy += 0.5;
-        e.y += e.vy;
-        for (const b of collideBlocks(e)) {
-          if (e.vy > 0) { e.y = b.y - e.h; e.vy = 0; }
-          else if (e.vx !== 0) {
-            if (e.vx > 0) e.x = b.x - e.w; else e.x = b.x + b.w;
-            e.vx *= -1;
+        e.anim += 0.12 + Math.abs(e.vx) * 0.15;
+
+        if (e.kind === "goomba") {
+          e.x += e.vx;
+          e.vy += 0.5;
+          e.y += e.vy;
+          for (const b of collideBlocks(e)) {
+            if (b.type === "platform" || b.type === "cloud") {
+              if (e.vy > 0 && e.y + e.h - e.vy <= b.y + 1) { e.y = b.y - e.h; e.vy = 0; }
+              continue;
+            }
+            if (e.vy > 0) { e.y = b.y - e.h; e.vy = 0; }
+            else if (e.vx !== 0) {
+              if (e.vx > 0) e.x = b.x - e.w; else e.x = b.x + b.w;
+              e.vx *= -1;
+            }
           }
+          const foot = { x: e.x + (e.vx > 0 ? e.w + 2 : -2), y: e.y + e.h + 2, w: 2, h: 2 };
+          if (collideBlocks(foot).length === 0) e.vx *= -1;
+        } else if (e.kind === "flyer") {
+          // Hovering sine wave, chases horizontally
+          const dx = player.x - e.x;
+          e.vx += Math.sign(dx) * 0.04;
+          e.vx = Math.max(-1.6, Math.min(1.6, e.vx));
+          e.x += e.vx;
+          e.y = (e.baseY ?? e.y) + Math.sin(time * 0.05 + e.x * 0.01) * 24;
         }
-        const foot = { x: e.x + (e.vx > 0 ? e.w + 2 : -2), y: e.y + e.h + 2, w: 2, h: 2 };
-        if (collideBlocks(foot).length === 0) e.vx *= -1;
 
         if (
           player.x < e.x + e.w && player.x + player.w > e.x &&
           player.y < e.y + e.h && player.y + player.h > e.y
         ) {
-          if (player.vy > 1 && player.y + player.h - e.y < 18) {
+          const stompable = e.kind === "goomba" || e.kind === "flyer";
+          if (stompable && player.vy > 1 && player.y + player.h - e.y < 20) {
             e.alive = false; e.squashT = 30;
             player.vy = -8.5;
             player.squash = 0.7; player.stretch = 1.3;
-            localScore += 100; setScore(localScore);
-            floatText(e.x + e.w / 2, e.y - 4, "+100", "#ff7676");
-            addParticles(e.x + e.w / 2, e.y + 8, 10, { color: "#8b4513", size: 3, life: 25, speed: 3, gravity: 0.3 });
+            const reward = e.kind === "flyer" ? 200 : 100;
+            localScore += reward; setScore(localScore);
+            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
+            addParticles(e.x + e.w / 2, e.y + 8, 10, {
+              color: e.kind === "flyer" ? "#c8ccd4" : "#8b4513",
+              size: 3, life: 25, speed: 3, gravity: 0.3,
+            });
             cameraShake = 3;
-          } else if (player.invuln === 0) die();
+          } else die();
         }
       }
 
+      // Coins
       for (const c of world.coins) {
         if (c.taken) { if (c.pop > 0) c.pop--; continue; }
         c.t += 0.18;
@@ -311,24 +494,23 @@ function Index() {
           c.taken = true; c.pop = 20;
           localCoins += 1; localScore += 100;
           setCoinsCount(localCoins); setScore(localScore);
+          if (localCoins > 0 && localCoins % 20 === 0) {
+            localLives += 1; setLives(localLives);
+            floatText(c.x, c.y - 18, "1UP!", "#7ee085");
+          }
           floatText(c.x + 8, c.y - 4, "+100", "#ffd94a");
           addParticles(c.x + 8, c.y + 8, 8, { color: "#ffe680", size: 2, life: 24, speed: 2.5, gravity: 0.15, shape: "star" });
         }
       }
 
+      // Flag
       if (
-        world.flag.x &&
+        !stageCompleted && world.flag.x &&
         player.x + player.w > world.flag.x &&
         player.x < world.flag.x + 8 &&
         player.y + player.h > world.flag.y
       ) {
-        setStatus("win"); running = false;
-        for (let i = 0; i < 60; i++) {
-          addParticles(world.flag.x, world.flag.y - 200 + i * 5, 1, {
-            color: ["#ffd94a", "#ff5c8a", "#4ac1ff", "#7ee085"][i % 4],
-            size: 4, life: 60, speed: 4, gravity: 0.2, shape: "star",
-          });
-        }
+        completeStage();
       }
 
       particles = particles.filter((p) => p.life > 0);
@@ -339,13 +521,10 @@ function Index() {
     }
 
     // ------- Drawing -------
-    function drawSky() {
+    function drawSkyGrass() {
       const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#4a86f7");
-      g.addColorStop(0.6, "#7cb4ff");
-      g.addColorStop(1, "#c5e2ff");
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      g.addColorStop(0, "#4a86f7"); g.addColorStop(0.6, "#7cb4ff"); g.addColorStop(1, "#c5e2ff");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const sunX = canvas.width - 90 - cameraX * 0.02;
       const sunY = 80;
@@ -353,8 +532,7 @@ function Index() {
       sunGrad.addColorStop(0, "rgba(255,240,180,1)");
       sunGrad.addColorStop(0.4, "rgba(255,220,140,0.5)");
       sunGrad.addColorStop(1, "rgba(255,220,140,0)");
-      ctx.fillStyle = sunGrad;
-      ctx.fillRect(sunX - 90, sunY - 90, 180, 180);
+      ctx.fillStyle = sunGrad; ctx.fillRect(sunX - 90, sunY - 90, 180, 180);
       ctx.fillStyle = "#fff5c8";
       ctx.beginPath(); ctx.arc(sunX, sunY, 26, 0, Math.PI * 2); ctx.fill();
 
@@ -366,41 +544,105 @@ function Index() {
         ctx.lineTo(mx + 120, canvas.height - 240);
         ctx.lineTo(mx + 260, canvas.height - 100);
         ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#eaf1ff";
-        ctx.beginPath();
-        ctx.moveTo(mx + 90, canvas.height - 200);
-        ctx.lineTo(mx + 120, canvas.height - 240);
-        ctx.lineTo(mx + 150, canvas.height - 200);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = "#6b8fbf";
       }
-
       for (let i = 0; i < 8; i++) {
         const hx = i * 260 - (cameraX * 0.3) % 260;
         const grad = ctx.createLinearGradient(0, canvas.height - 160, 0, canvas.height);
-        grad.addColorStop(0, "#4aa64a");
-        grad.addColorStop(1, "#2f7a2f");
+        grad.addColorStop(0, "#4aa64a"); grad.addColorStop(1, "#2f7a2f");
         ctx.fillStyle = grad;
         ctx.beginPath(); ctx.arc(hx, canvas.height - 90, 100, Math.PI, 0); ctx.fill();
-        ctx.beginPath(); ctx.arc(hx + 140, canvas.height - 70, 70, Math.PI, 0); ctx.fill();
       }
-
       for (let i = 0; i < 10; i++) {
         const cx = i * 220 - (cameraX * 0.25) % 220;
         const cy = 50 + ((i * 53) % 60);
         cloud(cx, cy, 0.9 + (i % 3) * 0.15);
       }
+    }
 
-      ctx.fillStyle = "#1c5e1c";
+    function drawSkyCave() {
+      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      g.addColorStop(0, "#1a0f22"); g.addColorStop(0.6, "#3a1a10"); g.addColorStop(1, "#5a2010");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Torch glows
+      for (let i = 0; i < 6; i++) {
+        const tx = i * 180 - (cameraX * 0.5) % 180 + 90;
+        const ty = 120;
+        const flick = Math.sin(time * 0.3 + i) * 6 + 60;
+        const g2 = ctx.createRadialGradient(tx, ty, 5, tx, ty, flick);
+        g2.addColorStop(0, "rgba(255,180,80,0.6)");
+        g2.addColorStop(1, "rgba(255,180,80,0)");
+        ctx.fillStyle = g2; ctx.fillRect(tx - flick, ty - flick, flick * 2, flick * 2);
+      }
+
+      // Stalactites (ceiling)
+      ctx.fillStyle = "#2a1a12";
       for (let i = 0; i < 20; i++) {
-        const bx = i * 160 - (cameraX * 0.7) % 160;
-        const by = canvas.height - 100;
+        const sx = i * 90 - (cameraX * 0.6) % 90;
+        const h = 24 + ((i * 17) % 30);
         ctx.beginPath();
-        ctx.arc(bx, by, 14, Math.PI, 0);
-        ctx.arc(bx + 14, by - 4, 16, Math.PI, 0);
-        ctx.arc(bx + 30, by, 14, Math.PI, 0);
+        ctx.moveTo(sx, 32); ctx.lineTo(sx + 12, 32); ctx.lineTo(sx + 6, 32 + h);
+        ctx.closePath(); ctx.fill();
+      }
+      // Distant rock silhouettes
+      ctx.fillStyle = "#2a1810";
+      for (let i = 0; i < 6; i++) {
+        const rx = i * 260 - (cameraX * 0.2) % 260;
+        ctx.beginPath();
+        ctx.moveTo(rx, canvas.height - 60);
+        ctx.lineTo(rx + 80, canvas.height - 180);
+        ctx.lineTo(rx + 160, canvas.height - 60);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    function drawSkyNight() {
+      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      g.addColorStop(0, "#0a0a2e"); g.addColorStop(0.5, "#1a1a5a"); g.addColorStop(1, "#3a1a5a");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Stars
+      for (const st of stars) {
+        const tw = 0.6 + Math.abs(Math.sin(time * 0.03 + st.tw)) * 0.4;
+        ctx.fillStyle = `rgba(255,255,255,${tw})`;
+        const sx = ((st.x - cameraX * 0.1) % LEVEL_W + LEVEL_W) % LEVEL_W;
+        ctx.fillRect(sx, st.y, st.s, st.s);
+      }
+      // Moon
+      const mx = canvas.width - 100 - cameraX * 0.03;
+      const my = 90;
+      ctx.fillStyle = "rgba(255,240,200,0.2)";
+      ctx.beginPath(); ctx.arc(mx, my, 60, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#f8f4d0";
+      ctx.beginPath(); ctx.arc(mx, my, 32, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#d8d0a8";
+      ctx.beginPath(); ctx.arc(mx - 8, my - 4, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(mx + 10, my + 6, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(mx + 4, my - 12, 3, 0, Math.PI * 2); ctx.fill();
+
+      // Distant cloud islands
+      for (let i = 0; i < 8; i++) {
+        const cx = i * 260 - (cameraX * 0.3) % 260;
+        const cy = 260 + ((i * 41) % 80);
+        ctx.fillStyle = "rgba(120,100,180,0.5)";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 90, 20, 0, 0, Math.PI * 2);
         ctx.fill();
       }
+      // Foreground drifting clouds
+      for (let i = 0; i < 8; i++) {
+        const cx = i * 240 - (cameraX * 0.5) % 240;
+        const cy = 80 + ((i * 47) % 100);
+        ctx.globalAlpha = 0.7;
+        cloud(cx, cy, 1);
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawSky() {
+      if (stage.theme === "grass") drawSkyGrass();
+      else if (stage.theme === "cave") drawSkyCave();
+      else drawSkyNight();
     }
 
     function cloud(x: number, y: number, s = 1) {
@@ -432,10 +674,8 @@ function Index() {
           ctx.fillRect(x + 4, y + 6, 4, 4);
           ctx.fillRect(x + 20, y + 14, 4, 4);
           ctx.fillRect(x + 12, y + 22, 4, 4);
-          ctx.fillStyle = "rgba(0,0,0,0.35)";
-          ctx.fillRect(x, y + b.h - 3, b.w, 3);
-          ctx.fillStyle = "rgba(255,255,255,0.15)";
-          ctx.fillRect(x, y, b.w, 2);
+          ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + b.h - 3, b.w, 3);
+          ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(x, y, b.w, 2);
           break;
         }
         case "grass": {
@@ -449,8 +689,6 @@ function Index() {
           ctx.fillRect(x + 3, y - 2, 2, 4);
           ctx.fillRect(x + 11, y - 3, 2, 5);
           ctx.fillRect(x + 22, y - 2, 2, 4);
-          ctx.fillStyle = "rgba(0,0,0,0.15)";
-          ctx.fillRect(x, y + 10, b.w, 2);
           break;
         }
         case "brick": {
@@ -465,8 +703,7 @@ function Index() {
           ctx.moveTo(x + 24, y + 16); ctx.lineTo(x + 24, y + b.h);
           ctx.stroke();
           ctx.strokeRect(x + 1, y + 1, b.w - 2, b.h - 2);
-          ctx.fillStyle = "rgba(255,255,255,0.2)";
-          ctx.fillRect(x + 2, y + 2, b.w - 4, 1);
+          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(x + 2, y + 2, b.w - 4, 1);
           break;
         }
         case "question": {
@@ -482,17 +719,12 @@ function Index() {
             g.addColorStop(0, "#ffcf3f"); g.addColorStop(1, "rgba(200,110,0,1)");
             ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
             ctx.fillStyle = "#7a4600";
-            ctx.fillRect(x, y, b.w, 3);
-            ctx.fillRect(x, y + b.h - 3, b.w, 3);
-            ctx.fillRect(x, y, 3, b.h);
-            ctx.fillRect(x + b.w - 3, y, 3, b.h);
+            ctx.fillRect(x, y, b.w, 3); ctx.fillRect(x, y + b.h - 3, b.w, 3);
+            ctx.fillRect(x, y, 3, b.h); ctx.fillRect(x + b.w - 3, y, 3, b.h);
             ctx.fillStyle = "#ffe680";
-            ctx.fillRect(x + 3, y + 3, 3, 3);
-            ctx.fillRect(x + b.w - 6, y + 3, 3, 3);
-            ctx.fillRect(x + 3, y + b.h - 6, 3, 3);
-            ctx.fillRect(x + b.w - 6, y + b.h - 6, 3, 3);
-            ctx.fillStyle = "rgba(0,0,0,0.4)";
-            ctx.font = "bold 20px monospace";
+            ctx.fillRect(x + 3, y + 3, 3, 3); ctx.fillRect(x + b.w - 6, y + 3, 3, 3);
+            ctx.fillRect(x + 3, y + b.h - 6, 3, 3); ctx.fillRect(x + b.w - 6, y + b.h - 6, 3, 3);
+            ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.font = "bold 20px monospace";
             ctx.fillText("?", x + 11, y + 24);
             ctx.fillStyle = `rgba(255,255,255,${pulse})`;
             ctx.fillText("?", x + 10, y + 23);
@@ -501,38 +733,74 @@ function Index() {
         }
         case "pipe": {
           const g = ctx.createLinearGradient(x, 0, x + b.w, 0);
-          g.addColorStop(0, "#0f5a19");
-          g.addColorStop(0.15, "#7ee085");
-          g.addColorStop(0.5, "#3ec54a");
-          g.addColorStop(0.85, "#1a6b22");
-          g.addColorStop(1, "#0a3d10");
+          g.addColorStop(0, "#0f5a19"); g.addColorStop(0.15, "#7ee085");
+          g.addColorStop(0.5, "#3ec54a"); g.addColorStop(0.85, "#1a6b22"); g.addColorStop(1, "#0a3d10");
           ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
           if (b.pipeTop) {
             const rimX = b.pipeLeft ? x - 4 : x;
             const rimW = b.w + 4;
             ctx.fillStyle = "#1a6b22"; ctx.fillRect(rimX, y - 6, rimW, 8);
             const rg = ctx.createLinearGradient(rimX, 0, rimX + rimW, 0);
-            rg.addColorStop(0, "#0f5a19");
-            rg.addColorStop(0.2, "#8ff090");
-            rg.addColorStop(0.5, "#4ad058");
-            rg.addColorStop(0.8, "#1a6b22");
-            rg.addColorStop(1, "#0a3d10");
+            rg.addColorStop(0, "#0f5a19"); rg.addColorStop(0.2, "#8ff090");
+            rg.addColorStop(0.5, "#4ad058"); rg.addColorStop(0.8, "#1a6b22"); rg.addColorStop(1, "#0a3d10");
             ctx.fillStyle = rg; ctx.fillRect(rimX, y - 4, rimW, 4);
-            ctx.fillStyle = "rgba(255,255,255,0.3)";
-            ctx.fillRect(rimX + 4, y - 2, 8, 1);
+            ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillRect(rimX + 4, y - 2, 8, 1);
           }
           break;
         }
         case "stone": {
           const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#c8ccd4"); g.addColorStop(1, "#5c6270");
+          if (stage.theme === "cave") {
+            g.addColorStop(0, "#b56a3a"); g.addColorStop(1, "#5a2810");
+          } else {
+            g.addColorStop(0, "#c8ccd4"); g.addColorStop(1, "#5c6270");
+          }
           ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "rgba(0,0,0,0.2)";
+          ctx.fillStyle = "rgba(0,0,0,0.25)";
           ctx.fillRect(x + 6, y + 8, 4, 2);
           ctx.fillRect(x + 18, y + 18, 4, 2);
-          ctx.fillStyle = "rgba(255,255,255,0.25)";
-          ctx.fillRect(x, y, b.w, 2);
+          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(x, y, b.w, 2);
           break;
+        }
+        case "platform": {
+          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
+          g.addColorStop(0, "#c07500"); g.addColorStop(1, "#7a4600");
+          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
+          ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(x, y, b.w, 2);
+          ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + b.h - 2, b.w, 2);
+          break;
+        }
+        case "cloud": {
+          // Cloud platform (sky theme)
+          ctx.fillStyle = "rgba(255,255,255,0.9)";
+          ctx.beginPath();
+          ctx.arc(x + 6, y + 8, 8, 0, Math.PI * 2);
+          ctx.arc(x + 16, y + 5, 10, 0, Math.PI * 2);
+          ctx.arc(x + 26, y + 8, 8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#ffffff"; ctx.fillRect(x, y + 4, b.w, 8);
+          ctx.fillStyle = "rgba(180,200,240,0.5)"; ctx.fillRect(x, y + 10, b.w, 2);
+          break;
+        }
+      }
+    }
+
+    function drawHazard(h: Hazard) {
+      const x = Math.round(h.x - cameraX);
+      const y = Math.round(h.y - cameraY);
+      if (h.kind === "spike") {
+        ctx.fillStyle = "#8090a0";
+        const step = 6;
+        for (let i = 0; i < h.w; i += step) {
+          ctx.beginPath();
+          ctx.moveTo(x + i, y + h.h);
+          ctx.lineTo(x + i + step / 2, y);
+          ctx.lineTo(x + i + step, y + h.h);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        for (let i = 0; i < h.w; i += step) {
+          ctx.fillRect(x + i + step / 2 - 1, y + 2, 1, h.h - 4);
         }
       }
     }
@@ -543,7 +811,6 @@ function Index() {
       const py = player.y - cameraY;
       const f = player.facing;
 
-      // Shadow (unaffected by squash)
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.beginPath();
       ctx.ellipse(px + player.w / 2, py + player.h + 1, player.w * 0.55, 3.5, 0, 0, Math.PI * 2);
@@ -558,104 +825,57 @@ function Index() {
       const walkFrame = Math.floor(player.anim) % 4;
       const airborne = !player.onGround;
 
-      // Hat
       ctx.fillStyle = "#d32626";
       ctx.fillRect(2, 0, 18, 5);
       ctx.fillRect(10, -3, 12, 5);
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(12, 1, 6, 3);
-      ctx.fillStyle = "#a51a1a";
-      ctx.fillRect(12, 0, 6, 1);
+      ctx.fillStyle = "#fff"; ctx.fillRect(12, 1, 6, 3);
+      ctx.fillStyle = "#a51a1a"; ctx.fillRect(12, 0, 6, 1);
 
-      // Hair sides
       ctx.fillStyle = "#3a1e0a";
-      ctx.fillRect(2, 5, 3, 3);
-      ctx.fillRect(17, 5, 3, 3);
+      ctx.fillRect(2, 5, 3, 3); ctx.fillRect(17, 5, 3, 3);
+      ctx.fillStyle = "#ffcf9a"; ctx.fillRect(4, 5, 14, 9); ctx.fillRect(1, 8, 3, 4);
 
-      // Face
-      ctx.fillStyle = "#ffcf9a";
-      ctx.fillRect(4, 5, 14, 9);
-      ctx.fillRect(1, 8, 3, 4);
+      ctx.fillStyle = "#fff"; ctx.fillRect(12, 6, 4, 5);
+      ctx.fillStyle = "#1a3a8a"; ctx.fillRect(13, 7, 2, 3);
+      ctx.fillStyle = "#000"; ctx.fillRect(13, 8, 2, 2);
 
-      // Eye
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(12, 6, 4, 5);
-      ctx.fillStyle = "#1a3a8a";
-      ctx.fillRect(13, 7, 2, 3);
-      ctx.fillStyle = "#000";
-      ctx.fillRect(13, 8, 2, 2);
+      ctx.fillStyle = "#2a1408"; ctx.fillRect(6, 11, 12, 3); ctx.fillRect(4, 12, 2, 2);
+      ctx.fillStyle = "#e5a97a"; ctx.fillRect(15, 9, 3, 3);
 
-      // Mustache
-      ctx.fillStyle = "#2a1408";
-      ctx.fillRect(6, 11, 12, 3);
-      ctx.fillRect(4, 12, 2, 2);
-
-      // Nose
-      ctx.fillStyle = "#e5a97a";
-      ctx.fillRect(15, 9, 3, 3);
-
-      // Body / overalls
-      ctx.fillStyle = "#1e5fd8";
-      ctx.fillRect(2, 14, 18, 10);
-      ctx.fillRect(5, 13, 3, 3);
-      ctx.fillRect(13, 13, 3, 3);
-      // Shirt
+      ctx.fillStyle = "#1e5fd8"; ctx.fillRect(2, 14, 18, 10);
+      ctx.fillRect(5, 13, 3, 3); ctx.fillRect(13, 13, 3, 3);
       ctx.fillStyle = "#d32626";
-      ctx.fillRect(0, 14, 3, 7);
-      ctx.fillRect(19, 14, 3, 7);
-      ctx.fillRect(8, 13, 5, 3);
-      // Buttons
-      ctx.fillStyle = "#ffd94a";
-      ctx.fillRect(6, 17, 2, 2);
-      ctx.fillRect(14, 17, 2, 2);
+      ctx.fillRect(0, 14, 3, 7); ctx.fillRect(19, 14, 3, 7); ctx.fillRect(8, 13, 5, 3);
+      ctx.fillStyle = "#ffd94a"; ctx.fillRect(6, 17, 2, 2); ctx.fillRect(14, 17, 2, 2);
 
-      // Arms
       ctx.fillStyle = "#d32626";
       if (walking) {
         const armSwing = walkFrame % 2 === 0 ? 0 : 2;
         ctx.fillRect(-1, 15 + armSwing, 4, 7);
         ctx.fillRect(19, 15 - armSwing, 4, 7);
       } else if (airborne) {
-        ctx.fillRect(-2, 12, 4, 8);
-        ctx.fillRect(20, 12, 4, 8);
+        ctx.fillRect(-2, 12, 4, 8); ctx.fillRect(20, 12, 4, 8);
       } else {
-        ctx.fillRect(-1, 16, 4, 7);
-        ctx.fillRect(19, 16, 4, 7);
+        ctx.fillRect(-1, 16, 4, 7); ctx.fillRect(19, 16, 4, 7);
       }
-      // Gloves
       ctx.fillStyle = "#fff";
-      if (airborne) {
-        ctx.fillRect(-3, 19, 5, 4);
-        ctx.fillRect(20, 19, 5, 4);
-      } else {
-        ctx.fillRect(-2, 21, 5, 4);
-        ctx.fillRect(19, 21, 5, 4);
-      }
+      if (airborne) { ctx.fillRect(-3, 19, 5, 4); ctx.fillRect(20, 19, 5, 4); }
+      else { ctx.fillRect(-2, 21, 5, 4); ctx.fillRect(19, 21, 5, 4); }
 
-      // Legs / shoes
       ctx.fillStyle = "#5a2a08";
       if (airborne) {
-        ctx.fillRect(3, 24, 8, 6);
-        ctx.fillRect(11, 24, 8, 6);
-        ctx.fillStyle = "#2a1408";
-        ctx.fillRect(2, 27, 10, 3);
-        ctx.fillRect(10, 27, 10, 3);
+        ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
+        ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       } else if (walking) {
         const back = walkFrame === 0 || walkFrame === 2 ? 0 : 2;
         const front = walkFrame === 0 || walkFrame === 2 ? 2 : 0;
-        ctx.fillRect(3, 24 - back, 8, 6);
-        ctx.fillRect(11, 24 - front, 8, 6);
+        ctx.fillRect(3, 24 - back, 8, 6); ctx.fillRect(11, 24 - front, 8, 6);
         ctx.fillStyle = "#2a1408";
-        ctx.fillRect(2, 27 - back, 10, 3);
-        ctx.fillRect(10, 27 - front, 10, 3);
+        ctx.fillRect(2, 27 - back, 10, 3); ctx.fillRect(10, 27 - front, 10, 3);
       } else {
-        ctx.fillRect(3, 24, 8, 6);
-        ctx.fillRect(11, 24, 8, 6);
-        ctx.fillStyle = "#2a1408";
-        ctx.fillRect(2, 27, 10, 3);
-        ctx.fillRect(10, 27, 10, 3);
+        ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
+        ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       }
-
       ctx.restore();
 
       if (player.landPulse > 0) {
@@ -667,15 +887,13 @@ function Index() {
       }
     }
 
-    function drawEnemy(e: Enemy) {
+    function drawGoomba(e: Enemy) {
       const x = Math.round(e.x - cameraX);
       const y = Math.round(e.y - cameraY);
       if (!e.alive) {
         if (e.squashT > 0) {
-          ctx.fillStyle = "#5a2f14";
-          ctx.fillRect(x, y + e.h - 6, e.w, 6);
-          ctx.fillStyle = "#8b4513";
-          ctx.fillRect(x + 4, y + e.h - 12, e.w - 8, 6);
+          ctx.fillStyle = "#5a2f14"; ctx.fillRect(x, y + e.h - 6, e.w, 6);
+          ctx.fillStyle = "#8b4513"; ctx.fillRect(x + 4, y + e.h - 12, e.w - 8, 6);
         }
         return;
       }
@@ -688,20 +906,13 @@ function Index() {
       const capGrad = ctx.createRadialGradient(x + e.w / 2, y + 6 - bounce, 3, x + e.w / 2, y + 12 - bounce, 18);
       capGrad.addColorStop(0, "#c96a2a"); capGrad.addColorStop(1, "#5a2a08");
       ctx.fillStyle = capGrad;
-      ctx.beginPath();
-      ctx.arc(x + e.w / 2, y + 12 - bounce, 14, Math.PI, 0);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x + e.w / 2, y + 12 - bounce, 14, Math.PI, 0); ctx.fill();
       ctx.fillRect(x, y + 12 - bounce, e.w, 10);
       ctx.fillStyle = "rgba(255,220,180,0.35)";
-      ctx.beginPath();
-      ctx.arc(x + 10, y + 8 - bounce, 4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 10, y + 8 - bounce, 4, 0, Math.PI * 2); ctx.fill();
 
-      ctx.fillStyle = "#f4c88a";
-      ctx.fillRect(x + 5, y + 14 - bounce, 18, 8);
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      ctx.fillRect(x + 5, y + 14 - bounce, 18, 1);
-
+      ctx.fillStyle = "#f4c88a"; ctx.fillRect(x + 5, y + 14 - bounce, 18, 8);
+      ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x + 5, y + 14 - bounce, 18, 1);
       ctx.fillStyle = "#fff";
       ctx.fillRect(x + 6, y + 15 - bounce, 6, 6);
       ctx.fillRect(x + 16, y + 15 - bounce, 6, 6);
@@ -710,16 +921,54 @@ function Index() {
       ctx.fillRect(x + 6 + eyeDir, y + 17 - bounce, 3, 3);
       ctx.fillRect(x + 16 + eyeDir, y + 17 - bounce, 3, 3);
       ctx.fillStyle = "#3a1408";
-      ctx.fillRect(x + 5, y + 14 - bounce, 8, 2);
-      ctx.fillRect(x + 15, y + 14 - bounce, 8, 2);
+      ctx.fillRect(x + 5, y + 14 - bounce, 8, 2); ctx.fillRect(x + 15, y + 14 - bounce, 8, 2);
 
       const step = Math.floor(e.anim) % 2;
       ctx.fillStyle = "#2a1408";
       ctx.fillRect(x + 2, y + 22 + (step ? 0 : 1), 8, 6);
       ctx.fillRect(x + 18, y + 22 + (step ? 1 : 0), 8, 6);
-      ctx.fillStyle = "#5a2a08";
-      ctx.fillRect(x + 2, y + 22 + (step ? 0 : 1), 8, 2);
-      ctx.fillRect(x + 18, y + 22 + (step ? 1 : 0), 8, 2);
+    }
+
+    function drawFlyer(e: Enemy) {
+      const x = Math.round(e.x - cameraX);
+      const y = Math.round(e.y - cameraY);
+      if (!e.alive) {
+        if (e.squashT > 0) {
+          ctx.fillStyle = "#5c6270"; ctx.fillRect(x + 4, y + e.h - 6, e.w - 8, 6);
+        }
+        return;
+      }
+      const flap = Math.sin(e.anim * 2) * 6;
+      // Body
+      const g = ctx.createRadialGradient(x + e.w / 2, y + 12, 4, x + e.w / 2, y + 12, 14);
+      g.addColorStop(0, "#e05c8a"); g.addColorStop(1, "#8b2a4a");
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(x + e.w / 2, y + 12, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+      // Wings
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + 8);
+      ctx.lineTo(x - 6, y + 8 - flap);
+      ctx.lineTo(x + 4, y + 14);
+      ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + e.w - 4, y + 8);
+      ctx.lineTo(x + e.w + 6, y + 8 - flap);
+      ctx.lineTo(x + e.w - 4, y + 14);
+      ctx.closePath(); ctx.fill();
+      // Eyes
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(x + 8, y + 9, 5, 5); ctx.fillRect(x + 15, y + 9, 5, 5);
+      ctx.fillStyle = "#000";
+      const eyeDir = e.vx > 0 ? 2 : 0;
+      ctx.fillRect(x + 9 + eyeDir, y + 10, 2, 3); ctx.fillRect(x + 16 + eyeDir, y + 10, 2, 3);
+      // Beak
+      ctx.fillStyle = "#ffd94a";
+      ctx.beginPath();
+      ctx.moveTo(x + e.w / 2 - 2, y + 16);
+      ctx.lineTo(x + e.w / 2 + 2, y + 16);
+      ctx.lineTo(x + e.w / 2, y + 20);
+      ctx.closePath(); ctx.fill();
     }
 
     function drawCoin(c: Coin) {
@@ -728,24 +977,16 @@ function Index() {
       const x = Math.round(c.x - cameraX);
       const y = Math.round(c.y + bob - cameraY);
       const gr = ctx.createRadialGradient(x + 8, y + 8, 2, x + 8, y + 8, 14);
-      gr.addColorStop(0, "rgba(255,220,80,0.4)");
-      gr.addColorStop(1, "rgba(255,220,80,0)");
-      ctx.fillStyle = gr;
-      ctx.fillRect(x - 6, y - 6, 28, 28);
-
+      gr.addColorStop(0, "rgba(255,220,80,0.4)"); gr.addColorStop(1, "rgba(255,220,80,0)");
+      ctx.fillStyle = gr; ctx.fillRect(x - 6, y - 6, 28, 28);
       const scale = Math.abs(Math.cos(c.t));
       const w = Math.max(2, 14 * scale);
       const grad = ctx.createLinearGradient(x, 0, x + 16, 0);
-      grad.addColorStop(0, "#c07500");
-      grad.addColorStop(0.5, "#ffd94a");
-      grad.addColorStop(1, "#c07500");
-      ctx.fillStyle = grad;
-      ctx.fillRect(x + 8 - w / 2, y, w, 14);
+      grad.addColorStop(0, "#c07500"); grad.addColorStop(0.5, "#ffd94a"); grad.addColorStop(1, "#c07500");
+      ctx.fillStyle = grad; ctx.fillRect(x + 8 - w / 2, y, w, 14);
       if (w > 4) {
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        ctx.fillRect(x + 8 - w / 2 + 1, y + 2, 2, 10);
-        ctx.fillStyle = "rgba(0,0,0,0.35)";
-        ctx.fillRect(x + 8 + w / 2 - 2, y + 2, 1, 10);
+        ctx.fillStyle = "rgba(255,255,255,0.55)"; ctx.fillRect(x + 8 - w / 2 + 1, y + 2, 2, 10);
+        ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x + 8 + w / 2 - 2, y + 2, 1, 10);
       }
     }
 
@@ -755,27 +996,23 @@ function Index() {
       const y = world.flag.y - cameraY;
       const pg = ctx.createLinearGradient(x, 0, x + 4, 0);
       pg.addColorStop(0, "#7a8090"); pg.addColorStop(0.5, "#e0e5ec"); pg.addColorStop(1, "#5c6270");
-      ctx.fillStyle = pg;
-      ctx.fillRect(x, y - 220, 4, 280);
+      ctx.fillStyle = pg; ctx.fillRect(x, y - 220, 4, 280);
       ctx.fillStyle = "#ffd94a";
       ctx.beginPath(); ctx.arc(x + 2, y - 220, 7, 0, Math.PI * 2); ctx.fill();
       const wave = Math.sin(time * 0.1) * 4;
-      ctx.fillStyle = "#00c853";
+      const flagColors = ["#00c853", "#ff9500", "#c05af0"];
+      ctx.fillStyle = flagColors[stageIdx] || "#00c853";
       ctx.beginPath();
-      ctx.moveTo(x + 4, y - 210);
-      ctx.lineTo(x + 40 + wave, y - 200);
-      ctx.lineTo(x + 4, y - 190);
+      ctx.moveTo(x + 4, y - 210); ctx.lineTo(x + 40 + wave, y - 200); ctx.lineTo(x + 4, y - 190);
       ctx.closePath(); ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 12px monospace";
+      ctx.fillStyle = "#fff"; ctx.font = "bold 12px monospace";
       ctx.fillText("★", x + 14, y - 197);
     }
 
     function drawParticles() {
       for (const p of particles) {
         const alpha = Math.min(1, p.life / p.maxLife);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = alpha;
+        ctx.fillStyle = p.color; ctx.globalAlpha = alpha;
         const px = Math.round(p.x - cameraX);
         const py = Math.round(p.y - cameraY);
         if (p.shape === "star") {
@@ -783,9 +1020,7 @@ function Index() {
           ctx.fillRect(px, py - p.size, 1, p.size * 2);
         } else if (p.shape === "circle") {
           ctx.beginPath(); ctx.arc(px, py, p.size, 0, Math.PI * 2); ctx.fill();
-        } else {
-          ctx.fillRect(px - p.size / 2, py - p.size / 2, p.size, p.size);
-        }
+        } else ctx.fillRect(px - p.size / 2, py - p.size / 2, p.size, p.size);
       }
       ctx.globalAlpha = 1;
     }
@@ -797,10 +1032,8 @@ function Index() {
         ctx.globalAlpha = alpha;
         const x = Math.round(f.x - cameraX);
         const y = Math.round(f.y - cameraY);
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillText(f.text, x - 12, y + 1);
-        ctx.fillStyle = f.color;
-        ctx.fillText(f.text, x - 13, y);
+        ctx.fillStyle = "rgba(0,0,0,0.7)"; ctx.fillText(f.text, x - 12, y + 1);
+        ctx.fillStyle = f.color; ctx.fillText(f.text, x - 13, y);
       }
       ctx.globalAlpha = 1;
     }
@@ -813,9 +1046,13 @@ function Index() {
 
       drawSky();
       for (const b of world.blocks) drawBlock(b);
+      for (const h of world.hazards) drawHazard(h);
       drawFlag();
       for (const c of world.coins) drawCoin(c);
-      for (const e of world.enemies) drawEnemy(e);
+      for (const e of world.enemies) {
+        if (e.kind === "goomba") drawGoomba(e);
+        else drawFlyer(e);
+      }
       drawPlayer();
       drawParticles();
       drawFloatTexts();
@@ -825,11 +1062,24 @@ function Index() {
         canvas.width / 2, canvas.height / 2, canvas.height * 0.85
       );
       vg.addColorStop(0, "rgba(0,0,0,0)");
-      vg.addColorStop(1, "rgba(0,0,0,0.35)");
-      ctx.fillStyle = vg;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      vg.addColorStop(1, stage.theme === "cave" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)");
+      ctx.fillStyle = vg; ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.restore();
+
+      // Stage banner (first 90 frames)
+      if (time < 90) {
+        const alpha = time < 60 ? 1 : (90 - time) / 30;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, canvas.height / 2 - 30, canvas.width, 60);
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 26px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(stage.name.toUpperCase(), canvas.width / 2, canvas.height / 2 + 10);
+        ctx.textAlign = "left";
+        ctx.globalAlpha = 1;
+      }
     }
 
     let raf = 0;
@@ -847,11 +1097,20 @@ function Index() {
       running = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetKey]);
+  }, [resetKey, stageIdx]);
 
   const restart = () => {
-    setScore(0); setCoinsCount(0); setLives(3);
+    setScore(0); setCoinsCount(0); setLives(3); setStageIdx(0);
+    setTimeLeft(STAGES[0].timeLimit);
     setStatus("playing"); setResetKey((k) => k + 1);
+  };
+
+  const nextStage = () => {
+    const nxt = stageIdx + 1;
+    setStageIdx(nxt);
+    setTimeLeft(STAGES[nxt].timeLimit);
+    setStatus("playing");
+    setResetKey((k) => k + 1);
   };
 
   const holdKey = (code: string) => ({
@@ -868,10 +1127,12 @@ function Index() {
         SUPER PLUMBER ADVENTURE
       </h1>
 
-      <div className="flex gap-4 text-white font-mono font-bold text-sm md:text-base drop-shadow-[2px_2px_0_#000]">
+      <div className="flex flex-wrap justify-center gap-3 md:gap-5 text-white font-mono font-bold text-xs md:text-base drop-shadow-[2px_2px_0_#000]">
         <span>SCORE {score.toString().padStart(6, "0")}</span>
         <span className="text-yellow-300">◉ x{coinsCount.toString().padStart(2, "0")}</span>
         <span className="text-red-300">♥ x{lives}</span>
+        <span className={timeLeft <= 20 ? "text-red-400 animate-pulse" : ""}>⏱ {timeLeft.toString().padStart(3, "0")}</span>
+        <span className="text-cyan-300">WORLD {STAGES[stageIdx].name.split(" ")[0]}</span>
       </div>
 
       <div className="relative rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-4 ring-yellow-400 bg-sky-400 max-w-full">
@@ -882,16 +1143,30 @@ function Index() {
           className="block w-full h-auto"
           style={{ imageRendering: "pixelated", maxWidth: "min(100vw - 24px, 800px)" }}
         />
-        {status !== "playing" && (
+        {status === "stageClear" && (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">
-              {status === "win" ? "¡NIVEL COMPLETO!" : "GAME OVER"}
-            </h2>
+            <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
+            <p className="text-lg">Puntuación: {score}</p>
+            <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+              SIGUIENTE MUNDO →
+            </button>
+          </div>
+        )}
+        {status === "win" && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
+            <p className="text-xl">Puntuación final: {score}</p>
+            <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
+            <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+              JUGAR DE NUEVO
+            </button>
+          </div>
+        )}
+        {status === "dead" && (
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
             <p className="text-xl">Puntuación: {score}</p>
-            <button
-              onClick={restart}
-              className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition"
-            >
+            <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
               JUGAR DE NUEVO
             </button>
           </div>
@@ -907,7 +1182,7 @@ function Index() {
       </div>
 
       <p className="text-white/90 text-xs md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000]">
-        ← → moverse · SHIFT correr · ESPACIO / ↑ saltar · salta sobre enemigos · llega a la bandera
+        ← → moverse · SHIFT correr · ESPACIO / ↑ saltar · 20 monedas = 1UP · cuidado con el tiempo
       </p>
     </main>
   );
