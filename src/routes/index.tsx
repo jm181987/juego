@@ -621,8 +621,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           castShadow={false}
         />
 
-          castShadow={false}
-        />
+
         {/* target lejano en el eje -Y local (dirección del cabezal) */}
         <object3D ref={spotTargetRef} position={[0, -12, 0]} />
         {/* halo cercano para no dejar el cuerpo a oscuras */}
