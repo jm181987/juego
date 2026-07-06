@@ -1144,7 +1144,7 @@ function Index() {
       ctx.scale(f * st * CHAR_SCALE, sq * CHAR_SCALE);
       ctx.translate(-BW / 2, -BH);
 
-      const speed = Math.abs(player.vx);
+      const speed = Math.abs(player.vx); void speed;
       const walking = player.onGround && speed > 0.3;
       const walkPhase = player.anim * 0.55;
       const walkFrame = Math.floor(player.anim) % 4; void walkFrame;
