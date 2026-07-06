@@ -1023,6 +1023,21 @@ function Index() {
         }
       }
 
+      // Checkpoints
+      for (const cp of world.checkpoints) {
+        if (cp.reached) continue;
+        if (
+          player.x + player.w > cp.x - 20 && player.x < cp.x + 20 &&
+          player.y + player.h > cp.y && player.y < cp.y + TILE * 4
+        ) {
+          cp.reached = true;
+          localScore += 250; setScore(localScore);
+          floatText(cp.x, cp.y - 20, "CHECKPOINT!", "#7ee085");
+          addParticles(cp.x, cp.y, 20, { color: "#7ee085", size: 3, life: 40, speed: 4, gravity: 0.15, shape: "star" });
+          cameraShake = 3;
+        }
+      }
+
       // Flag
       if (
         !stageCompleted && world.flag.x &&
