@@ -1121,8 +1121,54 @@ function Index() {
       }
 
 
+      // Loot drops physics + pickup
+      for (const l of loot) {
+        if (l.taken) continue;
+        l.life--;
+        if (l.life <= 0) { l.taken = true; continue; }
+        l.vy += 0.5;
+        if (l.vy > 10) l.vy = 10;
+        l.x += l.vx;
+        l.y += l.vy;
+        l.t += 0.15;
+        // Simple ground collision
+        const foot = { x: l.x - 4, y: l.y - 4, w: 8, h: 8 };
+        for (const b of collideBlocks(foot)) {
+          if (b.type === "platform" || b.type === "cloud") {
+            if (l.vy > 0 && foot.y + foot.h - l.vy <= b.y + 1) { l.y = b.y - 4; l.vy = 0; l.vx *= 0.8; }
+            continue;
+          }
+          if (l.vy > 0 && foot.y + foot.h - l.vy <= b.y + 2) { l.y = b.y - 4; l.vy = 0; l.vx *= 0.7; }
+          else { l.vx *= -0.5; l.x += l.vx; }
+        }
+        // Pickup
+        if (
+          player.x < l.x + 8 && player.x + player.w > l.x - 8 &&
+          player.y < l.y + 8 && player.y + player.h > l.y - 8
+        ) {
+          l.taken = true;
+          if (l.kind === "gold") {
+            stats.gold += 1; localScore += 25; setScore(localScore);
+            floatText(l.x, l.y - 4, "+1G", "#ffd94a");
+          } else if (l.kind === "gem") {
+            stats.gold += 10; localScore += 250; setScore(localScore);
+            floatText(l.x, l.y - 4, "+10G", "#c05af0");
+            addParticles(l.x, l.y, 12, { color: "#c05af0", size: 3, life: 30, speed: 3, gravity: 0.1, shape: "star" });
+          } else if (l.kind === "hpPotion") {
+            stats.hpPotions += 1;
+            floatText(l.x, l.y - 4, "+POCIÓN", "#7ee085");
+          } else if (l.kind === "mpPotion") {
+            stats.mpPotions += 1;
+            floatText(l.x, l.y - 4, "+MANÁ", "#4ac1ff");
+          }
+          hudTick();
+        }
+      }
+      loot = loot.filter((l) => !l.taken);
+
       // Coins
       for (const c of world.coins) {
+
         if (c.taken) { if (c.pop > 0) c.pop--; continue; }
         c.t += 0.18;
         if (
