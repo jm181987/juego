@@ -2653,31 +2653,48 @@ function Index() {
 }
 
 
-function Overlay({ title, subtitle, color, onClick, btn }: { title: string; subtitle: string; color: string; onClick?: () => void; btn?: string }) {
+function Overlay({ title, subtitle, color, onClick, btn, onCustomize }: {
+  title: string; subtitle: string; color: string;
+  onClick?: () => void; btn?: string; onCustomize?: () => void;
+}) {
   return (
     <div style={{
       position: "absolute", inset: 0, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       background: "radial-gradient(ellipse at center, #1a0838ee, #000f)",
-      color: "#fff", textAlign: "center", padding: 20,
+      color: "#fff", textAlign: "center", padding: 20, zIndex: 50,
     }}>
       <h1 style={{ fontSize: 56, margin: 0, color, textShadow: `0 0 30px ${color}, 0 0 60px ${color}88`, letterSpacing: 4 }}>{title}</h1>
       <p style={{ fontSize: 16, color: "#ccc", marginTop: 12 }}>{subtitle}</p>
-      {btn && onClick && (
-        <button
-          onClick={onClick}
-          style={{
-            marginTop: 32, padding: "14px 36px", fontSize: 18, fontWeight: 700,
-            background: `linear-gradient(180deg, ${color}, ${color}88)`,
-            color: "#0a0418", border: "2px solid #fff", borderRadius: 8,
-            cursor: "pointer", letterSpacing: 2, textTransform: "uppercase",
-            boxShadow: `0 0 30px ${color}`,
-          }}
-        >{btn}</button>
-      )}
+      <div style={{ display: "flex", gap: 12, marginTop: 32, flexWrap: "wrap", justifyContent: "center" }}>
+        {btn && onClick && (
+          <button
+            onClick={onClick}
+            style={{
+              padding: "14px 36px", fontSize: 18, fontWeight: 700,
+              background: `linear-gradient(180deg, ${color}, ${color}88)`,
+              color: "#0a0418", border: "2px solid #fff", borderRadius: 8,
+              cursor: "pointer", letterSpacing: 2, textTransform: "uppercase",
+              boxShadow: `0 0 30px ${color}`,
+            }}
+          >{btn}</button>
+        )}
+        {onCustomize && (
+          <button
+            onClick={onCustomize}
+            style={{
+              padding: "14px 28px", fontSize: 14, fontWeight: 700,
+              background: "transparent",
+              color: "#fff", border: "2px solid #7ee6ff", borderRadius: 8,
+              cursor: "pointer", letterSpacing: 2, textTransform: "uppercase",
+            }}
+          >Personalizar personaje</button>
+        )}
+      </div>
       <p style={{ fontSize: 12, color: "#666", marginTop: 24 }}>
-        WASD · Espacio · Z ataque · Q/E pociones
+        WASD · Espacio · Z ataque · Q/E pociones · Shift correr · F linterna · Esc pausa
       </p>
     </div>
   );
 }
+
