@@ -773,144 +773,33 @@ function Index() {
     }
 
     // ------- Drawing -------
-    function drawSkyGrass() {
-      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#4a86f7"); g.addColorStop(0.6, "#7cb4ff"); g.addColorStop(1, "#c5e2ff");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const sunX = canvas.width - 90 - cameraX * 0.02;
-      const sunY = 80;
-      const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 80);
-      sunGrad.addColorStop(0, "rgba(255,240,180,1)");
-      sunGrad.addColorStop(0.4, "rgba(255,220,140,0.5)");
-      sunGrad.addColorStop(1, "rgba(255,220,140,0)");
-      ctx.fillStyle = sunGrad; ctx.fillRect(sunX - 90, sunY - 90, 180, 180);
-      ctx.fillStyle = "#fff5c8";
-      ctx.beginPath(); ctx.arc(sunX, sunY, 26, 0, Math.PI * 2); ctx.fill();
-
-      ctx.fillStyle = "#6b8fbf";
-      for (let i = 0; i < 8; i++) {
-        const mx = i * 320 - (cameraX * 0.15) % 320;
-        ctx.beginPath();
-        ctx.moveTo(mx - 20, canvas.height - 100);
-        ctx.lineTo(mx + 120, canvas.height - 240);
-        ctx.lineTo(mx + 260, canvas.height - 100);
-        ctx.closePath(); ctx.fill();
-      }
-      for (let i = 0; i < 8; i++) {
-        const hx = i * 260 - (cameraX * 0.3) % 260;
-        const grad = ctx.createLinearGradient(0, canvas.height - 160, 0, canvas.height);
-        grad.addColorStop(0, "#4aa64a"); grad.addColorStop(1, "#2f7a2f");
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(hx, canvas.height - 90, 100, Math.PI, 0); ctx.fill();
-      }
-      for (let i = 0; i < 10; i++) {
-        const cx = i * 220 - (cameraX * 0.25) % 220;
-        const cy = 50 + ((i * 53) % 60);
-        cloud(cx, cy, 0.9 + (i % 3) * 0.15);
-      }
-    }
-
-    function drawSkyCave() {
-      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#1a0f22"); g.addColorStop(0.6, "#3a1a10"); g.addColorStop(1, "#5a2010");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Torch glows
-      for (let i = 0; i < 6; i++) {
-        const tx = i * 180 - (cameraX * 0.5) % 180 + 90;
-        const ty = 120;
-        const flick = Math.sin(time * 0.3 + i) * 6 + 60;
-        const g2 = ctx.createRadialGradient(tx, ty, 5, tx, ty, flick);
-        g2.addColorStop(0, "rgba(255,180,80,0.6)");
-        g2.addColorStop(1, "rgba(255,180,80,0)");
-        ctx.fillStyle = g2; ctx.fillRect(tx - flick, ty - flick, flick * 2, flick * 2);
-      }
-
-      // Stalactites (ceiling)
-      ctx.fillStyle = "#2a1a12";
-      for (let i = 0; i < 20; i++) {
-        const sx = i * 90 - (cameraX * 0.6) % 90;
-        const h = 24 + ((i * 17) % 30);
-        ctx.beginPath();
-        ctx.moveTo(sx, 32); ctx.lineTo(sx + 12, 32); ctx.lineTo(sx + 6, 32 + h);
-        ctx.closePath(); ctx.fill();
-      }
-      // Distant rock silhouettes
-      ctx.fillStyle = "#2a1810";
-      for (let i = 0; i < 6; i++) {
-        const rx = i * 260 - (cameraX * 0.2) % 260;
-        ctx.beginPath();
-        ctx.moveTo(rx, canvas.height - 60);
-        ctx.lineTo(rx + 80, canvas.height - 180);
-        ctx.lineTo(rx + 160, canvas.height - 60);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-
-    function drawSkyNight() {
-      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#0a0a2e"); g.addColorStop(0.5, "#1a1a5a"); g.addColorStop(1, "#3a1a5a");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Stars
-      for (const st of stars) {
-        const tw = 0.6 + Math.abs(Math.sin(time * 0.03 + st.tw)) * 0.4;
-        ctx.fillStyle = `rgba(255,255,255,${tw})`;
-        const sx = ((st.x - cameraX * 0.1) % LEVEL_W + LEVEL_W) % LEVEL_W;
-        ctx.fillRect(sx, st.y, st.s, st.s);
-      }
-      // Moon
-      const mx = canvas.width - 100 - cameraX * 0.03;
-      const my = 90;
-      ctx.fillStyle = "rgba(255,240,200,0.2)";
-      ctx.beginPath(); ctx.arc(mx, my, 60, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#f8f4d0";
-      ctx.beginPath(); ctx.arc(mx, my, 32, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#d8d0a8";
-      ctx.beginPath(); ctx.arc(mx - 8, my - 4, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(mx + 10, my + 6, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(mx + 4, my - 12, 3, 0, Math.PI * 2); ctx.fill();
-
-      // Distant cloud islands
-      for (let i = 0; i < 8; i++) {
-        const cx = i * 260 - (cameraX * 0.3) % 260;
-        const cy = 260 + ((i * 41) % 80);
-        ctx.fillStyle = "rgba(120,100,180,0.5)";
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, 90, 20, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Foreground drifting clouds
-      for (let i = 0; i < 8; i++) {
-        const cx = i * 240 - (cameraX * 0.5) % 240;
-        const cy = 80 + ((i * 47) % 100);
-        ctx.globalAlpha = 0.7;
-        cloud(cx, cy, 1);
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    function drawSky() {
-      if (stage.theme === "grass") drawSkyGrass();
-      else if (stage.theme === "cave") drawSkyCave();
-      else drawSkyNight();
-    }
-
     function cloud(x: number, y: number, s = 1) {
-      ctx.fillStyle = "rgba(230,240,255,0.9)";
-      ctx.beginPath();
-      ctx.arc(x, y + 2, 16 * s, 0, Math.PI * 2);
-      ctx.arc(x + 18 * s, y - 4, 22 * s, 0, Math.PI * 2);
-      ctx.arc(x + 40 * s, y + 2, 16 * s, 0, Math.PI * 2);
-      ctx.arc(x + 22 * s, y + 10, 18 * s, 0, Math.PI * 2);
-      ctx.fill();
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(x, y - 1, 14 * s, 0, Math.PI * 2);
       ctx.arc(x + 18 * s, y - 7, 20 * s, 0, Math.PI * 2);
       ctx.arc(x + 40 * s, y - 1, 14 * s, 0, Math.PI * 2);
+      ctx.arc(x + 22 * s, y + 7, 16 * s, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    function drawSky() {
+      // Base sky + baked sun/moon/stars/stalactites — tiled parallax
+      const offFar = -((cameraX * 0.15) % BG_W);
+      ctx.drawImage(bgFar.c, offFar, 0);
+      ctx.drawImage(bgFar.c, offFar + BG_W, 0);
+      const offMid = -((cameraX * 0.3) % BG_W);
+      ctx.drawImage(bgMid.c, offMid, 0);
+      ctx.drawImage(bgMid.c, offMid + BG_W, 0);
+
+      // A few animated clouds for grass/sky themes (cheap)
+      if (stage.theme !== "cave") {
+        for (let i = 0; i < 5; i++) {
+          const cx2 = i * 260 - (cameraX * 0.4) % 260;
+          const cy = 50 + ((i * 53) % 60);
+          cloud(cx2, cy, 0.9 + (i % 3) * 0.15);
+        }
+      }
     }
 
     function drawBlock(b: Block) {
