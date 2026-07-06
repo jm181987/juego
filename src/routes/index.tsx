@@ -350,17 +350,24 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   walkPhaseRef: React.MutableRefObject<number>;
 }) {
   const group = useRef<THREE.Group>(null!);
-  
   const swordRef = useRef<THREE.Group>(null!);
+  const bonesRef = useRef<{
+    rightArm?: THREE.Object3D;
+    rightForeArm?: THREE.Object3D;
+    spine1?: THREE.Object3D;
+    rightHand?: THREE.Object3D;
+    base: {
+      rightArm?: THREE.Euler;
+      rightForeArm?: THREE.Euler;
+      spine1?: THREE.Euler;
+    };
+  }>({ base: {} });
 
   const gltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
 
-  // Clone the scene WITH skeleton so multiple hero instances (or React strict-mode
-  // double-mounts) don't fight over one shared skinned mesh — this was the cause of
-  // the hero staying in T-pose while the shadow moved.
   const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
 
   useEffect(() => {
@@ -374,13 +381,22 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           mat.color.multiplyScalar(0.85);
         }
       }
+      const name = o.name;
+      if (name === "mixamorigRightArm" || name === "mixamorig:RightArm") bonesRef.current.rightArm = o;
+      else if (name === "mixamorigRightForeArm" || name === "mixamorig:RightForeArm") bonesRef.current.rightForeArm = o;
+      else if (name === "mixamorigSpine1" || name === "mixamorig:Spine1") bonesRef.current.spine1 = o;
+      else if (name === "mixamorigRightHand" || name === "mixamorig:RightHand") bonesRef.current.rightHand = o;
     });
+    // Attach sword to the right hand bone so it follows the arm swing.
+    if (bonesRef.current.rightHand && swordRef.current) {
+      bonesRef.current.rightHand.add(swordRef.current);
+      swordRef.current.position.set(0, 0.05, 0.08);
+      swordRef.current.rotation.set(Math.PI / 2, 0, 0);
+      swordRef.current.scale.setScalar(1);
+    }
   }, [cloned]);
 
-  // Bind animations to the cloned scene (fresh mixer per instance).
   const { actions } = useAnimations(gltf.animations, cloned);
-
-
   const currentAction = useRef<string>("");
   const prevWalkPhase = useRef(0);
 
@@ -403,63 +419,81 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions]);
 
+  // Priority 1: run AFTER the animation mixer so our bone offsets aren't
+  // overwritten by the clip evaluator.
   useFrame(() => {
     if (!group.current) return;
 
-    // Follow the player position; face the aim direction.
     group.current.position.set(posRef.current.x, posRef.current.y, posRef.current.z);
     group.current.rotation.y = facingRef.current + Math.PI;
 
     const wp = walkPhaseRef.current;
     const walking = Math.abs(wp - prevWalkPhase.current) > 0.0005;
     prevWalkPhase.current = wp;
-    const atk = attackingRef.current;
 
     if (walking) {
       switchTo("Run", 0.18, 1.35);
     } else {
       switchTo("Idle", 0.22, 1);
     }
+  }, 0);
 
-    if (swordRef.current) {
-      // Overhead-to-forward slash independent of locomotion animation.
-      const swing = atk > 0 ? Math.sin((1 - atk) * Math.PI) : 0;
-      swordRef.current.rotation.z = -0.6 - swing * 1.6;
-      swordRef.current.rotation.x = swing * 1.2;
+  useFrame(() => {
+    const b = bonesRef.current;
+    // Cache base rotations from the currently-playing clip on first sight.
+    if (b.rightArm && !b.base.rightArm) b.base.rightArm = b.rightArm.rotation.clone();
+    if (b.rightForeArm && !b.base.rightForeArm) b.base.rightForeArm = b.rightForeArm.rotation.clone();
+    if (b.spine1 && !b.base.spine1) b.base.spine1 = b.spine1.rotation.clone();
+
+    // attackingRef is 1 → 0 across the attack window; s is 0 → 1 → 0 slash curve.
+    const atk = Math.max(0, Math.min(1, attackingRef.current));
+    const s = atk > 0 ? Math.sin((1 - atk) * Math.PI) : 0;
+
+    if (b.rightArm) {
+      const base = b.base.rightArm!;
+      // Raise shoulder, then chop down/forward.
+      b.rightArm.rotation.set(
+        base.x - s * 1.6,
+        base.y,
+        base.z + s * 0.4,
+      );
     }
-  });
+    if (b.rightForeArm) {
+      const base = b.base.rightForeArm!;
+      b.rightForeArm.rotation.set(base.x, base.y - s * 1.2, base.z);
+    }
+    if (b.spine1) {
+      const base = b.base.spine1!;
+      b.spine1.rotation.set(base.x + s * 0.15, base.y - s * 0.35, base.z);
+    }
+  }, 1);
 
   return (
-    <>
-      <group ref={group} scale={1.05}>
-        <primitive object={cloned} />
-        {/* Heroic sword bolted to the hero group (right-hand side) */}
-        <group ref={swordRef} position={[0.55, 1.0, 0.2]} rotation={[0, 0, -0.6]}>
-          {/* Grip */}
-          <mesh position={[0, -0.15, 0]} castShadow>
-            <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
-            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
-          </mesh>
-          {/* Crossguard */}
-          <mesh position={[0, 0.02, 0]} castShadow>
-            <boxGeometry args={[0.42, 0.06, 0.08]} />
-            <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
-          </mesh>
-          {/* Blade */}
-          <mesh position={[0, 0.75, 0]} castShadow>
-            <boxGeometry args={[0.09, 1.4, 0.02]} />
-            <meshStandardMaterial color="#c8ccd4" metalness={0.85} roughness={0.25} emissive="#3a4658" emissiveIntensity={0.15} />
-          </mesh>
-          {/* Pommel */}
-          <mesh position={[0, -0.32, 0]} castShadow>
-            <sphereGeometry args={[0.06, 12, 10]} />
-            <meshStandardMaterial color="#4a3218" metalness={0.7} roughness={0.4} />
-          </mesh>
-        </group>
+    <group ref={group} scale={1.05}>
+      <primitive object={cloned} />
+      {/* Sword — reparented to the right-hand bone in the effect above. */}
+      <group ref={swordRef}>
+        <mesh position={[0, -0.15, 0]} castShadow>
+          <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
+          <meshStandardMaterial color="#1a0f08" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, 0.02, 0]} castShadow>
+          <boxGeometry args={[0.42, 0.06, 0.08]} />
+          <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
+        </mesh>
+        <mesh position={[0, 0.75, 0]} castShadow>
+          <boxGeometry args={[0.09, 1.4, 0.02]} />
+          <meshStandardMaterial color="#c8ccd4" metalness={0.85} roughness={0.25} emissive="#3a4658" emissiveIntensity={0.15} />
+        </mesh>
+        <mesh position={[0, -0.32, 0]} castShadow>
+          <sphereGeometry args={[0.06, 12, 10]} />
+          <meshStandardMaterial color="#4a3218" metalness={0.7} roughness={0.4} />
+        </mesh>
       </group>
-    </>
+    </group>
   );
 }
+
 
 
 
