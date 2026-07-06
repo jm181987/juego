@@ -643,19 +643,68 @@ function Index() {
     }
 
     function die() {
-      if (player.invuln > 0) return;
+      // Full death (fall, lava, spikes, or hp<=0)
       localLives -= 1;
       setLives(localLives);
       cameraShake = 12;
       addParticles(player.x + 11, player.y + 15, 24, { color: "#ff3b3b", speed: 6, size: 4, life: 50 });
       addParticles(player.x + 11, player.y + 15, 12, { color: "#ffd94a", speed: 4, size: 3, life: 40 });
       if (localLives <= 0) { setStatus("dead"); running = false; }
-      else respawn();
+      else { stats.hp = stats.maxHp; stats.mp = stats.maxMp; hudTick(); respawn(); }
+    }
+
+    function takeDamage(amount: number, knockDir: number) {
+      if (player.invuln > 0) return;
+      const dmg = Math.max(1, amount - stats.def);
+      stats.hp -= dmg;
+      hudTick();
+      player.invuln = 90;
+      player.vy = -6; player.vx = knockDir * 5;
+      cameraShake = 6;
+      floatText(player.x + player.w / 2, player.y - 4, `-${dmg}`, "#ff5c5c");
+      addParticles(player.x + player.w / 2, player.y + 20, 10, { color: "#ff5c5c", size: 3, life: 24, speed: 3 });
+      if (stats.hp <= 0) { stats.hp = 0; die(); }
+    }
+
+    function gainXp(amount: number) {
+      stats.xp += amount;
+      floatText(player.x + player.w / 2, player.y - 10, `+${amount} XP`, "#a78bfa");
+      while (stats.xp >= stats.xpNext) {
+        stats.xp -= stats.xpNext;
+        stats.level += 1;
+        stats.xpNext = Math.floor(stats.xpNext * 1.6);
+        stats.maxHp += 6; stats.hp = stats.maxHp;
+        stats.maxMp += 3; stats.mp = stats.maxMp;
+        stats.str += 1; stats.def += 1;
+        floatText(player.x + player.w / 2, player.y - 30, `LEVEL ${stats.level}!`, "#ffd94a");
+        addParticles(player.x + player.w / 2, player.y + player.h / 2, 40, {
+          color: "#ffd94a", size: 4, life: 50, speed: 5, gravity: -0.05, shape: "star",
+        });
+        cameraShake = 8;
+      }
+      hudTick();
+    }
+
+    function spawnLoot(x: number, y: number, e: Enemy) {
+      // Gold coins
+      const gc = e.gold;
+      for (let i = 0; i < gc; i++) {
+        loot.push({
+          x, y, vx: (Math.random() - 0.5) * 4, vy: -3 - Math.random() * 2,
+          t: Math.random() * 6, kind: "gold", taken: false, life: 600,
+        });
+      }
+      // 25% chance of HP potion, 15% MP, 8% gem
+      const r = Math.random();
+      if (r < 0.08) loot.push({ x, y, vx: 0, vy: -4, t: 0, kind: "gem", taken: false, life: 900 });
+      else if (r < 0.23) loot.push({ x, y, vx: 0, vy: -3.5, t: 0, kind: "hpPotion", taken: false, life: 900 });
+      else if (r < 0.38) loot.push({ x, y, vx: 0, vy: -3.5, t: 0, kind: "mpPotion", taken: false, life: 900 });
     }
 
     function floatText(x: number, y: number, text: string, color = "#fff") {
       floatTexts.push({ x, y, text, life: 45, color });
     }
+
 
     function completeStage() {
       if (stageCompleted) return;
