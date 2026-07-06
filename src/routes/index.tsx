@@ -261,9 +261,10 @@ const ATTACK_COOLDOWN = 0.4;
 type Keys = {
   fwd: boolean; back: boolean; left: boolean; right: boolean;
   jump: boolean; attack: boolean; pot1: boolean; pot2: boolean;
+  camFree: boolean;
 };
 function useKeys() {
-  const keys = useRef<Keys>({ fwd: false, back: false, left: false, right: false, jump: false, attack: false, pot1: false, pot2: false });
+  const keys = useRef<Keys>({ fwd: false, back: false, left: false, right: false, jump: false, attack: false, pot1: false, pot2: false, camFree: false });
   useEffect(() => {
     const map = (e: KeyboardEvent, v: boolean) => {
       const k = e.key.toLowerCase();
@@ -275,7 +276,9 @@ function useKeys() {
       if (k === "z" || k === "j") keys.current.attack = v;
       if (k === "q") keys.current.pot1 = v;
       if (k === "e") keys.current.pot2 = v;
+      if (k === "alt") { keys.current.camFree = v; e.preventDefault(); }
     };
+
     const dn = (e: KeyboardEvent) => map(e, true);
     const up = (e: KeyboardEvent) => map(e, false);
     window.addEventListener("keydown", dn);
@@ -1334,19 +1337,34 @@ function Scene({
   // Mouse look + click to attack. Works with pointer lock; falls back to
   // cursor position relative to canvas center when lock is unavailable (iframes).
   const yawRef = useRef(0);
+  const pitchRef = useRef(0.35); // radians, positive = looking down more
+  const camDistRef = useRef(9);
+  const camYawOffsetRef = useRef(0); // extra yaw added only while Alt held
   useEffect(() => {
     const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
     if (!canvas) return;
     let locked = false;
     const onMove = (e: MouseEvent) => {
+      const free = keysRef.current.camFree;
       if (locked && document.pointerLockElement === canvas) {
-        yawRef.current -= e.movementX * 0.0035;
+        if (free) {
+          camYawOffsetRef.current -= e.movementX * 0.0035;
+          pitchRef.current = Math.max(-0.4, Math.min(1.2, pitchRef.current + e.movementY * 0.0025));
+        } else {
+          yawRef.current -= e.movementX * 0.0035;
+        }
       } else {
-        // Fallback: aim by cursor horizontal offset from canvas center
         const rect = canvas.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
         const dx = e.clientX - cx;
-        yawRef.current -= (dx / rect.width) * 0.08;
+        const dy = e.clientY - cy;
+        if (free) {
+          camYawOffsetRef.current -= (dx / rect.width) * 0.08;
+          pitchRef.current = Math.max(-0.4, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
+        } else {
+          yawRef.current -= (dx / rect.width) * 0.08;
+        }
       }
     };
     const onDown = (e: MouseEvent) => {
@@ -1359,18 +1377,26 @@ function Scene({
     const onUp = (e: MouseEvent) => {
       if (e.button === 0) keysRef.current.attack = false;
     };
+    const onWheel = (e: WheelEvent) => {
+      if (!keysRef.current.camFree) return;
+      camDistRef.current = Math.max(4, Math.min(18, camDistRef.current + e.deltaY * 0.01));
+      e.preventDefault();
+    };
     const onLockChange = () => { locked = document.pointerLockElement === canvas; };
     document.addEventListener("mousemove", onMove);
     canvas.addEventListener("mousedown", onDown as any);
+    canvas.addEventListener("wheel", onWheel as any, { passive: false });
     window.addEventListener("mouseup", onUp);
     document.addEventListener("pointerlockchange", onLockChange);
     return () => {
       document.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mousedown", onDown as any);
+      canvas.removeEventListener("wheel", onWheel as any);
       window.removeEventListener("mouseup", onUp);
       document.removeEventListener("pointerlockchange", onLockChange);
     };
   }, [keysRef]);
+
 
   useFrame((state, dt) => {
     dt = Math.min(dt, 0.05);
@@ -1623,12 +1649,22 @@ function Scene({
     });
     floats.current = floats.current.filter((f) => f.life > 0);
 
-    // Camera follow (third person, orbits with mouse yaw)
-    const yaw = yawRef.current;
-    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * 8, 4, Math.cos(yaw) * 8));
+    // Camera follow (third person). Hold Alt to orbit freely (yaw offset + pitch + wheel zoom).
+    if (!keysRef.current.camFree) {
+      // Ease the free-look offset back to zero so aim re-syncs with view
+      camYawOffsetRef.current *= Math.pow(0.001, dt);
+      pitchRef.current += (0.35 - pitchRef.current) * (1 - Math.pow(0.01, dt));
+    }
+    const yaw = yawRef.current + camYawOffsetRef.current;
+    const pitch = pitchRef.current;
+    const dist = camDistRef.current;
+    const horiz = Math.cos(pitch) * dist;
+    const vert = Math.sin(pitch) * dist + 2.5;
+    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
     camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
+
 
     // Only rerender React tree when the floats list actually changes,
     // otherwise mesh refs update the scene each frame without React work.
@@ -2043,7 +2079,7 @@ function Index() {
             color: "#ccc", fontSize: 11, maxWidth: 220,
           }}>
             <div style={{ color: "#7ee6ff", fontWeight: 700, marginBottom: 4 }}>Controles</div>
-            WASD moverse · Ratón apuntar · Clic atacar · Espacio saltar · Q/E pociones
+            WASD moverse · Ratón apuntar · Clic atacar · Espacio saltar · Q/E pociones · Alt+Ratón cámara libre (rueda zoom)
             <div style={{ marginTop: 4, color: "#888" }}>(clic en la escena para bloquear el cursor)</div>
           </div>
 
