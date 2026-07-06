@@ -634,6 +634,54 @@ function EnemyMesh({ e }: { e: Enemy }) {
               </mesh>
             )}
 
+            {/* Wraith (female): long flowing hair, feminine silhouette, robed skirt */}
+            {e.kind === "wraith" && (
+              <group>
+                {/* Long dark hair cascade behind the head */}
+                <mesh position={[0, 1.62, -0.13]} castShadow>
+                  <sphereGeometry args={[0.22, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                  <meshStandardMaterial color="#0a0510" roughness={1} />
+                </mesh>
+                <mesh position={[0, 1.35, -0.16]} rotation={[0.15, 0, 0]} castShadow>
+                  <cylinderGeometry args={[0.19, 0.11, 0.55, 14, 1, true]} />
+                  <meshStandardMaterial color="#0a0510" roughness={1} side={THREE.DoubleSide} />
+                </mesh>
+                <mesh position={[0, 1.02, -0.18]} rotation={[0.25, 0, 0]} castShadow>
+                  <cylinderGeometry args={[0.11, 0.05, 0.35, 12, 1, true]} />
+                  <meshStandardMaterial color="#0a0510" roughness={1} side={THREE.DoubleSide} />
+                </mesh>
+                {/* Loose side locks framing the face */}
+                <mesh position={[-0.14, 1.55, 0.02]} rotation={[0.1, 0, 0.15]} castShadow>
+                  <cylinderGeometry args={[0.04, 0.02, 0.32, 8]} />
+                  <meshStandardMaterial color="#0a0510" roughness={1} />
+                </mesh>
+                <mesh position={[0.14, 1.55, 0.02]} rotation={[0.1, 0, -0.15]} castShadow>
+                  <cylinderGeometry args={[0.04, 0.02, 0.32, 8]} />
+                  <meshStandardMaterial color="#0a0510" roughness={1} />
+                </mesh>
+                {/* Subtle bust to signal feminine silhouette */}
+                <mesh position={[-0.09, 1.28, 0.13]} castShadow>
+                  <sphereGeometry args={[0.09, 10, 10]} />
+                  <meshStandardMaterial color="#3a2f4a" roughness={1} emissive="#180a24" emissiveIntensity={0.25} />
+                </mesh>
+                <mesh position={[0.09, 1.28, 0.13]} castShadow>
+                  <sphereGeometry args={[0.09, 10, 10]} />
+                  <meshStandardMaterial color="#3a2f4a" roughness={1} emissive="#180a24" emissiveIntensity={0.25} />
+                </mesh>
+                {/* Flared robe / skirt at the hips */}
+                <mesh position={[0, 0.55, 0]} castShadow>
+                  <coneGeometry args={[0.45, 1.0, 18, 1, true]} />
+                  <meshStandardMaterial
+                    color="#1a1024"
+                    roughness={1}
+                    side={THREE.DoubleSide}
+                    emissive="#2a1440"
+                    emissiveIntensity={0.15}
+                  />
+                </mesh>
+              </group>
+            )}
+
             {/* Brute: horned iron helm */}
             {e.kind === "brute" && (
               <group position={[0, 1.78, 0]}>
