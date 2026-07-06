@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Sky, Stars, Text } from "@react-three/drei";
+import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import hero0 from "@/assets/hero_0.png.asset.json";
-import hero1 from "@/assets/hero_1.png.asset.json";
-import hero2 from "@/assets/hero_2.png.asset.json";
-import hero3 from "@/assets/hero_3.png.asset.json";
+import type { SkeletonUtils } from "three-stdlib";
+import soldierAsset from "@/assets/soldier.glb.asset.json";
+
 
 
 export const Route = createFileRoute("/")({
