@@ -475,11 +475,17 @@ function Index() {
       x: world.spawn.x, y: world.spawn.y, w: 22, h: 30,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
+      crouching: false, groundPound: 0, gpCharge: 0,
+      wallSlide: 0, wallDir: 0, wallJumpLock: 0,
+      attack: 0, diving: false,
+      jumpCombo: 0, comboTimer: 0,
+      prevJump: false, prevAttack: false, prevGP: false,
+      hOffset: 0, // for crouch draw
     };
 
     const kd = (e: KeyboardEvent) => {
       keys[e.code] = true;
-      if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(e.code)) e.preventDefault();
+      if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space","KeyZ","KeyX","KeyC"].includes(e.code)) e.preventDefault();
     };
     const ku = (e: KeyboardEvent) => (keys[e.code] = false);
     window.addEventListener("keydown", kd);
@@ -577,46 +583,161 @@ function Index() {
 
       const left = keys["ArrowLeft"] || keys["KeyA"];
       const right = keys["ArrowRight"] || keys["KeyD"];
-      const jump = keys["ArrowUp"] || keys["Space"] || keys["KeyW"];
+      const jump = !!(keys["ArrowUp"] || keys["Space"] || keys["KeyW"]);
       const run = keys["ShiftLeft"] || keys["ShiftRight"];
+      const down = !!(keys["ArrowDown"] || keys["KeyS"]);
+      const attackBtn = !!(keys["KeyZ"] || keys["KeyJ"]);
+      const gpBtn = !!(keys["KeyX"] || keys["KeyK"]);
 
-      const maxSpeed = run ? 5.5 : 4;
-      const accel = player.onGround ? 0.55 : 0.35;
-      const friction = player.onGround ? 0.82 : 0.94;
+      const jumpPressed = jump && !player.prevJump;
+      const attackPressed = attackBtn && !player.prevAttack;
+      const gpPressed = gpBtn && !player.prevGP;
+      player.prevJump = jump; player.prevAttack = attackBtn; player.prevGP = gpBtn;
 
-      if (left) { player.vx = Math.max(player.vx - accel, -maxSpeed); player.facing = -1; }
-      else if (right) { player.vx = Math.min(player.vx + accel, maxSpeed); player.facing = 1; }
-      else { player.vx *= friction; if (Math.abs(player.vx) < 0.05) player.vx = 0; }
+      // Crouch
+      player.crouching = player.onGround && down && player.groundPound === 0 && !player.diving;
+
+      // Attack (punch/kick) — brief hitbox
+      if (attackPressed && player.attack <= 0 && player.groundPound === 0) {
+        player.attack = 14;
+        if (!player.onGround && (Math.abs(player.vx) > 2 || run)) {
+          // Dive: lunge forward
+          player.diving = true;
+          player.vx = player.facing * 7.5;
+          player.vy = Math.max(player.vy, -2);
+        }
+      }
+      if (player.attack > 0) player.attack--;
+      if (player.onGround) player.diving = false;
+
+      // Ground pound
+      if (gpPressed && !player.onGround && player.groundPound === 0) {
+        player.groundPound = 1; // charging
+        player.gpCharge = 14;
+        player.vx = 0; player.vy = 0;
+      }
+      if (player.groundPound === 1) {
+        player.gpCharge--;
+        if (player.gpCharge <= 0) player.groundPound = 2; // slamming
+      }
+
+      // Movement: locked during GP/dive/wallJumpLock
+      const inputLocked = player.groundPound > 0 || player.wallJumpLock > 0;
+      const crouchSlow = player.crouching ? 0.4 : 1;
+      const maxSpeed = (run ? 5.8 : 4) * crouchSlow;
+      const accel = (player.onGround ? 0.55 : 0.32) * crouchSlow;
+      const friction = player.onGround ? (player.crouching ? 0.7 : 0.82) : 0.96;
+
+      if (!inputLocked) {
+        if (left) { player.vx = Math.max(player.vx - accel, -maxSpeed); player.facing = -1; }
+        else if (right) { player.vx = Math.min(player.vx + accel, maxSpeed); player.facing = 1; }
+        else if (!player.diving) { player.vx *= friction; if (Math.abs(player.vx) < 0.05) player.vx = 0; }
+      }
+      if (player.wallJumpLock > 0) player.wallJumpLock--;
 
       if (player.onGround) player.coyote = 8; else if (player.coyote > 0) player.coyote--;
-      if (jump) player.jumpBuffer = 8; else if (player.jumpBuffer > 0) player.jumpBuffer--;
+      if (jumpPressed) player.jumpBuffer = 8; else if (player.jumpBuffer > 0) player.jumpBuffer--;
 
-      if (player.jumpBuffer > 0 && player.coyote > 0) {
-        player.vy = -11.5;
+      // Combo timer for triple jump
+      if (player.comboTimer > 0) player.comboTimer--;
+      else if (player.onGround) player.jumpCombo = 0;
+
+      // Ground / coyote jump
+      if (player.jumpBuffer > 0 && player.coyote > 0 && player.groundPound === 0) {
+        const running = Math.abs(player.vx) > 3.5;
+        let jv = -11.5;
+        let sfxColor = "#e0d7c0";
+        // Backflip: crouch + jump while stationary/slow
+        if (player.crouching && !running) {
+          jv = -15;
+          player.vx = -player.facing * 3;
+          player.jumpCombo = 0;
+          sfxColor = "#7ee085";
+          floatText(player.x + 11, player.y - 4, "BACKFLIP!", "#7ee085");
+        }
+        // Long jump: crouch + jump while running
+        else if (player.crouching && running) {
+          jv = -8;
+          player.vx = player.facing * 9;
+          player.jumpCombo = 0;
+          sfxColor = "#ffd94a";
+          floatText(player.x + 11, player.y - 4, "LONG JUMP!", "#ffd94a");
+        }
+        // Triple jump
+        else if (player.jumpCombo === 2 && running) {
+          jv = -14.5;
+          player.jumpCombo = 0;
+          sfxColor = "#ff7676";
+          floatText(player.x + 11, player.y - 4, "TRIPLE!", "#ff7676");
+          addParticles(player.x + 11, player.y + 8, 16, { color: "#ffd94a", speed: 4, size: 3, life: 30, shape: "star" });
+        }
+        // Double jump
+        else if (player.jumpCombo === 1) {
+          jv = -12.5;
+          player.jumpCombo = 2;
+          player.comboTimer = 20;
+          sfxColor = "#4ac1ff";
+        }
+        else {
+          player.jumpCombo = 1;
+          player.comboTimer = 20;
+        }
+        player.vy = jv;
         player.coyote = 0; player.jumpBuffer = 0; player.onGround = false;
         player.squash = 0.7; player.stretch = 1.3;
         addParticles(player.x + 11, player.y + player.h, 6, {
-          color: "#e0d7c0", size: 3, life: 20, spread: Math.PI, speed: 2, gravity: 0.15,
+          color: sfxColor, size: 3, life: 20, spread: Math.PI, speed: 2, gravity: 0.15,
         });
       }
-      if (!jump && player.vy < -4) player.vy = -4;
+      // Wall jump
+      else if (player.jumpBuffer > 0 && !player.onGround && player.wallSlide > 0 && player.groundPound === 0) {
+        player.vy = -11.5;
+        player.vx = -player.wallDir * 6.5;
+        player.facing = -player.wallDir;
+        player.wallJumpLock = 8;
+        player.jumpBuffer = 0; player.wallSlide = 0;
+        player.jumpCombo = 1; player.comboTimer = 20;
+        floatText(player.x + 11, player.y - 4, "WALL JUMP!", "#4ac1ff");
+        addParticles(player.x + 11 + player.wallDir * 6, player.y + 12, 8, {
+          color: "#c8ccd4", size: 3, life: 22, speed: 2.5, gravity: 0.2,
+        });
+      }
+      if (!jump && player.vy < -4 && player.groundPound === 0) player.vy = -4;
 
       // Sky theme = lower gravity, higher jumps feel floaty
-      const grav = stage.theme === "sky" ? 0.42 : 0.55;
+      const gravBase = stage.theme === "sky" ? 0.42 : 0.55;
+      let grav = gravBase;
+      if (player.groundPound === 1) grav = 0; // freeze in air while charging
+      if (player.groundPound === 2) grav = 1.4; // slam
+      if (player.wallSlide > 0) grav = 0.18; // slide slowly
       player.vy += grav;
-      if (player.vy > 13) player.vy = 13;
+      const maxFall = player.groundPound === 2 ? 18 : 13;
+      if (player.vy > maxFall) player.vy = maxFall;
 
       // X move
       player.x += player.vx;
       if (player.x < 0) { player.x = 0; player.vx = 0; }
       if (player.x + player.w > LEVEL_W) player.x = LEVEL_W - player.w;
+      let hitWallDir = 0;
       for (const b of collideBlocks(player)) {
-        // Platforms are one-way (no side collision)
         if (b.type === "platform" || b.type === "cloud") continue;
-        if (player.vx > 0) player.x = b.x - player.w;
-        else if (player.vx < 0) player.x = b.x + b.w;
+        if (player.vx > 0) { player.x = b.x - player.w; hitWallDir = 1; }
+        else if (player.vx < 0) { player.x = b.x + b.w; hitWallDir = -1; }
         player.vx = 0;
       }
+      // Wall slide: pressing into wall while airborne + falling
+      if (!player.onGround && player.vy > 0 && hitWallDir !== 0 &&
+          ((hitWallDir === 1 && right) || (hitWallDir === -1 && left)) &&
+          player.groundPound === 0) {
+        player.wallSlide = 6;
+        player.wallDir = hitWallDir;
+        if (time % 4 === 0) {
+          addParticles(player.x + (hitWallDir > 0 ? player.w : 0), player.y + 20, 1, {
+            color: "#e0d7c0", size: 2, life: 20, vx: -hitWallDir * 0.6, vy: -0.4, gravity: 0.15,
+          });
+        }
+      } else if (player.wallSlide > 0) player.wallSlide--;
+
       if (player.onGround && Math.abs(player.vx) > 2 && time % 5 === 0) {
         addParticles(player.x + 11 - player.facing * 6, player.y + player.h - 2, 1, {
           color: stage.theme === "cave" ? "#6b6b6b" : "#d9cfb5",
@@ -629,7 +750,6 @@ function Index() {
       player.y += player.vy;
       player.onGround = false;
       for (const b of collideBlocks(player)) {
-        // Platform: only land from above
         if (b.type === "platform" || b.type === "cloud") {
           const prevBottom = player.y - player.vy + player.h;
           if (player.vy > 0 && prevBottom <= b.y + 1) {
@@ -637,7 +757,19 @@ function Index() {
           }
           continue;
         }
-        if (player.vy > 0) { player.y = b.y - player.h; player.vy = 0; player.onGround = true; }
+        if (player.vy > 0) {
+          player.y = b.y - player.h;
+          // Ground pound break brick
+          if (player.groundPound === 2 && b.type === "brick") {
+            b.bump = 12;
+            // Remove brick
+            const idx = world.blocks.indexOf(b);
+            if (idx >= 0) world.blocks.splice(idx, 1);
+            localScore += 50; setScore(localScore);
+            addParticles(b.x + 16, b.y + 8, 14, { color: "#c94a1a", size: 3, life: 30, speed: 4, gravity: 0.3 });
+          }
+          player.vy = 0; player.onGround = true;
+        }
         else if (player.vy < 0) {
           player.y = b.y + b.h; player.vy = 0;
           if (b.type === "question" && !b.used) {
@@ -653,10 +785,28 @@ function Index() {
         }
       }
       if (!wasOnGround && player.onGround) {
-        player.squash = 1.3; player.stretch = 0.75; player.landPulse = 8;
-        addParticles(player.x + 11, player.y + player.h - 2, 4, {
-          color: "#e0d7c0", size: 3, life: 18, spread: Math.PI, speed: 1.5, gravity: 0.15,
+        const hard = player.groundPound === 2;
+        player.squash = hard ? 1.6 : 1.3; player.stretch = hard ? 0.5 : 0.75;
+        player.landPulse = hard ? 14 : 8;
+        addParticles(player.x + 11, player.y + player.h - 2, hard ? 18 : 4, {
+          color: "#e0d7c0", size: 3, life: 22, spread: Math.PI, speed: hard ? 4 : 1.5, gravity: 0.15,
         });
+        if (hard) {
+          cameraShake = 8;
+          // Damage enemies in radius
+          for (const e of world.enemies) {
+            if (!e.alive) continue;
+            const dx = (e.x + e.w/2) - (player.x + player.w/2);
+            const dy = (e.y + e.h/2) - (player.y + player.h/2);
+            if (Math.abs(dx) < 60 && Math.abs(dy) < 40) {
+              e.alive = false; e.squashT = 30;
+              localScore += 100; setScore(localScore);
+              floatText(e.x + e.w/2, e.y - 4, "+100", "#ff7676");
+            }
+          }
+          player.comboTimer = 20; // reset combo
+        }
+        player.groundPound = 0;
       }
       player.squash += (1 - player.squash) * 0.25;
       player.stretch += (1 - player.stretch) * 0.25;
@@ -673,6 +823,7 @@ function Index() {
           player.y < h.y + h.h && player.y + player.h > h.y
         ) die();
       }
+
 
       // Camera
       const target = player.x - 260;
@@ -714,6 +865,25 @@ function Index() {
           e.y = (e.baseY ?? e.y) + Math.sin(time * 0.05 + e.x * 0.01) * 24;
         }
 
+        // Attack / dive hitbox
+        const attacking = player.attack > 0;
+        if (attacking) {
+          const hx = player.x + (player.facing > 0 ? player.w - 4 : -14);
+          const hy = player.y + 8;
+          const hw = 18, hh = 18;
+          if (hx < e.x + e.w && hx + hw > e.x && hy < e.y + e.h && hy + hh > e.y) {
+            e.alive = false; e.squashT = 30;
+            const reward = e.kind === "flyer" ? 200 : 100;
+            localScore += reward; setScore(localScore);
+            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
+            addParticles(e.x + e.w / 2, e.y + 8, 12, {
+              color: "#fff", size: 3, life: 25, speed: 4, gravity: 0.3,
+            });
+            cameraShake = 4;
+            continue;
+          }
+        }
+
         if (
           player.x < e.x + e.w && player.x + player.w > e.x &&
           player.y < e.y + e.h && player.y + player.h > e.y
@@ -721,7 +891,7 @@ function Index() {
           const stompable = e.kind === "goomba" || e.kind === "flyer";
           if (stompable && player.vy > 1 && player.y + player.h - e.y < 20) {
             e.alive = false; e.squashT = 30;
-            player.vy = -8.5;
+            player.vy = jump ? -11 : -8.5; // higher bounce with jump held
             player.squash = 0.7; player.stretch = 1.3;
             const reward = e.kind === "flyer" ? 200 : 100;
             localScore += reward; setScore(localScore);
@@ -854,59 +1024,151 @@ function Index() {
       const py = player.y - cameraY;
       const f = player.facing;
 
+      // Shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.beginPath();
       ctx.ellipse(px + player.w / 2, py + player.h + 1, player.w * 0.55, 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      // Ground-pound charge aura
+      if (player.groundPound === 1) {
+        ctx.strokeStyle = `rgba(255,220,80,${0.4 + Math.sin(time * 0.6) * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px + player.w / 2, py + player.h / 2, 22 + Math.sin(time * 0.6) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Ground-pound slam trail
+      if (player.groundPound === 2) {
+        ctx.fillStyle = "rgba(140,180,255,0.35)";
+        ctx.fillRect(px, py - 30, player.w, 30);
+      }
+
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
-      ctx.scale(f * player.stretch, player.squash);
+
+      // Ground-pound spin
+      let rot = 0;
+      if (player.groundPound === 1) rot = (time * 0.6) % (Math.PI * 2);
+      if (player.diving) rot = f * 0.9;
+      ctx.rotate(rot);
+
+      // Squash/stretch — crouch = flatter
+      const sq = player.crouching ? player.squash * 1.4 : player.squash;
+      const st = player.crouching ? player.stretch * 1.15 : player.stretch;
+      ctx.scale(f * st, sq);
       ctx.translate(-player.w / 2, -player.h);
 
       const walking = player.onGround && Math.abs(player.vx) > 0.3;
       const walkFrame = Math.floor(player.anim) % 4;
       const airborne = !player.onGround;
+      const crouched = player.crouching;
+      const attacking = player.attack > 0;
+      const wallSliding = player.wallSlide > 0 && !player.onGround;
 
-      ctx.fillStyle = "#d32626";
-      ctx.fillRect(2, 0, 18, 5);
-      ctx.fillRect(10, -3, 12, 5);
-      ctx.fillStyle = "#fff"; ctx.fillRect(12, 1, 6, 3);
-      ctx.fillStyle = "#a51a1a"; ctx.fillRect(12, 0, 6, 1);
+      // ---- CAP (red with white M badge) ----
+      // Brim
+      ctx.fillStyle = "#a51818";
+      ctx.fillRect(0, 4, 22, 2);
+      // Cap body
+      ctx.fillStyle = "#e83030";
+      ctx.fillRect(2, -1, 18, 5);
+      ctx.fillRect(6, -4, 12, 4);
+      // Highlight
+      ctx.fillStyle = "#ff5c5c";
+      ctx.fillRect(6, -3, 2, 2);
+      // M badge
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(11, 1, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#e83030";
+      ctx.font = "bold 5px monospace";
+      ctx.fillText("M", 9, 3);
 
-      ctx.fillStyle = "#3a1e0a";
-      ctx.fillRect(2, 5, 3, 3); ctx.fillRect(17, 5, 3, 3);
-      ctx.fillStyle = "#ffcf9a"; ctx.fillRect(4, 5, 14, 9); ctx.fillRect(1, 8, 3, 4);
+      // ---- FACE ----
+      // Sideburns/hair
+      ctx.fillStyle = "#2a1408";
+      ctx.fillRect(1, 6, 3, 5); ctx.fillRect(17, 6, 4, 5);
+      // Face skin
+      ctx.fillStyle = "#ffcf9a";
+      ctx.fillRect(4, 6, 14, 9);
+      ctx.fillRect(2, 9, 2, 3); // left cheek
+      // Ear
+      ctx.fillStyle = "#e8a878";
+      ctx.fillRect(18, 9, 2, 3);
+      // Nose (big!)
+      ctx.fillStyle = "#e8a878";
+      ctx.fillRect(13, 8, 5, 4);
+      ctx.fillStyle = "#c47a4a"; ctx.fillRect(13, 11, 5, 1);
+      // Eye
+      ctx.fillStyle = "#fff"; ctx.fillRect(10, 7, 3, 4);
+      ctx.fillStyle = "#1a3a8a"; ctx.fillRect(11, 8, 2, 3);
+      ctx.fillStyle = "#000"; ctx.fillRect(11, 9, 2, 2);
+      // Eyebrow
+      ctx.fillStyle = "#2a1408"; ctx.fillRect(10, 6, 4, 1);
+      // ---- BIG MUSTACHE ----
+      ctx.fillStyle = "#2a1408";
+      ctx.fillRect(6, 12, 13, 3);
+      ctx.fillRect(4, 13, 2, 2);
+      ctx.fillRect(18, 13, 2, 2);
+      // Mouth
+      ctx.fillStyle = "#5a2a1a"; ctx.fillRect(10, 15, 4, 1);
 
-      ctx.fillStyle = "#fff"; ctx.fillRect(12, 6, 4, 5);
-      ctx.fillStyle = "#1a3a8a"; ctx.fillRect(13, 7, 2, 3);
-      ctx.fillStyle = "#000"; ctx.fillRect(13, 8, 2, 2);
+      // ---- BODY / OVERALLS ----
+      // Blue overalls
+      ctx.fillStyle = "#1e5fd8"; ctx.fillRect(2, 15, 18, 10);
+      ctx.fillRect(4, 14, 4, 3); ctx.fillRect(14, 14, 4, 3);
+      // Red shirt (sleeves + collar)
+      ctx.fillStyle = "#e83030";
+      ctx.fillRect(0, 15, 3, 7); ctx.fillRect(19, 15, 3, 7);
+      ctx.fillRect(8, 14, 6, 3);
+      // Yellow buttons
+      ctx.fillStyle = "#ffd94a";
+      ctx.beginPath(); ctx.arc(6, 18, 1.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(16, 18, 1.4, 0, Math.PI * 2); ctx.fill();
+      // Overall strap highlight
+      ctx.fillStyle = "#3a7ef0";
+      ctx.fillRect(2, 15, 18, 1);
 
-      ctx.fillStyle = "#2a1408"; ctx.fillRect(6, 11, 12, 3); ctx.fillRect(4, 12, 2, 2);
-      ctx.fillStyle = "#e5a97a"; ctx.fillRect(15, 9, 3, 3);
-
-      ctx.fillStyle = "#1e5fd8"; ctx.fillRect(2, 14, 18, 10);
-      ctx.fillRect(5, 13, 3, 3); ctx.fillRect(13, 13, 3, 3);
-      ctx.fillStyle = "#d32626";
-      ctx.fillRect(0, 14, 3, 7); ctx.fillRect(19, 14, 3, 7); ctx.fillRect(8, 13, 5, 3);
-      ctx.fillStyle = "#ffd94a"; ctx.fillRect(6, 17, 2, 2); ctx.fillRect(14, 17, 2, 2);
-
-      ctx.fillStyle = "#d32626";
-      if (walking) {
+      // ---- ARMS ----
+      ctx.fillStyle = "#e83030";
+      if (attacking) {
+        // Punch forward
+        ctx.fillRect(18, 14, 8, 4);
+        ctx.fillStyle = "#fff"; ctx.fillRect(24, 13, 5, 6);
+        ctx.fillStyle = "#e83030"; ctx.fillRect(-1, 16, 4, 6);
+      } else if (crouched) {
+        ctx.fillRect(-1, 17, 4, 5); ctx.fillRect(19, 17, 4, 5);
+      } else if (wallSliding) {
+        ctx.fillRect(18, 12, 5, 6); ctx.fillRect(-1, 18, 4, 5);
+      } else if (walking) {
         const armSwing = walkFrame % 2 === 0 ? 0 : 2;
         ctx.fillRect(-1, 15 + armSwing, 4, 7);
         ctx.fillRect(19, 15 - armSwing, 4, 7);
       } else if (airborne) {
-        ctx.fillRect(-2, 12, 4, 8); ctx.fillRect(20, 12, 4, 8);
+        ctx.fillRect(-2, 11, 4, 7); ctx.fillRect(20, 11, 4, 7);
       } else {
         ctx.fillRect(-1, 16, 4, 7); ctx.fillRect(19, 16, 4, 7);
       }
-      ctx.fillStyle = "#fff";
-      if (airborne) { ctx.fillRect(-3, 19, 5, 4); ctx.fillRect(20, 19, 5, 4); }
-      else { ctx.fillRect(-2, 21, 5, 4); ctx.fillRect(19, 21, 5, 4); }
 
+      // Gloves (white)
+      ctx.fillStyle = "#fff";
+      if (attacking) {
+        // already drew forward glove
+        ctx.fillRect(-2, 20, 5, 4);
+      } else if (crouched) {
+        ctx.fillRect(-2, 20, 5, 4); ctx.fillRect(19, 20, 5, 4);
+      } else if (airborne) {
+        ctx.fillRect(-3, 17, 5, 4); ctx.fillRect(20, 17, 5, 4);
+      } else {
+        ctx.fillRect(-2, 21, 5, 4); ctx.fillRect(19, 21, 5, 4);
+      }
+
+      // ---- FEET / SHOES ----
       ctx.fillStyle = "#5a2a08";
-      if (airborne) {
+      if (crouched) {
+        ctx.fillRect(2, 26, 18, 4);
+        ctx.fillStyle = "#2a1408"; ctx.fillRect(1, 28, 20, 2);
+      } else if (airborne) {
         ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
         ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       } else if (walking) {
@@ -919,13 +1181,23 @@ function Index() {
         ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
         ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       }
+
       ctx.restore();
 
-      if (player.landPulse > 0) {
-        ctx.strokeStyle = `rgba(255,255,255,${(player.landPulse / 8) * 0.6})`;
+      // Attack sfx swipe
+      if (player.attack > 6) {
+        ctx.strokeStyle = `rgba(255,255,255,${player.attack / 14})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.ellipse(px + player.w / 2, py + player.h, (8 - player.landPulse) * 3, 3, 0, 0, Math.PI * 2);
+        ctx.arc(px + player.w / 2 + f * 14, py + 16, 10, -0.6, 0.6);
+        ctx.stroke();
+      }
+
+      if (player.landPulse > 0) {
+        ctx.strokeStyle = `rgba(255,255,255,${(player.landPulse / 14) * 0.7})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(px + player.w / 2, py + player.h, (14 - player.landPulse) * 3, 3, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
@@ -1210,16 +1482,23 @@ function Index() {
         )}
       </div>
 
-      <div className="flex justify-between w-full max-w-[800px] gap-3 md:hidden">
+      <div className="flex justify-between items-end w-full max-w-[800px] gap-2 md:hidden">
         <div className="flex gap-2">
-          <button {...holdKey("ArrowLeft")} className="w-16 h-16 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">◀</button>
-          <button {...holdKey("ArrowRight")} className="w-16 h-16 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▶</button>
+          <button {...holdKey("ArrowLeft")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">◀</button>
+          <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▶</button>
+          <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/90 rounded-full text-xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▼</button>
         </div>
-        <button {...holdKey("Space")} className="w-20 h-20 bg-red-500 text-white rounded-full text-xl font-black shadow-[0_4px_0_#000] active:translate-y-1">SALTAR</button>
+        <div className="flex gap-2 items-end">
+          <button {...holdKey("KeyZ")} className="w-14 h-14 bg-yellow-400 text-black rounded-full text-sm font-black shadow-[0_4px_0_#000] active:translate-y-1">PUÑO</button>
+          <button {...holdKey("KeyX")} className="w-14 h-14 bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_#000] active:translate-y-1 leading-tight">POUND</button>
+          <button {...holdKey("ShiftLeft")} className="w-14 h-14 bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_#000] active:translate-y-1">RUN</button>
+          <button {...holdKey("Space")} className="w-18 h-18 min-w-[68px] min-h-[68px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_#000] active:translate-y-1">SALTAR</button>
+        </div>
       </div>
 
-      <p className="text-white/90 text-xs md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000]">
-        ← → moverse · SHIFT correr · ESPACIO / ↑ saltar · 20 monedas = 1UP · cuidado con el tiempo
+      <p className="text-white/90 text-[11px] md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000] max-w-[800px]">
+        ← → moverse · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
+        Combos: doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
       </p>
     </main>
   );
