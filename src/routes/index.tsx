@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
+import michelleAsset from "@/assets/michelle.glb.asset.json";
 import { playSwing, playDeath, genderFor } from "@/lib/sfx";
 import { useGame, type SaveSlot } from "@/game/store";
 import { StatBar, BatteryPill } from "@/components/hud/Bars";
@@ -381,6 +382,7 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
 }
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
 useGLTF.preload(soldierAsset.url);
+useGLTF.preload(michelleAsset.url);
 
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
@@ -419,11 +421,18 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   }>({ base: {} });
 
 
-  const gltf = useGLTF(soldierAsset.url) as unknown as {
+  const appearanceGender = useGame((s) => s.appearance.gender);
+  const soldierGltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-
+  const michelleGltf = useGLTF(michelleAsset.url) as unknown as {
+    scene: THREE.Group;
+    animations: THREE.AnimationClip[];
+  };
+  // Both models use the Mixamo rig (mixamorig* bones) so the soldier's
+  // animation clips play cleanly on Michelle's skeleton.
+  const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
   const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
 
   // Cache each mesh's original base color so appearance tint can be recomputed
