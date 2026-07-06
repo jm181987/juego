@@ -1535,10 +1535,22 @@ function Index() {
       ctx.fill();
 
       const capGrad = ctx.createRadialGradient(x + EW / 2, y + 6 - bounce, 3, x + EW / 2, y + 12 - bounce, 18);
-      capGrad.addColorStop(0, "#c96a2a"); capGrad.addColorStop(1, "#5a2a08");
+      if (e.kind === "jumper") {
+        capGrad.addColorStop(0, "#e64a4a"); capGrad.addColorStop(1, "#5a0a0a");
+      } else {
+        capGrad.addColorStop(0, "#c96a2a"); capGrad.addColorStop(1, "#5a2a08");
+      }
       ctx.fillStyle = capGrad;
       ctx.beginPath(); ctx.arc(x + EW / 2, y + 12 - bounce, 14, Math.PI, 0); ctx.fill();
       ctx.fillRect(x, y + 12 - bounce, EW, 10);
+      // jumper: little spikes on top to signal "danger, jumps"
+      if (e.kind === "jumper") {
+        ctx.fillStyle = "#ffd94a";
+        ctx.beginPath();
+        ctx.moveTo(x + 8, y + 2 - bounce); ctx.lineTo(x + 11, y - 4 - bounce); ctx.lineTo(x + 14, y + 2 - bounce);
+        ctx.moveTo(x + 14, y + 2 - bounce); ctx.lineTo(x + 17, y - 5 - bounce); ctx.lineTo(x + 20, y + 2 - bounce);
+        ctx.closePath(); ctx.fill();
+      }
       ctx.fillStyle = "rgba(255,220,180,0.35)";
       ctx.beginPath(); ctx.arc(x + 10, y + 8 - bounce, 4, 0, Math.PI * 2); ctx.fill();
 
