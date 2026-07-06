@@ -531,14 +531,16 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     currentAction.current = name;
   };
 
-  // Bind Idle once on mount. Do NOT re-bind on re-render — that causes a
-  // brief T-pose flash when the parent forces a rerender (e.g. after killing
-  // an enemy) because cleanup stops every action for a frame.
+  // Bind Idle when the animation set changes (mount, gender/model swap).
   useEffect(() => {
-    switchTo("Idle", 0);
+    currentAction.current = "";
+    const idle = actions["Idle"];
+    if (idle) {
+      idle.reset().setEffectiveWeight(1).play();
+      currentAction.current = "Idle";
+    }
     return () => { Object.values(actionsRef.current).forEach((a) => a?.stop()); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [actions]);
 
 
   // Priority 1: run AFTER the animation mixer so our bone offsets aren't
