@@ -865,6 +865,25 @@ function Index() {
           e.y = (e.baseY ?? e.y) + Math.sin(time * 0.05 + e.x * 0.01) * 24;
         }
 
+        // Attack / dive hitbox
+        const attacking = player.attack > 0;
+        if (attacking) {
+          const hx = player.x + (player.facing > 0 ? player.w - 4 : -14);
+          const hy = player.y + 8;
+          const hw = 18, hh = 18;
+          if (hx < e.x + e.w && hx + hw > e.x && hy < e.y + e.h && hy + hh > e.y) {
+            e.alive = false; e.squashT = 30;
+            const reward = e.kind === "flyer" ? 200 : 100;
+            localScore += reward; setScore(localScore);
+            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
+            addParticles(e.x + e.w / 2, e.y + 8, 12, {
+              color: "#fff", size: 3, life: 25, speed: 4, gravity: 0.3,
+            });
+            cameraShake = 4;
+            continue;
+          }
+        }
+
         if (
           player.x < e.x + e.w && player.x + player.w > e.x &&
           player.y < e.y + e.h && player.y + player.h > e.y
@@ -872,7 +891,7 @@ function Index() {
           const stompable = e.kind === "goomba" || e.kind === "flyer";
           if (stompable && player.vy > 1 && player.y + player.h - e.y < 20) {
             e.alive = false; e.squashT = 30;
-            player.vy = -8.5;
+            player.vy = jump ? -11 : -8.5; // higher bounce with jump held
             player.squash = 0.7; player.stretch = 1.3;
             const reward = e.kind === "flyer" ? 200 : 100;
             localScore += reward; setScore(localScore);
