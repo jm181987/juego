@@ -1390,9 +1390,16 @@ function Index() {
       ctx.fillStyle = "#4a2410";
       ctx.beginPath(); ctx.ellipse(22, 21, 5, 0.7, 0, 0, Math.PI * 2); ctx.fill();
 
+      // Cheek blush
+      ctx.fillStyle = "rgba(220,80,80,0.28)";
+      ctx.beginPath(); ctx.ellipse(15, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(33, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
+      // Lower lip hint
+      ctx.strokeStyle = "rgba(90,30,20,0.55)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(20, 25.5); ctx.quadraticCurveTo(22, 26.6, 24, 25.5); ctx.stroke();
       // Chin shadow
       ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.beginPath(); ctx.ellipse(22, 26, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(22, 27, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
 
       ctx.restore();
 
