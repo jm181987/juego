@@ -549,7 +549,7 @@ function Index() {
 
 
     const player = {
-      x: world.spawn.x, y: world.spawn.y, w: 62, h: 84,
+      x: world.spawn.x, y: world.spawn.y, w: 99, h: 134,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
       crouching: false, groundPound: 0, gpCharge: 0,
@@ -1127,7 +1127,7 @@ function Index() {
 
       // Sprite is drawn in a 44x60 virtual space with smooth shapes and gradients.
       const BW = 44, BH = 60;
-      const CHAR_SCALE = 1.4;
+      const CHAR_SCALE = 2.24;
 
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
