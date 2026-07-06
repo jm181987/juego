@@ -2380,8 +2380,59 @@ function Index() {
   useAmbientMusic(status === "play", worldIdx, world.difficulty);
   const checkpointRef = useRef<Vec3>(world.spawn);
 
+  // Store subscriptions
+  const settings = useGame((s) => s.settings);
+  const activeMenu = useGame((s) => s.activeMenu);
+  const stamina = useGame((s) => s.stamina);
+  const maxStamina = useGame((s) => s.maxStamina);
+  const quests = useGame((s) => s.quests);
+  const setMenu = useGame((s) => s.setMenu);
+  const saveToSlot = useGame((s) => s.saveToSlot);
+
+  // Shared refs for HUD (populated by Scene each frame).
+  const sharedPos = useRef({ x: 0, y: 0, z: 0 });
+  const sharedFacing = useRef(0);
+  const sharedEnemies = useRef<Enemy[]>([]);
+  const blipsRef = useRef<MiniBlip[]>([]);
+  const marksRef = useRef<CompassMark[]>([]);
+
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
+
+  // Rebuild minimap blips + compass marks each ~150ms (cheap, no per-frame React work)
+  useEffect(() => {
+    const id = setInterval(() => {
+      const alive = sharedEnemies.current.filter((e) => e.alive);
+      const blips: MiniBlip[] = alive.map((e) => ({
+        x: e.pos.x, z: e.pos.z,
+        color: e.kind === "brute" ? "#ff2020" : e.kind === "wraith" ? "#c080ff" : "#ff8848",
+        size: e.kind === "brute" ? 4 : 3,
+      }));
+      // Goal
+      blips.push({ x: world.goal[0], z: world.goal[2], color: "#ffe040", size: 5 });
+      blipsRef.current = blips;
+
+      const marks: CompassMark[] = [];
+      // Current active quest with target OR the world goal as fallback
+      const active = quests.find((q) => q.status === "active" && q.target) ?? null;
+      if (active?.target) marks.push({ x: active.target[0], z: active.target[2], color: "#ffe040", icon: "◈", label: active.title });
+      marks.push({ x: world.goal[0], z: world.goal[2], color: "#a080ff", icon: "★", label: "Portal" });
+      marksRef.current = marks;
+    }, 150);
+    return () => clearInterval(id);
+  }, [world.goal, quests]);
+
+  // Auto-save every 2 minutes while playing.
+  useEffect(() => {
+    if (status !== "play") return;
+    const id = setInterval(() => {
+      const st = statsRef.current;
+      saveToSlot(0, {
+        worldIdx, stats: st, checkpoint: checkpointRef.current,
+      }, { world: world.name, level: st.level });
+    }, 120_000);
+    return () => clearInterval(id);
+  }, [status, worldIdx, world.name, saveToSlot]);
 
   const onDeath = () => {
     const st = statsRef.current;
@@ -2391,14 +2442,15 @@ function Index() {
     } else {
       st.hp = st.maxHp;
       setHudTick((v) => v + 1);
-      // Force remount by toggling worldIdx via key
       setStatus("play");
-      setWorldIdx((i) => i); // re-render Scene by key change below
-      // We rely on Scene key = worldIdx + tick
+      setWorldIdx((i) => i);
       setHudTick((v) => v + 1);
     }
   };
   const onWin = () => {
+    // Advance prologue quest on first win
+    const gs = useGame.getState();
+    gs.updateQuest("prologue", 1);
     if (worldIdx + 1 >= WORLDS.length) setStatus("victory");
     else {
       setStatus("win");
@@ -2421,6 +2473,28 @@ function Index() {
     setStatus("play");
   };
 
+  // Save / load helpers
+  const captureShot = () => {
+    const cv = document.querySelector("canvas") as HTMLCanvasElement | null;
+    try { return cv?.toDataURL("image/jpeg", 0.5); } catch { return undefined; }
+  };
+  const doSave = (slotId: number) => {
+    saveToSlot(slotId, {
+      worldIdx, stats: statsRef.current, checkpoint: checkpointRef.current,
+    }, { world: world.name, level: statsRef.current.level, screenshot: captureShot() });
+  };
+  const doLoad = (slot: SaveSlot) => {
+    try {
+      const d = slot.data as { worldIdx: number; stats: Stats; checkpoint: Vec3 };
+      statsRef.current = d.stats;
+      checkpointRef.current = d.checkpoint;
+      setWorldIdx(d.worldIdx);
+      setStatus("play");
+      setMenu(null);
+      setSceneKey((k) => k + 1);
+    } catch { /* ignore */ }
+  };
+
   // Mobile controls
   const setKey = (name: keyof Keys, v: boolean) => { keysRef.current[name] = v; };
   const btn = (label: string, name: keyof Keys) => (
@@ -2438,13 +2512,17 @@ function Index() {
     >{label}</button>
   );
 
+  const hudVisible = settings.hudVisible;
+  const activeQuest = quests.find((q) => q.status === "active");
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", overflow: "hidden", fontFamily: "system-ui" }}>
       {mounted && status !== "menu" && (
         <Canvas
           key={sceneKey}
-          shadows
-          camera={{ position: [0, 6, 10], fov: 60 }}
+          shadows={settings.shadows}
+          camera={{ position: [0, 6, 10], fov: settings.fov }}
+          gl={{ toneMappingExposure: settings.brightness }}
           style={{ width: "100vw", height: "100vh" }}
         >
           <Suspense fallback={null}>
@@ -2456,41 +2534,70 @@ function Index() {
               onDeath={onDeath}
               onWin={onWin}
               onHudUpdate={() => setHudTick((v) => v + 1)}
+              sharedPosRef={sharedPos}
+              sharedFacingRef={sharedFacing}
+              sharedEnemiesRef={sharedEnemies}
             />
+            <PostFX />
           </Suspense>
         </Canvas>
       )}
 
       {/* HUD */}
-      {status === "play" && (
+      {status === "play" && hudVisible && (
         <>
+          {/* Top-left: stats panel */}
           <div style={{
             position: "absolute", top: 12, left: 12, padding: 12,
             background: "linear-gradient(180deg, #1a0838cc, #0a0418cc)",
             border: "1px solid #7ee6ff44", borderRadius: 8, color: "#fff",
-            backdropFilter: "blur(4px)",
+            backdropFilter: "blur(4px)", minWidth: 240,
           }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#a080ff", marginBottom: 6, letterSpacing: 1 }}>
-              {world.name} · Nv.{st.level} · Mundo {worldIdx + 1}/{WORLDS.length} · Dif ×{world.difficulty.toFixed(1)}
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#a080ff", marginBottom: 8, letterSpacing: 1 }}>
+              {world.name} · Nv.{st.level} · {worldIdx + 1}/{WORLDS.length}
             </div>
-            <Bar value={st.hp} max={st.maxHp} color="#e04040" label="HP" />
-            <Bar value={st.mp} max={st.maxMp} color="#4080ff" label="MP" />
-            <Bar value={st.xp} max={st.xpNext} color="#ffe040" label="XP" />
-            <div style={{ fontSize: 12, color: "#ccc", marginTop: 6 }}>
-              ⚔ {st.str} 🛡 {st.def} · 🪙 {st.gold} · ❤ {st.lives}
+            <StatBar value={st.hp} max={st.maxHp} color="#e04040" glow="#ff4040" label="Vida" />
+            <StatBar value={stamina} max={maxStamina} color="#5aff8a" glow="#5aff8a" label="Stamina" />
+            <StatBar value={st.mp} max={st.maxMp} color="#4080ff" label="Maná" />
+            <StatBar value={st.xp} max={st.xpNext} color="#ffe040" label="XP" />
+            <div style={{ fontSize: 11, color: "#ccc", marginTop: 8, fontFamily: "monospace", letterSpacing: 1 }}>
+              ⚔ {st.str} · 🛡 {st.def} · 🪙 {st.gold} · ❤ {st.lives}
             </div>
-            <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>
-              Q Poción HP ({st.potHp}) · E Poción MP ({st.potMp})
+            <div style={{ fontSize: 10, color: "#888", marginTop: 4 }}>
+              Q Poc.HP ({st.potHp}) · E Poc.MP ({st.potMp})
             </div>
           </div>
+
+          {/* Top-right: minimap + battery */}
+          <div style={{ position: "absolute", top: 12, right: 12, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+            <Minimap playerRef={sharedPos} facingRef={sharedFacing} blipsRef={blipsRef} />
+            <BatteryPill />
+            {activeQuest && (
+              <div style={{
+                maxWidth: 200, padding: "6px 10px", background: "#0a0418dd",
+                border: "1px solid #ffe04044", borderRadius: 4,
+                color: "#eee", fontSize: 11, fontFamily: "monospace", textAlign: "right",
+              }}>
+                <div style={{ color: "#ffe040", letterSpacing: 1, textTransform: "uppercase", fontSize: 9 }}>Objetivo</div>
+                <div>{activeQuest.title}</div>
+                <div style={{ color: "#888", fontSize: 10 }}>{activeQuest.progress}/{activeQuest.goal}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Top-center: quest compass */}
+          <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", pointerEvents: "none" }}>
+            <QuestCompass playerRef={sharedPos} facingRef={sharedFacing} marksRef={marksRef} />
+          </div>
+
+          {/* Bottom hint bar */}
           <div style={{
-            position: "absolute", top: 12, right: 12, padding: 10,
-            background: "#0a0418cc", border: "1px solid #7ee6ff44", borderRadius: 8,
-            color: "#ccc", fontSize: 11, maxWidth: 220,
+            position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)",
+            padding: "6px 14px", background: "#0a0418cc",
+            border: "1px solid #7ee6ff22", borderRadius: 20,
+            color: "#aaa", fontSize: 10, fontFamily: "monospace", letterSpacing: 2, textTransform: "uppercase",
           }}>
-            <div style={{ color: "#7ee6ff", fontWeight: 700, marginBottom: 4 }}>Controles</div>
-            WASD moverse · Ratón apuntar · Clic atacar · Espacio saltar · Q/E pociones · Alt+Ratón cámara libre (rueda zoom)
-            <div style={{ marginTop: 4, color: "#888" }}>(clic en la escena para bloquear el cursor)</div>
+            Esc pausa · I inventario · J diario · F linterna · H ocultar HUD · Shift correr
           </div>
 
           {/* Mobile controls */}
@@ -2504,6 +2611,23 @@ function Index() {
           </div>
         </>
       )}
+
+      {/* Menu overlays */}
+      {activeMenu === "pause" && (
+        <PauseMenu
+          onQuit={() => { setMenu(null); setStatus("menu"); }}
+          onSave={() => { doSave(0); setMenu(null); }}
+          onLoad={() => {
+            const slot = useGame.getState().saves.find((s) => s.id === 0);
+            if (slot) doLoad(slot);
+          }}
+        />
+      )}
+      {activeMenu === "settings" && <SettingsPanel />}
+      {activeMenu === "character" && <CharacterCreator />}
+      {activeMenu === "inventory" && <Inventory />}
+      {activeMenu === "journal" && <Journal />}
+      {activeMenu === "saves" && <SaveLoadPanel onSave={doSave} onLoad={doLoad} />}
 
       {status === "win" && (
         <Overlay title="¡Reino Superado!" subtitle="Preparando el siguiente..." color="#a080ff" />
@@ -2521,11 +2645,13 @@ function Index() {
           color="#a080ff"
           onClick={startGame}
           btn="Comenzar aventura"
+          onCustomize={() => setMenu("character")}
         />
       )}
     </div>
   );
 }
+
 
 function Overlay({ title, subtitle, color, onClick, btn }: { title: string; subtitle: string; color: string; onClick?: () => void; btn?: string }) {
   return (
