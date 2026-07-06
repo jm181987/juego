@@ -509,7 +509,10 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
 
-  const { actions } = useAnimations(gltf.animations, cloned);
+  // Always drive with the soldier animation clips (Idle, Run, etc). Michelle
+  // shares the mixamorig* bone naming so the clips retarget onto her rig
+  // through three's AnimationMixer automatically.
+  const { actions } = useAnimations(soldierGltf.animations, cloned);
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
   const currentAction = useRef<string>("");
