@@ -249,8 +249,11 @@ function buildWorlds(): WorldDef[] {
 const WORLDS: WorldDef[] = buildWorlds();
 
 const GRAVITY = -30;
-const JUMP_V = 12;
-const MOVE_SPEED = 7;
+const JUMP_V = 17;
+const MOVE_SPEED = 10;
+const AIR_CONTROL = 1.0;
+const COYOTE_TIME = 0.12;
+const JUMP_BUFFER = 0.12;
 const ATTACK_RANGE = 2.6;
 const ATTACK_COOLDOWN = 0.4;
 
@@ -608,6 +611,8 @@ function Scene({
 
   const [, force] = useState(0);
   const rerender = () => force((v) => v + 1);
+  const coyoteTimer = useRef(0);
+  const jumpBuffer = useRef(0);
 
   const diff = world.difficulty;
   const enemies = useRef<Enemy[]>(
@@ -697,27 +702,38 @@ function Scene({
     const inputLen = Math.hypot(mx, mz);
     // Player always faces the camera-forward direction (where the mouse is aiming)
     facing.current = camYaw + Math.PI;
+    // Air control: full speed on ground, slightly reduced smoothing in air
+    const control = grounded.current ? 1 : AIR_CONTROL;
     if (inputLen > 0) {
       mx /= inputLen; mz /= inputLen;
       const s = Math.sin(camYaw), c = Math.cos(camYaw);
       const wx = mx * c + mz * s;
       const wz = -mx * s + mz * c;
-      vel.current.x = wx * MOVE_SPEED;
-      vel.current.z = wz * MOVE_SPEED;
+      const targetX = wx * MOVE_SPEED;
+      const targetZ = wz * MOVE_SPEED;
+      // Lerp toward target for snappy but not jittery movement
+      const alpha = grounded.current ? 1 : 0.25 * control;
+      vel.current.x = vel.current.x + (targetX - vel.current.x) * alpha;
+      vel.current.z = vel.current.z + (targetZ - vel.current.z) * alpha;
       walkPhase.current += dt;
-    } else {
-      vel.current.x *= 0.7;
-      vel.current.z *= 0.7;
+    } else if (grounded.current) {
+      vel.current.x *= 0.6;
+      vel.current.z *= 0.6;
     }
 
-    // Jump
-    if (k.jump && grounded.current) {
+    // Coyote time + jump buffer
+    coyoteTimer.current = grounded.current ? COYOTE_TIME : Math.max(0, coyoteTimer.current - dt);
+    if (k.jump) jumpBuffer.current = JUMP_BUFFER;
+    else jumpBuffer.current = Math.max(0, jumpBuffer.current - dt);
+    if (jumpBuffer.current > 0 && coyoteTimer.current > 0) {
       vel.current.y = JUMP_V;
       grounded.current = false;
+      coyoteTimer.current = 0;
+      jumpBuffer.current = 0;
     }
 
-    // Gravity
-    vel.current.y += GRAVITY * dt;
+    // Gravity (slightly stronger when falling for tighter platforming feel)
+    vel.current.y += (vel.current.y < 0 ? GRAVITY * 1.4 : GRAVITY) * dt;
 
     // Integrate X
     const nx = pos.current.x + vel.current.x * dt;
@@ -908,6 +924,7 @@ function Scene({
     if (gd < 1.5) { onWin(); return; }
 
     // Floating texts life
+    const beforeLen = floats.current.length;
     floats.current.forEach((f) => {
       f.life -= dt;
       f.pos.y += dt * 1.5;
@@ -921,7 +938,9 @@ function Scene({
     camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
 
-    rerender();
+    // Only rerender React tree when the floats list actually changes,
+    // otherwise mesh refs update the scene each frame without React work.
+    if (floats.current.length !== beforeLen) rerender();
   });
 
   return (
