@@ -186,7 +186,17 @@ function Index() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+
+    // Fullscreen sizing
+    const setCanvasSize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.imageSmoothingEnabled = true;
+      (ctx as any).imageSmoothingQuality = "high";
+    };
+    setCanvasSize();
 
     const world = buildWorld(stageIdx);
     const { LEVEL_W, LEVEL_H, stage } = world;
@@ -207,17 +217,22 @@ function Index() {
     let stageCompleted = false;
 
     // Stars for sky theme
-    const stars: { x: number; y: number; s: number; tw: number }[] = [];
-    if (stage.theme === "sky") {
-      for (let i = 0; i < 120; i++) {
-        stars.push({
-          x: Math.random() * LEVEL_W,
-          y: Math.random() * canvas.height * 0.7,
-          s: Math.random() * 2 + 0.5,
-          tw: Math.random() * Math.PI * 2,
-        });
+    let stars: { x: number; y: number; s: number; tw: number }[] = [];
+    const rebuildStars = () => {
+      stars = [];
+      if (stage.theme === "sky") {
+        for (let i = 0; i < 180; i++) {
+          stars.push({
+            x: Math.random() * LEVEL_W,
+            y: Math.random() * canvas.height * 0.7,
+            s: Math.random() * 2 + 0.5,
+            tw: Math.random() * Math.PI * 2,
+          });
+        }
       }
-    }
+    };
+    rebuildStars();
+
 
     // ---------- Sprite / background caches ----------
     function makeCanvas(w: number, h: number) {
@@ -232,244 +247,306 @@ function Index() {
     const S = TILE;
     const sprites: Record<string, HTMLCanvasElement> = {};
 
+    // helper: beveled cube-face — bright top, dark bottom, side highlights
+    function bevelFace(cx: CanvasRenderingContext2D, w: number, h: number, base: string, top: string, bot: string) {
+      const g = cx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, top); g.addColorStop(0.5, base); g.addColorStop(1, bot);
+      cx.fillStyle = g; cx.fillRect(0, 0, w, h);
+      // top highlight
+      cx.fillStyle = "rgba(255,255,255,0.55)"; cx.fillRect(0, 0, w, 2);
+      cx.fillStyle = "rgba(255,255,255,0.25)"; cx.fillRect(0, 2, w, 1);
+      // bottom shadow
+      cx.fillStyle = "rgba(0,0,0,0.5)"; cx.fillRect(0, h - 2, w, 2);
+      cx.fillStyle = "rgba(0,0,0,0.25)"; cx.fillRect(0, h - 3, w, 1);
+      // side highlights (isometric feel)
+      cx.fillStyle = "rgba(255,255,255,0.2)"; cx.fillRect(0, 0, 2, h);
+      cx.fillStyle = "rgba(0,0,0,0.25)"; cx.fillRect(w - 2, 0, 2, h);
+    }
+
     (function buildTileSprites() {
-      // ground
+      // ground / dirt
       {
         const { c, cx } = makeCanvas(S, S);
-        const g = cx.createLinearGradient(0, 0, 0, S);
-        g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#5c2f0d");
-        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
-        cx.fillStyle = "#6b3410";
-        cx.fillRect(4, 6, 4, 4); cx.fillRect(20, 14, 4, 4); cx.fillRect(12, 22, 4, 4);
-        cx.fillStyle = "rgba(0,0,0,0.35)"; cx.fillRect(0, S - 3, S, 3);
-        cx.fillStyle = "rgba(255,255,255,0.15)"; cx.fillRect(0, 0, S, 2);
+        bevelFace(cx, S, S, "#c9722e", "#f0a04a", "#5c2a08");
+        cx.fillStyle = "rgba(0,0,0,0.3)";
+        cx.beginPath(); cx.arc(8, 12, 2, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(22, 20, 1.6, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(14, 24, 1.4, 0, Math.PI * 2); cx.fill();
         sprites.ground = c;
       }
-      // grass
+      // grass block (dirt + grass top with rounded blades)
       {
         const { c, cx } = makeCanvas(S, S);
-        const g = cx.createLinearGradient(0, 0, 0, S);
-        g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#6b3410");
-        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
-        const gg = cx.createLinearGradient(0, 0, 0, 12);
-        gg.addColorStop(0, "#5cd464"); gg.addColorStop(1, "#2ea63a");
-        cx.fillStyle = gg; cx.fillRect(0, 0, S, 12);
-        cx.fillStyle = "#7ee085";
-        cx.fillRect(3, 0, 2, 2); cx.fillRect(11, 0, 2, 2); cx.fillRect(22, 0, 2, 2);
+        bevelFace(cx, S, S, "#c9722e", "#e8944a", "#5c2a08");
+        // grass top
+        const gg = cx.createLinearGradient(0, 0, 0, 14);
+        gg.addColorStop(0, "#7be86a"); gg.addColorStop(0.5, "#4bc74a"); gg.addColorStop(1, "#2a8a2a");
+        cx.fillStyle = gg; cx.fillRect(0, 0, S, 14);
+        // grass highlight
+        cx.fillStyle = "#b6f299"; cx.fillRect(0, 0, S, 2);
+        // grass blades hanging into dirt
+        cx.fillStyle = "#2a8a2a";
+        cx.beginPath();
+        cx.moveTo(0, 14); cx.lineTo(4, 18); cx.lineTo(8, 14); cx.lineTo(12, 19); cx.lineTo(16, 14);
+        cx.lineTo(20, 18); cx.lineTo(24, 14); cx.lineTo(28, 20); cx.lineTo(S, 14); cx.lineTo(S, 15); cx.lineTo(0, 15);
+        cx.closePath(); cx.fill();
+        // sparkles
+        cx.fillStyle = "#e8ffcf"; cx.fillRect(5, 2, 2, 2); cx.fillRect(18, 3, 2, 2); cx.fillRect(26, 2, 2, 2);
         sprites.grass = c;
       }
       // brick
       {
         const { c, cx } = makeCanvas(S, S);
-        const g = cx.createLinearGradient(0, 0, 0, S);
-        g.addColorStop(0, "#e05a2a"); g.addColorStop(1, "#8b3110");
-        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
-        cx.strokeStyle = "#2a0e04"; cx.lineWidth = 2;
-        cx.beginPath();
-        cx.moveTo(0, 16); cx.lineTo(S, 16);
-        cx.moveTo(16, 0); cx.lineTo(16, 16);
-        cx.moveTo(8, 16); cx.lineTo(8, S);
-        cx.moveTo(24, 16); cx.lineTo(24, S);
-        cx.stroke();
-        cx.strokeRect(1, 1, S - 2, S - 2);
-        cx.fillStyle = "rgba(255,255,255,0.2)"; cx.fillRect(2, 2, S - 4, 1);
+        bevelFace(cx, S, S, "#d94a1a", "#ff7a3a", "#5a1a08");
+        // mortar
+        cx.fillStyle = "#2a0e04";
+        cx.fillRect(0, 15, S, 2); cx.fillRect(0, S - 1, S, 1);
+        cx.fillRect(15, 0, 2, 15); cx.fillRect(7, 17, 2, S - 17); cx.fillRect(23, 17, 2, S - 17);
+        // brick highlights
+        cx.fillStyle = "rgba(255,255,255,0.25)";
+        cx.fillRect(2, 3, 11, 1); cx.fillRect(18, 3, 11, 1);
+        cx.fillRect(2, 18, 4, 1); cx.fillRect(10, 18, 12, 1); cx.fillRect(26, 18, 4, 1);
         sprites.brick = c;
       }
-      // question (unused, static; pulse drawn on top)
+      // question block — bright gold, riveted corners, glossy
       {
         const { c, cx } = makeCanvas(S, S);
-        const g = cx.createLinearGradient(0, 0, 0, S);
-        g.addColorStop(0, "#ffcf3f"); g.addColorStop(1, "#c86e00");
-        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
-        cx.fillStyle = "#7a4600";
-        cx.fillRect(0, 0, S, 3); cx.fillRect(0, S - 3, S, 3);
-        cx.fillRect(0, 0, 3, S); cx.fillRect(S - 3, 0, 3, S);
-        cx.fillStyle = "#ffe680";
-        cx.fillRect(3, 3, 3, 3); cx.fillRect(S - 6, 3, 3, 3);
-        cx.fillRect(3, S - 6, 3, 3); cx.fillRect(S - 6, S - 6, 3, 3);
-        cx.fillStyle = "rgba(0,0,0,0.4)"; cx.font = "bold 20px monospace";
-        cx.fillText("?", 11, 24);
-        cx.fillStyle = "#fff"; cx.fillText("?", 10, 23);
+        bevelFace(cx, S, S, "#f2a412", "#ffd94a", "#6b3a00");
+        // dark border frame
+        cx.strokeStyle = "#5a2e00"; cx.lineWidth = 2;
+        cx.strokeRect(2, 2, S - 4, S - 4);
+        // corner rivets
+        cx.fillStyle = "#fff2a8";
+        cx.fillRect(4, 4, 3, 3); cx.fillRect(S - 7, 4, 3, 3);
+        cx.fillRect(4, S - 7, 3, 3); cx.fillRect(S - 7, S - 7, 3, 3);
+        cx.fillStyle = "#6b3a00";
+        cx.fillRect(5, 5, 1, 1); cx.fillRect(S - 6, 5, 1, 1);
+        cx.fillRect(5, S - 6, 1, 1); cx.fillRect(S - 6, S - 6, 1, 1);
+        // "?"
+        cx.fillStyle = "rgba(0,0,0,0.55)"; cx.font = "bold 20px system-ui, sans-serif"; cx.fillText("?", 11, 25);
+        cx.fillStyle = "#fff"; cx.fillText("?", 10, 24);
+        // gloss
+        cx.fillStyle = "rgba(255,255,255,0.35)"; cx.fillRect(3, 3, S - 6, 2);
         sprites.question = c;
       }
       // question used
       {
         const { c, cx } = makeCanvas(S, S);
-        const g = cx.createLinearGradient(0, 0, 0, S);
-        g.addColorStop(0, "#8b5a2b"); g.addColorStop(1, "#4a2f14");
-        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        bevelFace(cx, S, S, "#8b5a2b", "#a5763a", "#3a2010");
         cx.strokeStyle = "#2a1808"; cx.lineWidth = 2;
-        cx.strokeRect(1, 1, S - 2, S - 2);
+        cx.strokeRect(2, 2, S - 4, S - 4);
         sprites.questionUsed = c;
       }
-      // pipe body
+      // pipe body (cylindrical shading)
       {
         const { c, cx } = makeCanvas(S, S);
         const g = cx.createLinearGradient(0, 0, S, 0);
-        g.addColorStop(0, "#0f5a19"); g.addColorStop(0.15, "#7ee085");
-        g.addColorStop(0.5, "#3ec54a"); g.addColorStop(0.85, "#1a6b22"); g.addColorStop(1, "#0a3d10");
+        g.addColorStop(0, "#0a3d10"); g.addColorStop(0.1, "#1a6b22");
+        g.addColorStop(0.35, "#7ee085"); g.addColorStop(0.5, "#3ec54a");
+        g.addColorStop(0.75, "#1a6b22"); g.addColorStop(1, "#08300b");
         cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        cx.fillStyle = "rgba(255,255,255,0.5)"; cx.fillRect(6, 0, 3, S);
+        cx.fillStyle = "rgba(0,0,0,0.35)"; cx.fillRect(S - 5, 0, 3, S);
         sprites.pipe = c;
       }
       // pipe top (rim overlay, wider)
       {
-        const rimW = S + 4;
-        const { c, cx } = makeCanvas(rimW, 8);
-        cx.fillStyle = "#1a6b22"; cx.fillRect(0, 0, rimW, 8);
+        const rimW = S + 6;
+        const { c, cx } = makeCanvas(rimW, 12);
         const rg = cx.createLinearGradient(0, 0, rimW, 0);
-        rg.addColorStop(0, "#0f5a19"); rg.addColorStop(0.2, "#8ff090");
-        rg.addColorStop(0.5, "#4ad058"); rg.addColorStop(0.8, "#1a6b22"); rg.addColorStop(1, "#0a3d10");
-        cx.fillStyle = rg; cx.fillRect(0, 2, rimW, 4);
-        cx.fillStyle = "rgba(255,255,255,0.3)"; cx.fillRect(4, 4, 8, 1);
+        rg.addColorStop(0, "#08300b"); rg.addColorStop(0.15, "#1a6b22");
+        rg.addColorStop(0.35, "#8ff090"); rg.addColorStop(0.55, "#4ad058");
+        rg.addColorStop(0.8, "#1a6b22"); rg.addColorStop(1, "#08300b");
+        cx.fillStyle = rg; cx.fillRect(0, 0, rimW, 12);
+        cx.fillStyle = "rgba(255,255,255,0.55)"; cx.fillRect(2, 2, rimW - 4, 2);
+        cx.fillStyle = "rgba(0,0,0,0.45)"; cx.fillRect(0, 10, rimW, 2);
         sprites.pipeTop = c;
       }
       // stone (theme-aware)
       {
         const { c, cx } = makeCanvas(S, S);
-        const g = cx.createLinearGradient(0, 0, 0, S);
         if (stage.theme === "cave") {
-          g.addColorStop(0, "#b56a3a"); g.addColorStop(1, "#5a2810");
+          bevelFace(cx, S, S, "#a86040", "#d68a5a", "#3a1808");
+          cx.fillStyle = "rgba(255,200,150,0.35)";
+          cx.fillRect(6, 8, 2, 2); cx.fillRect(20, 18, 2, 2); cx.fillRect(14, 12, 2, 2);
         } else {
-          g.addColorStop(0, "#c8ccd4"); g.addColorStop(1, "#5c6270");
+          bevelFace(cx, S, S, "#98a0b0", "#d0d6e0", "#3a4050");
+          cx.fillStyle = "rgba(0,0,0,0.35)";
+          cx.fillRect(6, 10, 3, 2); cx.fillRect(18, 20, 3, 2);
         }
-        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
-        cx.fillStyle = "rgba(0,0,0,0.25)";
-        cx.fillRect(6, 8, 4, 2); cx.fillRect(18, 18, 4, 2);
-        cx.fillStyle = "rgba(255,255,255,0.2)"; cx.fillRect(0, 0, S, 2);
         sprites.stone = c;
       }
-      // platform (14px tall)
+      // platform (14px tall) — wood plank
       {
         const { c, cx } = makeCanvas(S, 14);
-        const g = cx.createLinearGradient(0, 0, 0, 14);
-        g.addColorStop(0, "#c07500"); g.addColorStop(1, "#7a4600");
-        cx.fillStyle = g; cx.fillRect(0, 0, S, 14);
-        cx.fillStyle = "rgba(255,255,255,0.35)"; cx.fillRect(0, 0, S, 2);
-        cx.fillStyle = "rgba(0,0,0,0.35)"; cx.fillRect(0, 12, S, 2);
+        bevelFace(cx, S, 14, "#c07500", "#ffab3a", "#4a2600");
+        cx.fillStyle = "rgba(0,0,0,0.35)"; cx.fillRect(10, 3, 1, 8); cx.fillRect(22, 3, 1, 8);
         sprites.platform = c;
       }
-      // cloud platform
+      // cloud platform — fluffy
       {
         const { c, cx } = makeCanvas(S, 14);
-        cx.fillStyle = "rgba(255,255,255,0.9)";
+        cx.fillStyle = "rgba(255,255,255,0.95)";
         cx.beginPath();
-        cx.arc(6, 8, 8, 0, Math.PI * 2);
-        cx.arc(16, 5, 10, 0, Math.PI * 2);
-        cx.arc(26, 8, 8, 0, Math.PI * 2);
+        cx.arc(5, 8, 7, 0, Math.PI * 2);
+        cx.arc(14, 4, 8, 0, Math.PI * 2);
+        cx.arc(24, 5, 7, 0, Math.PI * 2);
+        cx.arc(28, 8, 6, 0, Math.PI * 2);
         cx.fill();
         cx.fillStyle = "#ffffff"; cx.fillRect(0, 4, S, 8);
         cx.fillStyle = "rgba(180,200,240,0.5)"; cx.fillRect(0, 10, S, 2);
+        cx.fillStyle = "rgba(255,255,255,0.9)"; cx.fillRect(0, 4, S, 2);
         sprites.cloud = c;
       }
     })();
 
-    // Pre-render static background (sky gradient + sun/moon + stars + far mountains)
-    // Wide strip so parallax can scroll; we tile horizontally.
-    const BG_W = canvas.width * 2;
-    const bgFar = makeCanvas(BG_W, canvas.height);
-    const bgMid = makeCanvas(BG_W, canvas.height);
-    (function buildBackgrounds() {
+    // Backgrounds: rebuilt on init and resize
+    let BG_W = Math.max(canvas.width * 2, 1600);
+    let bgFar = makeCanvas(BG_W, canvas.height);
+    let bgMid = makeCanvas(BG_W, canvas.height);
+    let vignette = makeCanvas(canvas.width, canvas.height);
+
+    function buildBackgrounds() {
+      BG_W = Math.max(canvas.width * 2, 1600);
+      bgFar = makeCanvas(BG_W, canvas.height);
+      bgMid = makeCanvas(BG_W, canvas.height);
+      vignette = makeCanvas(canvas.width, canvas.height);
+
       const { cx } = bgFar;
       if (stage.theme === "grass") {
+        // Bright N64-blue sky
         const g = cx.createLinearGradient(0, 0, 0, canvas.height);
-        g.addColorStop(0, "#4a86f7"); g.addColorStop(0.6, "#7cb4ff"); g.addColorStop(1, "#c5e2ff");
+        g.addColorStop(0, "#2f6ef0"); g.addColorStop(0.5, "#6aa7ff"); g.addColorStop(1, "#c5e8ff");
         cx.fillStyle = g; cx.fillRect(0, 0, BG_W, canvas.height);
-        // Sun
-        const sunX = canvas.width - 90, sunY = 80;
-        const sg = cx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 80);
+        // Sun with rays
+        const sunX = canvas.width - 120, sunY = 100;
+        const sg = cx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 140);
         sg.addColorStop(0, "rgba(255,240,180,1)");
-        sg.addColorStop(0.4, "rgba(255,220,140,0.5)");
+        sg.addColorStop(0.35, "rgba(255,220,140,0.4)");
         sg.addColorStop(1, "rgba(255,220,140,0)");
-        cx.fillStyle = sg; cx.fillRect(sunX - 90, sunY - 90, 180, 180);
-        cx.fillStyle = "#fff5c8";
-        cx.beginPath(); cx.arc(sunX, sunY, 26, 0, Math.PI * 2); cx.fill();
+        cx.fillStyle = sg; cx.fillRect(sunX - 160, sunY - 160, 320, 320);
+        cx.fillStyle = "#fff8d0";
+        cx.beginPath(); cx.arc(sunX, sunY, 34, 0, Math.PI * 2); cx.fill();
       } else if (stage.theme === "cave") {
         const g = cx.createLinearGradient(0, 0, 0, canvas.height);
-        g.addColorStop(0, "#1a0f22"); g.addColorStop(0.6, "#3a1a10"); g.addColorStop(1, "#5a2010");
+        g.addColorStop(0, "#160a20"); g.addColorStop(0.5, "#3a1a12"); g.addColorStop(1, "#6a2810");
         cx.fillStyle = g; cx.fillRect(0, 0, BG_W, canvas.height);
-        // Stalactites
-        cx.fillStyle = "#2a1a12";
-        for (let i = 0; i < 40; i++) {
+        // Warm glow
+        for (let i = 0; i < 6; i++) {
+          const gx = i * 400 + 150, gy = canvas.height * 0.7;
+          const rg = cx.createRadialGradient(gx, gy, 20, gx, gy, 260);
+          rg.addColorStop(0, "rgba(255,140,40,0.35)"); rg.addColorStop(1, "rgba(255,140,40,0)");
+          cx.fillStyle = rg; cx.fillRect(gx - 260, gy - 260, 520, 520);
+        }
+        cx.fillStyle = "#241610";
+        for (let i = 0; i < 60; i++) {
           const sx = i * 90 + ((i * 7) % 30);
-          const h = 24 + ((i * 17) % 30);
+          const h = 30 + ((i * 17) % 40);
           cx.beginPath();
-          cx.moveTo(sx, 32); cx.lineTo(sx + 12, 32); cx.lineTo(sx + 6, 32 + h);
+          cx.moveTo(sx, 0); cx.lineTo(sx + 16, 0); cx.lineTo(sx + 8, h);
           cx.closePath(); cx.fill();
         }
       } else {
         const g = cx.createLinearGradient(0, 0, 0, canvas.height);
-        g.addColorStop(0, "#0a0a2e"); g.addColorStop(0.5, "#1a1a5a"); g.addColorStop(1, "#3a1a5a");
+        g.addColorStop(0, "#08082e"); g.addColorStop(0.5, "#241a6a"); g.addColorStop(1, "#5a2a7a");
         cx.fillStyle = g; cx.fillRect(0, 0, BG_W, canvas.height);
-        // Stars baked in
         for (const st of stars) {
           cx.fillStyle = "rgba(255,255,255,0.9)";
           cx.fillRect(st.x % BG_W, st.y, st.s, st.s);
         }
-        // Moon
-        const mx = canvas.width - 100, my = 90;
+        const mx2 = canvas.width - 140, my2 = 110;
         cx.fillStyle = "rgba(255,240,200,0.2)";
-        cx.beginPath(); cx.arc(mx, my, 60, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(mx2, my2, 80, 0, Math.PI * 2); cx.fill();
         cx.fillStyle = "#f8f4d0";
-        cx.beginPath(); cx.arc(mx, my, 32, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(mx2, my2, 40, 0, Math.PI * 2); cx.fill();
         cx.fillStyle = "#d8d0a8";
-        cx.beginPath(); cx.arc(mx - 8, my - 4, 4, 0, Math.PI * 2); cx.fill();
-        cx.beginPath(); cx.arc(mx + 10, my + 6, 6, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(mx2 - 10, my2 - 6, 5, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(mx2 + 14, my2 + 8, 7, 0, Math.PI * 2); cx.fill();
       }
 
-      // Mid layer (mountains / hills / distant rocks / cloud islands)
+      // Mid layer
       const { cx: mx } = bgMid;
       mx.clearRect(0, 0, BG_W, canvas.height);
       if (stage.theme === "grass") {
-        mx.fillStyle = "#6b8fbf";
-        for (let i = 0; i < 8; i++) {
-          const px = i * 320;
+        // Far mountain range with snow caps
+        for (let i = 0; i < 12; i++) {
+          const px = i * 320 - 100;
+          const py = canvas.height - 120;
+          const grad = mx.createLinearGradient(0, py - 260, 0, py);
+          grad.addColorStop(0, "#8fa8d8"); grad.addColorStop(1, "#4a6ba4");
+          mx.fillStyle = grad;
           mx.beginPath();
-          mx.moveTo(px - 20, canvas.height - 100);
-          mx.lineTo(px + 120, canvas.height - 240);
-          mx.lineTo(px + 260, canvas.height - 100);
+          mx.moveTo(px - 40, py); mx.lineTo(px + 140, py - 260); mx.lineTo(px + 320, py);
+          mx.closePath(); mx.fill();
+          // snow cap
+          mx.fillStyle = "#f0f4ff";
+          mx.beginPath();
+          mx.moveTo(px + 110, py - 190); mx.lineTo(px + 140, py - 260); mx.lineTo(px + 170, py - 190);
+          mx.lineTo(px + 155, py - 200); mx.lineTo(px + 140, py - 220); mx.lineTo(px + 125, py - 200);
           mx.closePath(); mx.fill();
         }
-        for (let i = 0; i < 8; i++) {
-          const hx = i * 260;
-          const grad = mx.createLinearGradient(0, canvas.height - 160, 0, canvas.height);
-          grad.addColorStop(0, "#4aa64a"); grad.addColorStop(1, "#2f7a2f");
+        // rolling hills
+        for (let i = 0; i < 12; i++) {
+          const hx = i * 280;
+          const grad = mx.createLinearGradient(0, canvas.height - 200, 0, canvas.height);
+          grad.addColorStop(0, "#5ec95a"); grad.addColorStop(1, "#2a7a2a");
           mx.fillStyle = grad;
-          mx.beginPath(); mx.arc(hx, canvas.height - 90, 100, Math.PI, 0); mx.fill();
+          mx.beginPath(); mx.arc(hx, canvas.height - 100, 130, Math.PI, 0); mx.fill();
         }
       } else if (stage.theme === "cave") {
-        mx.fillStyle = "#2a1810";
-        for (let i = 0; i < 6; i++) {
-          const rx = i * 260;
+        mx.fillStyle = "#3a2010";
+        for (let i = 0; i < 8; i++) {
+          const rx = i * 320;
           mx.beginPath();
-          mx.moveTo(rx, canvas.height - 60);
-          mx.lineTo(rx + 80, canvas.height - 180);
-          mx.lineTo(rx + 160, canvas.height - 60);
+          mx.moveTo(rx - 40, canvas.height - 80);
+          mx.lineTo(rx + 100, canvas.height - 240);
+          mx.lineTo(rx + 200, canvas.height - 80);
+          mx.closePath(); mx.fill();
+        }
+        // crystals
+        for (let i = 0; i < 10; i++) {
+          const cx3 = i * 220 + 80;
+          const cy3 = canvas.height - 120 + ((i * 19) % 40);
+          mx.fillStyle = "rgba(180,120,80,0.6)";
+          mx.beginPath();
+          mx.moveTo(cx3, cy3); mx.lineTo(cx3 + 8, cy3 - 30); mx.lineTo(cx3 + 16, cy3);
           mx.closePath(); mx.fill();
         }
       } else {
-        for (let i = 0; i < 8; i++) {
-          const cx2 = i * 260;
-          const cy = 260 + ((i * 41) % 80);
-          mx.fillStyle = "rgba(120,100,180,0.5)";
+        // floating islands
+        for (let i = 0; i < 10; i++) {
+          const cx2 = i * 280 + 100;
+          const cy = 200 + ((i * 41) % 120);
+          mx.fillStyle = "rgba(140,110,200,0.6)";
           mx.beginPath();
-          mx.ellipse(cx2, cy, 90, 20, 0, 0, Math.PI * 2);
+          mx.ellipse(cx2, cy, 110, 26, 0, 0, Math.PI * 2);
+          mx.fill();
+          mx.fillStyle = "rgba(200,170,255,0.45)";
+          mx.beginPath();
+          mx.ellipse(cx2, cy - 4, 100, 8, 0, 0, Math.PI * 2);
           mx.fill();
         }
       }
-    })();
 
-    // Vignette cached
-    const vignette = makeCanvas(canvas.width, canvas.height);
-    {
-      const { cx } = vignette;
-      const vg = cx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.4,
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.85
+      // Vignette
+      const { cx: vcx } = vignette;
+      const vg = vcx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.35,
+        canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.75
       );
       vg.addColorStop(0, "rgba(0,0,0,0)");
-      vg.addColorStop(1, stage.theme === "cave" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)");
-      cx.fillStyle = vg; cx.fillRect(0, 0, canvas.width, canvas.height);
+      vg.addColorStop(1, stage.theme === "cave" ? "rgba(0,0,0,0.65)" : "rgba(0,0,0,0.4)");
+      vcx.fillStyle = vg; vcx.fillRect(0, 0, canvas.width, canvas.height);
     }
+    buildBackgrounds();
+
+    const onResize = () => {
+      setCanvasSize();
+      rebuildStars();
+      buildBackgrounds();
+    };
+    window.addEventListener("resize", onResize);
+
 
     const player = {
       x: world.spawn.x, y: world.spawn.y, w: 22, h: 30,
@@ -1403,6 +1480,7 @@ function Index() {
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);
+      window.removeEventListener("resize", onResize);
       running = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1431,75 +1509,83 @@ function Index() {
   });
 
   return (
-    <main className="min-h-screen w-full bg-gradient-to-b from-indigo-900 via-sky-700 to-sky-400 flex flex-col items-center justify-center p-3 gap-3 select-none">
-      <h1 className="text-2xl md:text-4xl font-black text-white drop-shadow-[3px_3px_0_#000] tracking-tight font-mono">
-        SUPER PLUMBER ADVENTURE
-      </h1>
+    <main className="fixed inset-0 w-screen h-screen overflow-hidden bg-black select-none">
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full block"
+      />
 
-      <div className="flex flex-wrap justify-center gap-3 md:gap-5 text-white font-mono font-bold text-xs md:text-base drop-shadow-[2px_2px_0_#000]">
-        <span>SCORE {score.toString().padStart(6, "0")}</span>
-        <span className="text-yellow-300">◉ x{coinsCount.toString().padStart(2, "0")}</span>
-        <span className="text-red-300">♥ x{lives}</span>
-        <span className={timeLeft <= 20 ? "text-red-400 animate-pulse" : ""}>⏱ {timeLeft.toString().padStart(3, "0")}</span>
-        <span className="text-cyan-300">WORLD {STAGES[stageIdx].name.split(" ")[0]}</span>
-      </div>
-
-      <div className="relative rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-4 ring-yellow-400 bg-sky-400 max-w-full">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={520}
-          className="block w-full h-auto"
-          style={{ imageRendering: "pixelated", maxWidth: "min(100vw - 24px, 800px)" }}
-        />
-        {status === "stageClear" && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
-            <p className="text-lg">Puntuación: {score}</p>
-            <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
-              SIGUIENTE MUNDO →
-            </button>
+      {/* HUD overlay */}
+      <div className="pointer-events-none absolute top-0 left-0 right-0 p-3 md:p-5 flex justify-between items-start z-10">
+        <div className="flex flex-col gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <div className="bg-black/40 backdrop-blur-sm rounded-xl px-3 md:px-4 py-1.5 md:py-2 border border-white/20">
+            <span className="text-yellow-300">★ {score.toString().padStart(6, "0")}</span>
           </div>
-        )}
-        {status === "win" && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
-            <p className="text-xl">Puntuación final: {score}</p>
-            <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
-            <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
-              JUGAR DE NUEVO
-            </button>
+          <div className="flex gap-2 text-xs md:text-base">
+            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-yellow-300">◉ ×{coinsCount.toString().padStart(2, "0")}</span>
+            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-red-300">♥ ×{lives}</span>
           </div>
-        )}
-        {status === "dead" && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
-            <p className="text-xl">Puntuación: {score}</p>
-            <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
-              JUGAR DE NUEVO
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-between items-end w-full max-w-[800px] gap-2 md:hidden">
-        <div className="flex gap-2">
-          <button {...holdKey("ArrowLeft")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">◀</button>
-          <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▶</button>
-          <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/90 rounded-full text-xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▼</button>
         </div>
-        <div className="flex gap-2 items-end">
-          <button {...holdKey("KeyZ")} className="w-14 h-14 bg-yellow-400 text-black rounded-full text-sm font-black shadow-[0_4px_0_#000] active:translate-y-1">PUÑO</button>
-          <button {...holdKey("KeyX")} className="w-14 h-14 bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_#000] active:translate-y-1 leading-tight">POUND</button>
-          <button {...holdKey("ShiftLeft")} className="w-14 h-14 bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_#000] active:translate-y-1">RUN</button>
-          <button {...holdKey("Space")} className="w-18 h-18 min-w-[68px] min-h-[68px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_#000] active:translate-y-1">SALTAR</button>
+        <div className="flex flex-col items-end gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <div className={`bg-black/40 backdrop-blur-sm rounded-xl px-3 md:px-4 py-1.5 md:py-2 border border-white/20 ${timeLeft <= 20 ? "text-red-400 animate-pulse" : ""}`}>
+            ⏱ {timeLeft.toString().padStart(3, "0")}
+          </div>
+          <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-xs md:text-base text-cyan-300">
+            {STAGES[stageIdx].name}
+          </div>
         </div>
       </div>
 
-      <p className="text-white/90 text-[11px] md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000] max-w-[800px]">
-        ← → moverse · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
-        Combos: doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
-      </p>
+      {/* Desktop hint */}
+      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-10 hidden md:block text-white/80 font-mono text-xs text-center drop-shadow-[1px_1px_0_#000]">
+        ← → mover · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
+        doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
+      </div>
+
+      {/* Mobile controls */}
+      <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-end z-20 md:hidden pointer-events-none">
+        <div className="flex gap-2 pointer-events-auto">
+          <button {...holdKey("ArrowLeft")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-2xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">◀</button>
+          <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-2xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▶</button>
+          <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▼</button>
+        </div>
+        <div className="flex gap-2 items-end pointer-events-auto">
+          <button {...holdKey("KeyZ")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-yellow-400 text-black rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">PUÑO</button>
+          <button {...holdKey("KeyX")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none leading-tight">POUND</button>
+          <button {...holdKey("ShiftLeft")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">RUN</button>
+          <button {...holdKey("Space")} className="w-18 h-18 min-w-[72px] min-h-[72px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">JUMP</button>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {status === "stageClear" && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white z-30" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
+          <p className="text-lg">Puntuación: {score}</p>
+          <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+            SIGUIENTE MUNDO →
+          </button>
+        </div>
+      )}
+      {status === "win" && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white z-30" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
+          <p className="text-xl">Puntuación final: {score}</p>
+          <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
+          <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+            JUGAR DE NUEVO
+          </button>
+        </div>
+      )}
+      {status === "dead" && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white z-30" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
+          <p className="text-xl">Puntuación: {score}</p>
+          <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+            JUGAR DE NUEVO
+          </button>
+        </div>
+      )}
     </main>
   );
 }
