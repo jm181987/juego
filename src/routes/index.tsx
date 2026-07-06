@@ -389,7 +389,9 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       else if (name === "mixamorigRightForeArm") bonesRef.current.rightForeArm = o;
       else if (name === "mixamorigSpine1") bonesRef.current.spine1 = o;
       else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
+      else if (name === "mixamorigLeftHand") bonesRef.current.leftHand = o;
     });
+
   }, [cloned]);
 
 
