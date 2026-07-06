@@ -1024,59 +1024,151 @@ function Index() {
       const py = player.y - cameraY;
       const f = player.facing;
 
+      // Shadow
       ctx.fillStyle = "rgba(0,0,0,0.28)";
       ctx.beginPath();
       ctx.ellipse(px + player.w / 2, py + player.h + 1, player.w * 0.55, 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      // Ground-pound charge aura
+      if (player.groundPound === 1) {
+        ctx.strokeStyle = `rgba(255,220,80,${0.4 + Math.sin(time * 0.6) * 0.3})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px + player.w / 2, py + player.h / 2, 22 + Math.sin(time * 0.6) * 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      // Ground-pound slam trail
+      if (player.groundPound === 2) {
+        ctx.fillStyle = "rgba(140,180,255,0.35)";
+        ctx.fillRect(px, py - 30, player.w, 30);
+      }
+
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
-      ctx.scale(f * player.stretch, player.squash);
+
+      // Ground-pound spin
+      let rot = 0;
+      if (player.groundPound === 1) rot = (time * 0.6) % (Math.PI * 2);
+      if (player.diving) rot = f * 0.9;
+      ctx.rotate(rot);
+
+      // Squash/stretch — crouch = flatter
+      const sq = player.crouching ? player.squash * 1.4 : player.squash;
+      const st = player.crouching ? player.stretch * 1.15 : player.stretch;
+      ctx.scale(f * st, sq);
       ctx.translate(-player.w / 2, -player.h);
 
       const walking = player.onGround && Math.abs(player.vx) > 0.3;
       const walkFrame = Math.floor(player.anim) % 4;
       const airborne = !player.onGround;
+      const crouched = player.crouching;
+      const attacking = player.attack > 0;
+      const wallSliding = player.wallSlide > 0 && !player.onGround;
 
-      ctx.fillStyle = "#d32626";
-      ctx.fillRect(2, 0, 18, 5);
-      ctx.fillRect(10, -3, 12, 5);
-      ctx.fillStyle = "#fff"; ctx.fillRect(12, 1, 6, 3);
-      ctx.fillStyle = "#a51a1a"; ctx.fillRect(12, 0, 6, 1);
+      // ---- CAP (red with white M badge) ----
+      // Brim
+      ctx.fillStyle = "#a51818";
+      ctx.fillRect(0, 4, 22, 2);
+      // Cap body
+      ctx.fillStyle = "#e83030";
+      ctx.fillRect(2, -1, 18, 5);
+      ctx.fillRect(6, -4, 12, 4);
+      // Highlight
+      ctx.fillStyle = "#ff5c5c";
+      ctx.fillRect(6, -3, 2, 2);
+      // M badge
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(11, 1, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#e83030";
+      ctx.font = "bold 5px monospace";
+      ctx.fillText("M", 9, 3);
 
-      ctx.fillStyle = "#3a1e0a";
-      ctx.fillRect(2, 5, 3, 3); ctx.fillRect(17, 5, 3, 3);
-      ctx.fillStyle = "#ffcf9a"; ctx.fillRect(4, 5, 14, 9); ctx.fillRect(1, 8, 3, 4);
+      // ---- FACE ----
+      // Sideburns/hair
+      ctx.fillStyle = "#2a1408";
+      ctx.fillRect(1, 6, 3, 5); ctx.fillRect(17, 6, 4, 5);
+      // Face skin
+      ctx.fillStyle = "#ffcf9a";
+      ctx.fillRect(4, 6, 14, 9);
+      ctx.fillRect(2, 9, 2, 3); // left cheek
+      // Ear
+      ctx.fillStyle = "#e8a878";
+      ctx.fillRect(18, 9, 2, 3);
+      // Nose (big!)
+      ctx.fillStyle = "#e8a878";
+      ctx.fillRect(13, 8, 5, 4);
+      ctx.fillStyle = "#c47a4a"; ctx.fillRect(13, 11, 5, 1);
+      // Eye
+      ctx.fillStyle = "#fff"; ctx.fillRect(10, 7, 3, 4);
+      ctx.fillStyle = "#1a3a8a"; ctx.fillRect(11, 8, 2, 3);
+      ctx.fillStyle = "#000"; ctx.fillRect(11, 9, 2, 2);
+      // Eyebrow
+      ctx.fillStyle = "#2a1408"; ctx.fillRect(10, 6, 4, 1);
+      // ---- BIG MUSTACHE ----
+      ctx.fillStyle = "#2a1408";
+      ctx.fillRect(6, 12, 13, 3);
+      ctx.fillRect(4, 13, 2, 2);
+      ctx.fillRect(18, 13, 2, 2);
+      // Mouth
+      ctx.fillStyle = "#5a2a1a"; ctx.fillRect(10, 15, 4, 1);
 
-      ctx.fillStyle = "#fff"; ctx.fillRect(12, 6, 4, 5);
-      ctx.fillStyle = "#1a3a8a"; ctx.fillRect(13, 7, 2, 3);
-      ctx.fillStyle = "#000"; ctx.fillRect(13, 8, 2, 2);
+      // ---- BODY / OVERALLS ----
+      // Blue overalls
+      ctx.fillStyle = "#1e5fd8"; ctx.fillRect(2, 15, 18, 10);
+      ctx.fillRect(4, 14, 4, 3); ctx.fillRect(14, 14, 4, 3);
+      // Red shirt (sleeves + collar)
+      ctx.fillStyle = "#e83030";
+      ctx.fillRect(0, 15, 3, 7); ctx.fillRect(19, 15, 3, 7);
+      ctx.fillRect(8, 14, 6, 3);
+      // Yellow buttons
+      ctx.fillStyle = "#ffd94a";
+      ctx.beginPath(); ctx.arc(6, 18, 1.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(16, 18, 1.4, 0, Math.PI * 2); ctx.fill();
+      // Overall strap highlight
+      ctx.fillStyle = "#3a7ef0";
+      ctx.fillRect(2, 15, 18, 1);
 
-      ctx.fillStyle = "#2a1408"; ctx.fillRect(6, 11, 12, 3); ctx.fillRect(4, 12, 2, 2);
-      ctx.fillStyle = "#e5a97a"; ctx.fillRect(15, 9, 3, 3);
-
-      ctx.fillStyle = "#1e5fd8"; ctx.fillRect(2, 14, 18, 10);
-      ctx.fillRect(5, 13, 3, 3); ctx.fillRect(13, 13, 3, 3);
-      ctx.fillStyle = "#d32626";
-      ctx.fillRect(0, 14, 3, 7); ctx.fillRect(19, 14, 3, 7); ctx.fillRect(8, 13, 5, 3);
-      ctx.fillStyle = "#ffd94a"; ctx.fillRect(6, 17, 2, 2); ctx.fillRect(14, 17, 2, 2);
-
-      ctx.fillStyle = "#d32626";
-      if (walking) {
+      // ---- ARMS ----
+      ctx.fillStyle = "#e83030";
+      if (attacking) {
+        // Punch forward
+        ctx.fillRect(18, 14, 8, 4);
+        ctx.fillStyle = "#fff"; ctx.fillRect(24, 13, 5, 6);
+        ctx.fillStyle = "#e83030"; ctx.fillRect(-1, 16, 4, 6);
+      } else if (crouched) {
+        ctx.fillRect(-1, 17, 4, 5); ctx.fillRect(19, 17, 4, 5);
+      } else if (wallSliding) {
+        ctx.fillRect(18, 12, 5, 6); ctx.fillRect(-1, 18, 4, 5);
+      } else if (walking) {
         const armSwing = walkFrame % 2 === 0 ? 0 : 2;
         ctx.fillRect(-1, 15 + armSwing, 4, 7);
         ctx.fillRect(19, 15 - armSwing, 4, 7);
       } else if (airborne) {
-        ctx.fillRect(-2, 12, 4, 8); ctx.fillRect(20, 12, 4, 8);
+        ctx.fillRect(-2, 11, 4, 7); ctx.fillRect(20, 11, 4, 7);
       } else {
         ctx.fillRect(-1, 16, 4, 7); ctx.fillRect(19, 16, 4, 7);
       }
-      ctx.fillStyle = "#fff";
-      if (airborne) { ctx.fillRect(-3, 19, 5, 4); ctx.fillRect(20, 19, 5, 4); }
-      else { ctx.fillRect(-2, 21, 5, 4); ctx.fillRect(19, 21, 5, 4); }
 
+      // Gloves (white)
+      ctx.fillStyle = "#fff";
+      if (attacking) {
+        // already drew forward glove
+        ctx.fillRect(-2, 20, 5, 4);
+      } else if (crouched) {
+        ctx.fillRect(-2, 20, 5, 4); ctx.fillRect(19, 20, 5, 4);
+      } else if (airborne) {
+        ctx.fillRect(-3, 17, 5, 4); ctx.fillRect(20, 17, 5, 4);
+      } else {
+        ctx.fillRect(-2, 21, 5, 4); ctx.fillRect(19, 21, 5, 4);
+      }
+
+      // ---- FEET / SHOES ----
       ctx.fillStyle = "#5a2a08";
-      if (airborne) {
+      if (crouched) {
+        ctx.fillRect(2, 26, 18, 4);
+        ctx.fillStyle = "#2a1408"; ctx.fillRect(1, 28, 20, 2);
+      } else if (airborne) {
         ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
         ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       } else if (walking) {
@@ -1089,13 +1181,23 @@ function Index() {
         ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
         ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       }
+
       ctx.restore();
 
-      if (player.landPulse > 0) {
-        ctx.strokeStyle = `rgba(255,255,255,${(player.landPulse / 8) * 0.6})`;
+      // Attack sfx swipe
+      if (player.attack > 6) {
+        ctx.strokeStyle = `rgba(255,255,255,${player.attack / 14})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.ellipse(px + player.w / 2, py + player.h, (8 - player.landPulse) * 3, 3, 0, 0, Math.PI * 2);
+        ctx.arc(px + player.w / 2 + f * 14, py + 16, 10, -0.6, 0.6);
+        ctx.stroke();
+      }
+
+      if (player.landPulse > 0) {
+        ctx.strokeStyle = `rgba(255,255,255,${(player.landPulse / 14) * 0.7})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(px + player.w / 2, py + player.h, (14 - player.landPulse) * 3, 3, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
     }
