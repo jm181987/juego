@@ -239,6 +239,12 @@ function Index() {
     let time = 0;
     let timerAccum = 0;
     let stageCompleted = false;
+    let loot: Loot[] = [];
+    const stats = statsRef.current;
+    // Full heal on stage start
+    stats.hp = stats.maxHp;
+    stats.mp = stats.maxMp;
+    hudTick();
 
     // Stars for sky theme
     let stars: { x: number; y: number; s: number; tw: number }[] = [];
