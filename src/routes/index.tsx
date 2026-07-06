@@ -452,13 +452,26 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
         }
       }
       const name = (o.name || "").replace(/[:_]/g, "");
-      if (name === "mixamorigRightArm") bonesRef.current.rightArm = o;
+      if (name === "mixamorigRightArm") { bonesRef.current.rightArm = o; }
       else if (name === "mixamorigRightForeArm") bonesRef.current.rightForeArm = o;
+      else if (name === "mixamorigSpine") bonesRef.current.spine = o;
       else if (name === "mixamorigSpine1") bonesRef.current.spine1 = o;
+      else if (name === "mixamorigSpine2") bonesRef.current.spine2 = o;
+      else if (name === "mixamorigNeck") bonesRef.current.neck = o;
       else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
       else if (name === "mixamorigLeftHand") bonesRef.current.leftHand = o;
       else if (name === "mixamorigHead") bonesRef.current.head = o;
       else if (name === "mixamorigHips") bonesRef.current.hips = o;
+      else if (name === "mixamorigLeftShoulder") bonesRef.current.leftShoulder = o;
+      else if (name === "mixamorigRightShoulder") bonesRef.current.rightShoulder = o;
+      else if (name === "mixamorigLeftArm") bonesRef.current.leftArm = o;
+      else if (name === "mixamorigLeftForeArm") bonesRef.current.leftForeArm = o;
+      else if (name === "mixamorigLeftUpLeg") bonesRef.current.leftUpLeg = o;
+      else if (name === "mixamorigLeftLeg") bonesRef.current.leftLeg = o;
+      else if (name === "mixamorigLeftFoot") bonesRef.current.leftFoot = o;
+      else if (name === "mixamorigRightUpLeg") bonesRef.current.rightUpLeg = o;
+      else if (name === "mixamorigRightLeg") bonesRef.current.rightLeg = o;
+      else if (name === "mixamorigRightFoot") bonesRef.current.rightFoot = o;
     });
   }, [cloned]);
 
