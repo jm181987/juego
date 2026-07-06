@@ -1294,15 +1294,22 @@ function Index() {
     }
 
     function drawGoomba(e: Enemy) {
-      const x = Math.round(e.x - cameraX);
-      const y = Math.round(e.y - cameraY);
+      const s = e.w / 28;
+      const scrX = Math.round(e.x - cameraX);
+      const scrY = Math.round(e.y - cameraY);
       if (!e.alive) {
         if (e.squashT > 0) {
-          ctx.fillStyle = "#5a2f14"; ctx.fillRect(x, y + e.h - 6, e.w, 6);
-          ctx.fillStyle = "#8b4513"; ctx.fillRect(x + 4, y + e.h - 12, e.w - 8, 6);
+          ctx.fillStyle = "#5a2f14"; ctx.fillRect(scrX, scrY + e.h - 6, e.w, 6);
+          ctx.fillStyle = "#8b4513"; ctx.fillRect(scrX + 4, scrY + e.h - 12, e.w - 8, 6);
         }
         return;
       }
+      ctx.save();
+      ctx.translate(scrX, scrY);
+      ctx.scale(s, s);
+      const x = 0, y = 0;
+      e.w; // keep locals; drawing uses local 28-space
+      const EW = 28;
       const bounce = Math.sin(e.anim) * 1.2;
       ctx.fillStyle = "rgba(0,0,0,0.25)";
       ctx.beginPath();
