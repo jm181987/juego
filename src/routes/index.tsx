@@ -115,9 +115,17 @@ type Enemy = Rect & {
   vx: number; vy: number; alive: boolean; squashT: number; anim: number;
   kind: "goomba" | "flyer" | "jumper";
   baseY?: number; jumpCd?: number;
+  hp: number; maxHp: number; hitFlash: number;
+  xp: number; gold: number; power: number;
 };
 type Coin = { x: number; y: number; taken: boolean; t: number; pop: number };
 type Hazard = Rect & { kind: "spike" | "lava" };
+type Loot = {
+  x: number; y: number; vx: number; vy: number; t: number;
+  kind: "gold" | "hpPotion" | "mpPotion" | "gem";
+  taken: boolean; life: number;
+};
+type Damage = { x: number; y: number; text: string; life: number; color: string; vy: number };
 type Block = Rect & {
   type: "ground" | "grass" | "brick" | "question" | "pipe" | "stone" | "platform" | "cloud";
   used?: boolean; bump?: number; pipeTop?: boolean; pipeLeft?: boolean;
