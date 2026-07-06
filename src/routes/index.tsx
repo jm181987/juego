@@ -730,7 +730,14 @@ function Scene({
       grounded.current = false;
       coyoteTimer.current = 0;
       jumpBuffer.current = 0;
+      jumpHeld.current = true;
     }
+    // Variable jump height: releasing space while ascending cuts upward velocity
+    if (jumpHeld.current && !k.jump) {
+      if (vel.current.y > 0) vel.current.y *= 0.35;
+      jumpHeld.current = false;
+    }
+    if (vel.current.y <= 0) jumpHeld.current = false;
 
     // Gravity (slightly stronger when falling for tighter platforming feel)
     vel.current.y += (vel.current.y < 0 ? GRAVITY * 1.4 : GRAVITY) * dt;
