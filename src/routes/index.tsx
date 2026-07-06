@@ -558,17 +558,21 @@ function Scene({
   const [, force] = useState(0);
   const rerender = () => force((v) => v + 1);
 
+  const diff = world.difficulty;
   const enemies = useRef<Enemy[]>(
-    world.enemies.map((e, i) => ({
-      id: i,
-      pos: new THREE.Vector3(...e.pos),
-      hp: e.kind === "brute" ? 60 : e.kind === "wraith" ? 30 : 20,
-      maxHp: e.kind === "brute" ? 60 : e.kind === "wraith" ? 30 : 20,
-      vel: new THREE.Vector3(),
-      kind: e.kind,
-      alive: true,
-      hitFlash: 0,
-    }))
+    world.enemies.map((e, i) => {
+      const baseHp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 30 : 20;
+      const hp = Math.round(baseHp * diff);
+      return {
+        id: i,
+        pos: new THREE.Vector3(...e.pos),
+        hp, maxHp: hp,
+        vel: new THREE.Vector3(),
+        kind: e.kind,
+        alive: true,
+        hitFlash: 0,
+      };
+    })
   );
   const pickups = useRef<Pickup[]>(
     world.pickups.map((p, i) => ({
