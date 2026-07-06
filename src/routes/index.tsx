@@ -430,10 +430,51 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  // Both models use the Mixamo rig (mixamorig* bones) so the soldier's
-  // animation clips play cleanly on Michelle's skeleton.
   const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
   const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
+
+  // Michelle uses a different bind pose than the soldier, so the soldier's
+  // animation clips must be RETARGETED onto Michelle's skeleton before they
+  // can drive her rig — otherwise she stays in a T-pose while the clip runs.
+  // We also normalize Michelle's world scale so she matches the soldier's
+  // apparent height (Michelle is authored in cm ≈ 100× larger).
+  const animationClips = useMemo(() => {
+    if (appearanceGender !== "female") return soldierGltf.animations;
+    // Find the source (soldier) and target (Michelle) skeleton roots.
+    let sourceRoot: THREE.Object3D | undefined;
+    soldierGltf.scene.traverse((o) => {
+      if (!sourceRoot && (o as THREE.SkinnedMesh).isSkinnedMesh) sourceRoot = o.parent ?? o;
+    });
+    let targetRoot: THREE.Object3D | undefined;
+    cloned.traverse((o) => {
+      if (!targetRoot && (o as THREE.SkinnedMesh).isSkinnedMesh) targetRoot = o.parent ?? o;
+    });
+    if (!sourceRoot || !targetRoot) return soldierGltf.animations;
+    return soldierGltf.animations
+      .map((clip) => {
+        try {
+          const retargeted = SkeletonUtils.retargetClip(targetRoot!, sourceRoot!, clip, {});
+          retargeted.name = clip.name;
+          return retargeted;
+        } catch {
+          return clip;
+        }
+      });
+  }, [appearanceGender, soldierGltf, cloned]);
+
+  // Michelle is authored ~100× larger than the soldier; shrink to match.
+  useEffect(() => {
+    if (appearanceGender === "female") {
+      const bbox = new THREE.Box3().setFromObject(cloned);
+      const h = bbox.max.y - bbox.min.y;
+      if (h > 3) {
+        const s = 1.8 / h;
+        cloned.scale.setScalar(s);
+      }
+    } else {
+      cloned.scale.setScalar(1);
+    }
+  }, [appearanceGender, cloned]);
 
   // Cache each mesh's original base color so appearance tint can be recomputed
   // live without permanently darkening the material.
