@@ -162,10 +162,10 @@ function buildWorld(stageIdx: number) {
       else if (ch === "L") hazards.push({ x, y: y + 8, w: TILE, h: TILE - 8, kind: "lava" });
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
       else if (ch === "G") enemies.push({
-        x, y: y - 22, w: 50, h: 50, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+        x, y: y - 34, w: 62, h: 62, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
       });
       else if (ch === "K") enemies.push({
-        x, y, w: 50, h: 42, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+        x, y, w: 62, h: 52, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
       });
       else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
     }
@@ -549,7 +549,7 @@ function Index() {
 
 
     const player = {
-      x: world.spawn.x, y: world.spawn.y, w: 44, h: 60,
+      x: world.spawn.x, y: world.spawn.y, w: 62, h: 84,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
       crouching: false, groundPound: 0, gpCharge: 0,
@@ -1127,7 +1127,7 @@ function Index() {
 
       // Sprite is drawn in a 44x60 virtual space with smooth shapes and gradients.
       const BW = 44, BH = 60;
-      const CHAR_SCALE = 1;
+      const CHAR_SCALE = 1.4;
 
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
@@ -1390,9 +1390,16 @@ function Index() {
       ctx.fillStyle = "#4a2410";
       ctx.beginPath(); ctx.ellipse(22, 21, 5, 0.7, 0, 0, Math.PI * 2); ctx.fill();
 
+      // Cheek blush
+      ctx.fillStyle = "rgba(220,80,80,0.28)";
+      ctx.beginPath(); ctx.ellipse(15, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(33, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
+      // Lower lip hint
+      ctx.strokeStyle = "rgba(90,30,20,0.55)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(20, 25.5); ctx.quadraticCurveTo(22, 26.6, 24, 25.5); ctx.stroke();
       // Chin shadow
       ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.beginPath(); ctx.ellipse(22, 26, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(22, 27, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
 
       ctx.restore();
 
