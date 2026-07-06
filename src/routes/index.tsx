@@ -1125,14 +1125,14 @@ function Index() {
         ctx.fillRect(px, py - 30, player.w, 30);
       }
 
-      // Base sprite is drawn in a 22x30 virtual space, then scaled up.
-      const BW = 22, BH = 30;
-      const CHAR_SCALE = 2;
+      // Sprite is drawn in a 44x60 virtual space with smooth shapes and gradients.
+      const BW = 44, BH = 60;
+      const CHAR_SCALE = 1;
 
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
 
-      // Ground-pound spin / dive tilt / subtle idle sway
+      // Rotation: ground-pound spin, dive tilt, subtle air sway
       let rot = 0;
       if (player.groundPound === 1) rot = (time * 0.6) % (Math.PI * 2);
       if (player.diving) rot = f * 0.9;
@@ -1141,7 +1141,7 @@ function Index() {
       }
       ctx.rotate(rot);
 
-      // Squash/stretch — crouch = flatter, plus subtle idle breathing
+      // Squash/stretch + idle breathing
       const idleBob = player.onGround && Math.abs(player.vx) < 0.3 ? Math.sin(time * 0.08) * 0.03 : 0;
       const sq = (player.crouching ? player.squash * 1.4 : player.squash) + idleBob;
       const st = (player.crouching ? player.stretch * 1.15 : player.stretch) - idleBob;
@@ -1151,131 +1151,248 @@ function Index() {
       const speed = Math.abs(player.vx);
       const walking = player.onGround && speed > 0.3;
       const walkPhase = player.anim * 0.55;
-      const walkFrame = Math.floor(player.anim) % 4; void walkFrame;
       const airborne = !player.onGround;
       const crouched = player.crouching;
       const attacking = player.attack > 0;
       const wallSliding = player.wallSlide > 0 && !player.onGround;
 
-      // ---- CAP (red with white M badge) ----
-      // Brim
-      ctx.fillStyle = "#a51818";
-      ctx.fillRect(0, 4, 22, 2);
-      // Cap body
-      ctx.fillStyle = "#e83030";
-      ctx.fillRect(2, -1, 18, 5);
-      ctx.fillRect(6, -4, 12, 4);
-      // Highlight
-      ctx.fillStyle = "#ff5c5c";
-      ctx.fillRect(6, -3, 2, 2);
-      // M badge
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.arc(11, 1, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#e83030";
-      ctx.font = "bold 5px monospace";
-      ctx.fillText("M", 9, 3);
+      // Palette
+      const SKIN = "#f4c9a0", SKIN_SHADE = "#c99268", SKIN_DARK = "#a06a45";
+      const HAIR = "#2a140a";
+      const CAP_HI = "#ff5d5d", CAP = "#dc2020", CAP_LO = "#8b1010";
+      const OVR_HI = "#3d84f0", OVR = "#1e58cc", OVR_LO = "#123578";
+      const SHIRT_HI = "#ff5d5d", SHIRT = "#dc2020", SHIRT_LO = "#8b1010";
+      const SHOE_HI = "#6a3410", SHOE = "#3a1608", SHOE_SOLE = "#1a0804";
+      const GLOVE_HI = "#ffffff", GLOVE_SH = "#c8c8d0";
 
-      // ---- FACE ----
-      // Sideburns/hair
-      ctx.fillStyle = "#2a1408";
-      ctx.fillRect(1, 6, 3, 5); ctx.fillRect(17, 6, 4, 5);
-      // Face skin
-      ctx.fillStyle = "#ffcf9a";
-      ctx.fillRect(4, 6, 14, 9);
-      ctx.fillRect(2, 9, 2, 3); // left cheek
-      // Ear
-      ctx.fillStyle = "#e8a878";
-      ctx.fillRect(18, 9, 2, 3);
-      // Nose (big!)
-      ctx.fillStyle = "#e8a878";
-      ctx.fillRect(13, 8, 5, 4);
-      ctx.fillStyle = "#c47a4a"; ctx.fillRect(13, 11, 5, 1);
-      // Eye
-      ctx.fillStyle = "#fff"; ctx.fillRect(10, 7, 3, 4);
-      ctx.fillStyle = "#1a3a8a"; ctx.fillRect(11, 8, 2, 3);
-      ctx.fillStyle = "#000"; ctx.fillRect(11, 9, 2, 2);
-      // Eyebrow
-      ctx.fillStyle = "#2a1408"; ctx.fillRect(10, 6, 4, 1);
-      // ---- BIG MUSTACHE ----
-      ctx.fillStyle = "#2a1408";
-      ctx.fillRect(6, 12, 13, 3);
-      ctx.fillRect(4, 13, 2, 2);
-      ctx.fillRect(18, 13, 2, 2);
-      // Mouth
-      ctx.fillStyle = "#5a2a1a"; ctx.fillRect(10, 15, 4, 1);
+      const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+      };
+      const linGrad = (x0: number, y0: number, x1: number, y1: number, stops: [number, string][]) => {
+        const g = ctx.createLinearGradient(x0, y0, x1, y1);
+        for (const s of stops) g.addColorStop(s[0], s[1]);
+        return g;
+      };
 
-      // ---- BODY / OVERALLS ----
-      // Blue overalls
-      ctx.fillStyle = "#1e5fd8"; ctx.fillRect(2, 15, 18, 10);
-      ctx.fillRect(4, 14, 4, 3); ctx.fillRect(14, 14, 4, 3);
-      // Red shirt (sleeves + collar)
-      ctx.fillStyle = "#e83030";
-      ctx.fillRect(0, 15, 3, 7); ctx.fillRect(19, 15, 3, 7);
-      ctx.fillRect(8, 14, 6, 3);
-      // Yellow buttons
-      ctx.fillStyle = "#ffd94a";
-      ctx.beginPath(); ctx.arc(6, 18, 1.4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(16, 18, 1.4, 0, Math.PI * 2); ctx.fill();
-      // Overall strap highlight
-      ctx.fillStyle = "#3a7ef0";
-      ctx.fillRect(2, 15, 18, 1);
+      // ---- Head (drawn later on top of shoulders slightly) ----
+      // ---- BODY / TORSO ----
+      // Torso overalls (rounded)
+      ctx.fillStyle = linGrad(0, 28, 0, 50, [[0, OVR_HI], [0.35, OVR], [1, OVR_LO]]);
+      roundRect(6, 28, 32, 22, 6); ctx.fill();
 
-      // ---- ARMS ----
-      ctx.fillStyle = "#e83030";
+      // Red shirt visible at neckline and sleeves
+      ctx.fillStyle = linGrad(0, 26, 0, 38, [[0, SHIRT_HI], [1, SHIRT]]);
+      roundRect(14, 26, 16, 8, 4); ctx.fill();
+
+      // Overall straps
+      ctx.fillStyle = OVR;
+      roundRect(11, 26, 5, 10, 2); ctx.fill();
+      roundRect(28, 26, 5, 10, 2); ctx.fill();
+      // Strap highlight
+      ctx.fillStyle = OVR_HI;
+      ctx.fillRect(12, 27, 1, 8); ctx.fillRect(29, 27, 1, 8);
+
+      // Overall bib seam
+      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(22, 32); ctx.lineTo(22, 46); ctx.stroke();
+
+      // Yellow buttons (with shine)
+      const button = (bx: number, by: number) => {
+        ctx.fillStyle = "#ffcc22";
+        ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#7a4400";
+        ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.beginPath(); ctx.arc(bx - 0.7, by - 0.7, 0.7, 0, Math.PI * 2); ctx.fill();
+      };
+      button(14, 36); button(30, 36);
+
+      // Torso shadow under head
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      roundRect(10, 27, 24, 4, 2); ctx.fill();
+
+      // ---- ARMS + GLOVES ----
+      const drawArm = (side: -1 | 1, shoulderY: number, elbowOffX: number, elbowOffY: number, gloveX: number, gloveY: number) => {
+        const sx = side === 1 ? 34 : 10;
+        // Sleeve (red)
+        ctx.strokeStyle = SHIRT; ctx.lineWidth = 6;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(sx, shoulderY);
+        ctx.quadraticCurveTo(sx + elbowOffX * side, shoulderY + elbowOffY, gloveX, gloveY);
+        ctx.stroke();
+        // Sleeve highlight
+        ctx.strokeStyle = SHIRT_HI; ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(sx - side, shoulderY + 1);
+        ctx.quadraticCurveTo(sx + elbowOffX * side - side, shoulderY + elbowOffY, gloveX - side, gloveY - 1);
+        ctx.stroke();
+        // Glove
+        ctx.fillStyle = linGrad(gloveX - 4, gloveY - 4, gloveX + 4, gloveY + 4, [[0, GLOVE_HI], [1, GLOVE_SH]]);
+        ctx.beginPath(); ctx.arc(gloveX, gloveY, 4.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 0.6; ctx.stroke();
+        // Thumb hint
+        ctx.fillStyle = GLOVE_SH;
+        ctx.beginPath(); ctx.arc(gloveX + side * 2.5, gloveY + 1.5, 1.6, 0, Math.PI * 2); ctx.fill();
+      };
+
       if (attacking) {
-        // Punch forward
-        ctx.fillRect(18, 14, 8, 4);
-        ctx.fillStyle = "#fff"; ctx.fillRect(24, 13, 5, 6);
-        ctx.fillStyle = "#e83030"; ctx.fillRect(-1, 16, 4, 6);
+        drawArm(1, 32, 8, 2, 48, 32);   // forward punch
+        drawArm(-1, 34, 4, 6, 2, 40);
       } else if (crouched) {
-        ctx.fillRect(-1, 17, 4, 5); ctx.fillRect(19, 17, 4, 5);
+        drawArm(1, 34, 3, 6, 36, 44);
+        drawArm(-1, 34, 3, 6, 8, 44);
       } else if (wallSliding) {
-        ctx.fillRect(18, 12, 5, 6); ctx.fillRect(-1, 18, 4, 5);
+        drawArm(1, 30, 6, 4, 40, 34);
+        drawArm(-1, 34, 3, 6, 6, 44);
       } else if (walking) {
-        const armSwing = Math.sin(walkPhase) * 2.2;
-        ctx.fillRect(-1, 15 + armSwing, 4, 7);
-        ctx.fillRect(19, 15 - armSwing, 4, 7);
+        const s = Math.sin(walkPhase) * 4;
+        drawArm(1, 32, 4, 8 - s, 36, 44 - s);
+        drawArm(-1, 32, 4, 8 + s, 8, 44 + s);
       } else if (airborne) {
         const t = Math.min(1, Math.abs(player.vy) / 10);
-        const up = player.vy < 0 ? 2 * t : 0;
-        ctx.fillRect(-2, 11 - up, 4, 7); ctx.fillRect(20, 11 - up, 4, 7);
+        const up = player.vy < 0 ? 4 * t : 0;
+        drawArm(1, 30, 6, -2 - up, 40, 26 - up);
+        drawArm(-1, 30, 6, -2 - up, 4, 26 - up);
       } else {
-        const breath = Math.sin(time * 0.08) * 0.4;
-        ctx.fillRect(-1, 16 + breath, 4, 7); ctx.fillRect(19, 16 + breath, 4, 7);
+        const b = Math.sin(time * 0.08) * 0.6;
+        drawArm(1, 32, 4, 8, 36, 44 + b);
+        drawArm(-1, 32, 4, 8, 8, 44 + b);
       }
 
-      // Gloves (white)
-      ctx.fillStyle = "#fff";
-      if (attacking) {
-        // already drew forward glove
-        ctx.fillRect(-2, 20, 5, 4);
-      } else if (crouched) {
-        ctx.fillRect(-2, 20, 5, 4); ctx.fillRect(19, 20, 5, 4);
-      } else if (airborne) {
-        ctx.fillRect(-3, 17, 5, 4); ctx.fillRect(20, 17, 5, 4);
-      } else {
-        ctx.fillRect(-2, 21, 5, 4); ctx.fillRect(19, 21, 5, 4);
-      }
+      // ---- LEGS + SHOES ----
+      const drawLeg = (side: -1 | 1, thighDrop: number) => {
+        const hx = side === 1 ? 27 : 17;
+        const kx = hx;
+        const ky = 50;
+        const fx = hx + side * 1;
+        const fy = 58 - thighDrop;
+        // Pant (overall)
+        ctx.strokeStyle = OVR; ctx.lineWidth = 7; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(hx, 46); ctx.quadraticCurveTo(kx, ky, fx, fy); ctx.stroke();
+        // Highlight
+        ctx.strokeStyle = OVR_HI; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(hx - side, 47); ctx.quadraticCurveTo(kx - side, ky, fx - side, fy - 1); ctx.stroke();
+        // Shoe (rounded, with sole)
+        ctx.fillStyle = linGrad(fx - 6, fy - 3, fx - 6, fy + 4, [[0, SHOE_HI], [1, SHOE]]);
+        roundRect(fx - 6, fy - 3, 12, 6, 3); ctx.fill();
+        ctx.fillStyle = SHOE_SOLE;
+        roundRect(fx - 7, fy + 2, 14, 2, 1); ctx.fill();
+      };
 
-      // ---- FEET / SHOES ----
-      ctx.fillStyle = "#5a2a08";
       if (crouched) {
-        ctx.fillRect(2, 26, 18, 4);
-        ctx.fillStyle = "#2a1408"; ctx.fillRect(1, 28, 20, 2);
+        drawLeg(1, -2); drawLeg(-1, -2);
       } else if (airborne) {
-        ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
-        ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
+        drawLeg(1, 0); drawLeg(-1, 0);
       } else if (walking) {
         const s = Math.sin(walkPhase);
-        const back = Math.max(0, s) * 2.5;
-        const front = Math.max(0, -s) * 2.5;
-        ctx.fillRect(3, 24 - back, 8, 6); ctx.fillRect(11, 24 - front, 8, 6);
-        ctx.fillStyle = "#2a1408";
-        ctx.fillRect(2, 27 - back, 10, 3); ctx.fillRect(10, 27 - front, 10, 3);
+        drawLeg(1, Math.max(0, s) * 3);
+        drawLeg(-1, Math.max(0, -s) * 3);
       } else {
-        ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
-        ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
+        drawLeg(1, 0); drawLeg(-1, 0);
       }
+
+      // ---- HEAD ----
+      // Neck shadow
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      roundRect(17, 24, 10, 4, 2); ctx.fill();
+
+      // Head base (skin)
+      ctx.fillStyle = linGrad(0, 6, 0, 26, [[0, SKIN], [1, SKIN_SHADE]]);
+      roundRect(9, 6, 26, 20, 9); ctx.fill();
+
+      // Ear
+      ctx.fillStyle = SKIN_SHADE;
+      ctx.beginPath(); ctx.ellipse(9, 17, 2, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = SKIN_DARK;
+      ctx.beginPath(); ctx.ellipse(9, 17, 0.9, 1.6, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Sideburn / hair
+      ctx.fillStyle = HAIR;
+      ctx.beginPath(); ctx.ellipse(11, 14, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(33, 14, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Cap brim (front curve)
+      ctx.fillStyle = CAP_LO;
+      ctx.beginPath();
+      ctx.moveTo(6, 10);
+      ctx.quadraticCurveTo(22, 14, 38, 10);
+      ctx.quadraticCurveTo(38, 12, 34, 13);
+      ctx.quadraticCurveTo(22, 15.5, 10, 13);
+      ctx.quadraticCurveTo(6, 12, 6, 10);
+      ctx.closePath(); ctx.fill();
+
+      // Cap dome (rounded top)
+      ctx.fillStyle = linGrad(0, -6, 0, 12, [[0, CAP_HI], [0.4, CAP], [1, CAP_LO]]);
+      ctx.beginPath();
+      ctx.moveTo(9, 10);
+      ctx.quadraticCurveTo(9, -6, 22, -6);
+      ctx.quadraticCurveTo(35, -6, 35, 10);
+      ctx.quadraticCurveTo(22, 6, 9, 10);
+      ctx.closePath(); ctx.fill();
+
+      // Cap gloss highlight
+      ctx.fillStyle = "rgba(255,255,255,0.28)";
+      ctx.beginPath(); ctx.ellipse(15, 0, 4, 2, -0.5, 0, Math.PI * 2); ctx.fill();
+
+      // M emblem circle
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(22, 3, 3.6, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.5; ctx.stroke();
+      ctx.fillStyle = CAP;
+      ctx.font = "bold 6px 'Arial Black', sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("M", 22, 3.6);
+      ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+
+      // Nose (big round)
+      ctx.fillStyle = linGrad(0, 14, 0, 22, [[0, SKIN], [1, SKIN_DARK]]);
+      ctx.beginPath(); ctx.ellipse(26, 19, 5, 4.2, 0, 0, Math.PI * 2); ctx.fill();
+      // Nose highlight
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.beginPath(); ctx.ellipse(24, 17.5, 1.6, 1, -0.4, 0, Math.PI * 2); ctx.fill();
+
+      // Eye white
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.ellipse(20, 15, 2.4, 3, 0, 0, Math.PI * 2); ctx.fill();
+      // Iris
+      ctx.fillStyle = "#2a4fb5";
+      ctx.beginPath(); ctx.ellipse(20.5, 15.5, 1.5, 2, 0, 0, Math.PI * 2); ctx.fill();
+      // Pupil
+      ctx.fillStyle = "#000";
+      ctx.beginPath(); ctx.ellipse(20.5, 15.8, 0.8, 1.3, 0, 0, Math.PI * 2); ctx.fill();
+      // Eye shine
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(20.2, 14.7, 0.5, 0, Math.PI * 2); ctx.fill();
+
+      // Eyebrow (thick, angled)
+      ctx.strokeStyle = HAIR; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(17, 11.5); ctx.quadraticCurveTo(20, 10, 23, 11); ctx.stroke();
+
+      // Mustache — thick curly bushy under nose
+      ctx.fillStyle = HAIR;
+      ctx.beginPath();
+      ctx.moveTo(13, 22);
+      ctx.quadraticCurveTo(14, 19, 20, 20);
+      ctx.quadraticCurveTo(24, 20.5, 30, 20);
+      ctx.quadraticCurveTo(34, 20, 34, 22);
+      ctx.quadraticCurveTo(33, 24.5, 30, 24);
+      ctx.quadraticCurveTo(24, 23, 20, 24);
+      ctx.quadraticCurveTo(14, 25, 13, 22);
+      ctx.closePath(); ctx.fill();
+      // Mustache highlight
+      ctx.fillStyle = "#4a2410";
+      ctx.beginPath(); ctx.ellipse(22, 21, 5, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+
+      // Chin shadow
+      ctx.fillStyle = "rgba(0,0,0,0.12)";
+      ctx.beginPath(); ctx.ellipse(22, 26, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
 
       ctx.restore();
 
@@ -1284,9 +1401,11 @@ function Index() {
         ctx.strokeStyle = `rgba(255,255,255,${player.attack / 14})`;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(px + player.w / 2 + f * 14, py + 16, 10, -0.6, 0.6);
+        ctx.arc(px + player.w / 2 + f * 22, py + 30, 14, -0.6, 0.6);
         ctx.stroke();
       }
+
+
 
       if (player.landPulse > 0) {
         ctx.strokeStyle = `rgba(255,255,255,${(player.landPulse / 14) * 0.7})`;
