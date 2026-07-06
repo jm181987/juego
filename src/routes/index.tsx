@@ -2079,7 +2079,7 @@ function Index() {
             color: "#ccc", fontSize: 11, maxWidth: 220,
           }}>
             <div style={{ color: "#7ee6ff", fontWeight: 700, marginBottom: 4 }}>Controles</div>
-            WASD moverse · Ratón apuntar · Clic atacar · Espacio saltar · Q/E pociones
+            WASD moverse · Ratón apuntar · Clic atacar · Espacio saltar · Q/E pociones · Alt+Ratón cámara libre (rueda zoom)
             <div style={{ marginTop: 4, color: "#888" }}>(clic en la escena para bloquear el cursor)</div>
           </div>
 
