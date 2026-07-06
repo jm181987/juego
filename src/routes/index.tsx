@@ -487,9 +487,31 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   });
 
 
+  const spotRef = useRef<THREE.SpotLight>(null!);
+  const spotTargetRef = useRef<THREE.Object3D>(null!);
+  useEffect(() => {
+    if (spotRef.current && spotTargetRef.current) {
+      spotRef.current.target = spotTargetRef.current;
+    }
+  }, []);
+
   return (
     <group ref={group} scale={1.05}>
       <primitive object={cloned} />
+      {/* Linterna: haz de luz proyectado desde el pecho hacia adelante */}
+      <spotLight
+        ref={spotRef}
+        position={[0, 1.35, -0.15]}
+        angle={0.55}
+        penumbra={0.65}
+        intensity={14}
+        distance={18}
+        decay={1.2}
+        color="#fff2c8"
+      />
+      <object3D ref={spotTargetRef} position={[0, 0.6, -10]} />
+      {/* halo cálido cerca del personaje para revelar el entorno inmediato */}
+      <pointLight position={[0, 1.2, -0.2]} color="#ffd89a" intensity={1.2} distance={3.5} decay={2} />
       {/* Sword — its transform is driven each frame from the right-hand bone. */}
       <group ref={swordRef}>
         <mesh position={[0, -0.15, 0]} castShadow>
@@ -512,6 +534,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     </group>
   );
 }
+
 
 
 
