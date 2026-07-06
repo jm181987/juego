@@ -623,8 +623,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const lightActive = flashlightOn && battery > 0;
   const lightIntensity = lightActive ? 16 * Math.min(1, battery / 30) : 0;
 
+  const isFemale = appearance.gender === "female";
+  const scaleX = 1.05 * appearance.build * (isFemale ? 0.9 : 1);
+  const scaleY = 1.05 * appearance.height * (isFemale ? 1.02 : 1);
+  const scaleZ = 1.05 * appearance.build * (isFemale ? 0.88 : 1);
+
   return (
-    <group ref={group} scale={[1.05 * appearance.build, 1.05 * appearance.height, 1.05 * appearance.build]}>
+    <group ref={group} scale={[scaleX, scaleY, scaleZ]}>
       <primitive object={cloned} />
       {/* Linterna sujeta por la mano izquierda: cuerpo + haz de luz hacia adelante */}
       <group ref={flashlightRef} visible={lightActive}>
@@ -683,9 +688,49 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           <meshStandardMaterial color="#4a3218" metalness={0.7} roughness={0.4} />
         </mesh>
       </group>
+
+      {/* Female overlays — head-bone-locked long hair + hips-bone-locked skirt. */}
+      <group ref={hairRef} visible={isFemale}>
+        {/* Back hair mass */}
+        <mesh castShadow position={[0, -0.02, -0.08]}>
+          <sphereGeometry args={[0.16, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.75]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+        {/* Ponytail down the back */}
+        <mesh castShadow position={[0, -0.25, -0.14]}>
+          <capsuleGeometry args={[0.055, 0.35, 4, 8]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+        {/* Side locks */}
+        <mesh castShadow position={[-0.13, -0.1, 0.02]}>
+          <boxGeometry args={[0.06, 0.28, 0.09]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+        <mesh castShadow position={[0.13, -0.1, 0.02]}>
+          <boxGeometry args={[0.06, 0.28, 0.09]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+      </group>
+      <group ref={skirtRef} visible={isFemale}>
+        <mesh castShadow position={[0, -0.28, 0]}>
+          <coneGeometry args={[0.42, 0.55, 16, 1, true]} />
+          <meshStandardMaterial color={appearance.clothTint} roughness={0.95} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, -0.54, 0]}>
+          <torusGeometry args={[0.4, 0.02, 6, 20]} />
+          <meshStandardMaterial color={appearance.accentTint} metalness={0.5} roughness={0.5} />
+        </mesh>
+      </group>
     </group>
   );
 }
+
+const MageMemo = React.memo(Mage);
+
+
+
+
+
 
 
 
