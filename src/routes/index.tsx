@@ -1127,7 +1127,7 @@ function Index() {
 
       // Base sprite is drawn in a 22x30 virtual space, then scaled up.
       const BW = 22, BH = 30;
-      const CHAR_SCALE = 1.5;
+      const CHAR_SCALE = 2;
 
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
