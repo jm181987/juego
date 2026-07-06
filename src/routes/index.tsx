@@ -395,11 +395,24 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const bonesRef = useRef<{
     rightArm?: THREE.Object3D;
     rightForeArm?: THREE.Object3D;
+    spine?: THREE.Object3D;
     spine1?: THREE.Object3D;
+    spine2?: THREE.Object3D;
+    neck?: THREE.Object3D;
     rightHand?: THREE.Object3D;
     leftHand?: THREE.Object3D;
     head?: THREE.Object3D;
     hips?: THREE.Object3D;
+    leftShoulder?: THREE.Object3D;
+    rightShoulder?: THREE.Object3D;
+    leftArm?: THREE.Object3D;
+    leftForeArm?: THREE.Object3D;
+    leftUpLeg?: THREE.Object3D;
+    leftLeg?: THREE.Object3D;
+    leftFoot?: THREE.Object3D;
+    rightUpLeg?: THREE.Object3D;
+    rightLeg?: THREE.Object3D;
+    rightFoot?: THREE.Object3D;
     base: {
       rightArm?: THREE.Euler;
       rightForeArm?: THREE.Euler;
