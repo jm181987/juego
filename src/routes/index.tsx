@@ -1262,8 +1262,9 @@ function Index() {
         ctx.fillRect(3, 24, 8, 6); ctx.fillRect(11, 24, 8, 6);
         ctx.fillStyle = "#2a1408"; ctx.fillRect(2, 27, 10, 3); ctx.fillRect(10, 27, 10, 3);
       } else if (walking) {
-        const back = walkFrame === 0 || walkFrame === 2 ? 0 : 2;
-        const front = walkFrame === 0 || walkFrame === 2 ? 2 : 0;
+        const s = Math.sin(walkPhase);
+        const back = Math.max(0, s) * 2.5;
+        const front = Math.max(0, -s) * 2.5;
         ctx.fillRect(3, 24 - back, 8, 6); ctx.fillRect(11, 24 - front, 8, 6);
         ctx.fillStyle = "#2a1408";
         ctx.fillRect(2, 27 - back, 10, 3); ctx.fillRect(10, 27 - front, 10, 3);
