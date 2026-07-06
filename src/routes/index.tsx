@@ -905,7 +905,11 @@ function Index() {
       // Camera
       const target = player.x - 260;
       cameraX += (target - cameraX) * 0.12;
-      const targetY = Math.max(0, Math.min(LEVEL_H - canvas.height, player.y - canvas.height * 0.6));
+      // If the level is shorter than the screen, pin the ground to the bottom (negative cameraY).
+      // Otherwise, follow the player vertically.
+      const groundPinY = LEVEL_H - canvas.height; // negative when level shorter than screen
+      const followY = Math.max(groundPinY, Math.min(LEVEL_H - canvas.height, player.y - canvas.height * 0.65));
+      const targetY = LEVEL_H < canvas.height ? groundPinY : followY;
       cameraY += (targetY - cameraY) * 0.08;
       if (cameraX < 0) cameraX = 0;
       if (cameraX > LEVEL_W - canvas.width) cameraX = LEVEL_W - canvas.width;
