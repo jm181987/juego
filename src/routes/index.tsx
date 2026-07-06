@@ -641,6 +641,36 @@ function Scene({
 
   const potPrev = useRef({ q: false, e: false });
 
+  // Mouse look + click to attack
+  const yawRef = useRef(0);
+  useEffect(() => {
+    const canvas = document.querySelector("canvas");
+    if (!canvas) return;
+    const onMove = (e: MouseEvent) => {
+      if (document.pointerLockElement === canvas) {
+        yawRef.current -= e.movementX * 0.0035;
+      }
+    };
+    const onDown = (e: MouseEvent) => {
+      if (document.pointerLockElement !== canvas) {
+        (canvas as HTMLCanvasElement).requestPointerLock?.();
+        return;
+      }
+      if (e.button === 0) keysRef.current.attack = true;
+    };
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 0) keysRef.current.attack = false;
+    };
+    document.addEventListener("mousemove", onMove);
+    canvas.addEventListener("mousedown", onDown as any);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      canvas.removeEventListener("mousedown", onDown as any);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [keysRef]);
+
   useFrame((state, dt) => {
     dt = Math.min(dt, 0.05);
     const k = keysRef.current;
