@@ -807,124 +807,26 @@ function Index() {
       const y = Math.round(b.y - (b.bump || 0) - cameraY);
       if (x + b.w < -20 || x > canvas.width + 20) return;
       switch (b.type) {
-        case "ground": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#5c2f0d");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "#6b3410";
-          ctx.fillRect(x + 4, y + 6, 4, 4);
-          ctx.fillRect(x + 20, y + 14, 4, 4);
-          ctx.fillRect(x + 12, y + 22, 4, 4);
-          ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + b.h - 3, b.w, 3);
-          ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(x, y, b.w, 2);
+        case "ground": ctx.drawImage(sprites.ground, x, y); break;
+        case "grass": ctx.drawImage(sprites.grass, x, y); break;
+        case "brick": ctx.drawImage(sprites.brick, x, y); break;
+        case "question":
+          ctx.drawImage(b.used ? sprites.questionUsed : sprites.question, x, y);
           break;
-        }
-        case "grass": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#6b3410");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          const gg = ctx.createLinearGradient(0, y, 0, y + 12);
-          gg.addColorStop(0, "#5cd464"); gg.addColorStop(1, "#2ea63a");
-          ctx.fillStyle = gg; ctx.fillRect(x, y, b.w, 12);
-          ctx.fillStyle = "#7ee085";
-          ctx.fillRect(x + 3, y - 2, 2, 4);
-          ctx.fillRect(x + 11, y - 3, 2, 5);
-          ctx.fillRect(x + 22, y - 2, 2, 4);
-          break;
-        }
-        case "brick": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#e05a2a"); g.addColorStop(1, "#8b3110");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.strokeStyle = "#2a0e04"; ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(x, y + 16); ctx.lineTo(x + b.w, y + 16);
-          ctx.moveTo(x + 16, y); ctx.lineTo(x + 16, y + 16);
-          ctx.moveTo(x + 8, y + 16); ctx.lineTo(x + 8, y + b.h);
-          ctx.moveTo(x + 24, y + 16); ctx.lineTo(x + 24, y + b.h);
-          ctx.stroke();
-          ctx.strokeRect(x + 1, y + 1, b.w - 2, b.h - 2);
-          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(x + 2, y + 2, b.w - 4, 1);
-          break;
-        }
-        case "question": {
-          if (b.used) {
-            const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-            g.addColorStop(0, "#8b5a2b"); g.addColorStop(1, "#4a2f14");
-            ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-            ctx.strokeStyle = "#2a1808"; ctx.lineWidth = 2;
-            ctx.strokeRect(x + 1, y + 1, b.w - 2, b.h - 2);
-          } else {
-            const pulse = Math.sin(time * 0.08) * 0.15 + 0.85;
-            const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-            g.addColorStop(0, "#ffcf3f"); g.addColorStop(1, "rgba(200,110,0,1)");
-            ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-            ctx.fillStyle = "#7a4600";
-            ctx.fillRect(x, y, b.w, 3); ctx.fillRect(x, y + b.h - 3, b.w, 3);
-            ctx.fillRect(x, y, 3, b.h); ctx.fillRect(x + b.w - 3, y, 3, b.h);
-            ctx.fillStyle = "#ffe680";
-            ctx.fillRect(x + 3, y + 3, 3, 3); ctx.fillRect(x + b.w - 6, y + 3, 3, 3);
-            ctx.fillRect(x + 3, y + b.h - 6, 3, 3); ctx.fillRect(x + b.w - 6, y + b.h - 6, 3, 3);
-            ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.font = "bold 20px monospace";
-            ctx.fillText("?", x + 11, y + 24);
-            ctx.fillStyle = `rgba(255,255,255,${pulse})`;
-            ctx.fillText("?", x + 10, y + 23);
-          }
-          break;
-        }
-        case "pipe": {
-          const g = ctx.createLinearGradient(x, 0, x + b.w, 0);
-          g.addColorStop(0, "#0f5a19"); g.addColorStop(0.15, "#7ee085");
-          g.addColorStop(0.5, "#3ec54a"); g.addColorStop(0.85, "#1a6b22"); g.addColorStop(1, "#0a3d10");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
+        case "pipe":
+          ctx.drawImage(sprites.pipe, x, y);
           if (b.pipeTop) {
             const rimX = b.pipeLeft ? x - 4 : x;
-            const rimW = b.w + 4;
-            ctx.fillStyle = "#1a6b22"; ctx.fillRect(rimX, y - 6, rimW, 8);
-            const rg = ctx.createLinearGradient(rimX, 0, rimX + rimW, 0);
-            rg.addColorStop(0, "#0f5a19"); rg.addColorStop(0.2, "#8ff090");
-            rg.addColorStop(0.5, "#4ad058"); rg.addColorStop(0.8, "#1a6b22"); rg.addColorStop(1, "#0a3d10");
-            ctx.fillStyle = rg; ctx.fillRect(rimX, y - 4, rimW, 4);
-            ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillRect(rimX + 4, y - 2, 8, 1);
+            ctx.drawImage(sprites.pipeTop, rimX, y - 6);
           }
           break;
-        }
-        case "stone": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          if (stage.theme === "cave") {
-            g.addColorStop(0, "#b56a3a"); g.addColorStop(1, "#5a2810");
-          } else {
-            g.addColorStop(0, "#c8ccd4"); g.addColorStop(1, "#5c6270");
-          }
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "rgba(0,0,0,0.25)";
-          ctx.fillRect(x + 6, y + 8, 4, 2);
-          ctx.fillRect(x + 18, y + 18, 4, 2);
-          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(x, y, b.w, 2);
-          break;
-        }
-        case "platform": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#c07500"); g.addColorStop(1, "#7a4600");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(x, y, b.w, 2);
-          ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + b.h - 2, b.w, 2);
-          break;
-        }
-        case "cloud": {
-          // Cloud platform (sky theme)
-          ctx.fillStyle = "rgba(255,255,255,0.9)";
-          ctx.beginPath();
-          ctx.arc(x + 6, y + 8, 8, 0, Math.PI * 2);
-          ctx.arc(x + 16, y + 5, 10, 0, Math.PI * 2);
-          ctx.arc(x + 26, y + 8, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#ffffff"; ctx.fillRect(x, y + 4, b.w, 8);
-          ctx.fillStyle = "rgba(180,200,240,0.5)"; ctx.fillRect(x, y + 10, b.w, 2);
-          break;
-        }
+        case "stone": ctx.drawImage(sprites.stone, x, y); break;
+        case "platform": ctx.drawImage(sprites.platform, x, y); break;
+        case "cloud": ctx.drawImage(sprites.cloud, x, y); break;
       }
     }
+
+
 
     function drawHazard(h: Hazard) {
       const x = Math.round(h.x - cameraX);
