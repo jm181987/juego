@@ -641,28 +641,58 @@ function Scene({
 
   const potPrev = useRef({ q: false, e: false });
 
+  // Mouse look + click to attack
+  const yawRef = useRef(0);
+  useEffect(() => {
+    const canvas = document.querySelector("canvas");
+    if (!canvas) return;
+    const onMove = (e: MouseEvent) => {
+      if (document.pointerLockElement === canvas) {
+        yawRef.current -= e.movementX * 0.0035;
+      }
+    };
+    const onDown = (e: MouseEvent) => {
+      if (document.pointerLockElement !== canvas) {
+        (canvas as HTMLCanvasElement).requestPointerLock?.();
+        return;
+      }
+      if (e.button === 0) keysRef.current.attack = true;
+    };
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 0) keysRef.current.attack = false;
+    };
+    document.addEventListener("mousemove", onMove);
+    canvas.addEventListener("mousedown", onDown as any);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      canvas.removeEventListener("mousedown", onDown as any);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [keysRef]);
+
   useFrame((state, dt) => {
     dt = Math.min(dt, 0.05);
     const k = keysRef.current;
     const st = statsRef.current;
 
-    // Movement direction relative to camera yaw (fixed follow cam)
-    const camYaw = Math.atan2(camera.position.x - pos.current.x, camera.position.z - pos.current.z);
+    // Movement direction relative to mouse yaw
+    const camYaw = yawRef.current;
     let mx = 0, mz = 0;
     if (k.fwd) mz -= 1;
     if (k.back) mz += 1;
     if (k.left) mx -= 1;
     if (k.right) mx += 1;
     const inputLen = Math.hypot(mx, mz);
+    // Player always faces the camera-forward direction (where the mouse is aiming)
+    facing.current = camYaw + Math.PI;
     if (inputLen > 0) {
       mx /= inputLen; mz /= inputLen;
-      // rotate by camYaw
       const s = Math.sin(camYaw), c = Math.cos(camYaw);
       const wx = mx * c + mz * s;
       const wz = -mx * s + mz * c;
       vel.current.x = wx * MOVE_SPEED;
       vel.current.z = wz * MOVE_SPEED;
-      facing.current = Math.atan2(wx, wz);
       walkPhase.current += dt;
     } else {
       vel.current.x *= 0.7;
@@ -873,8 +903,9 @@ function Scene({
     });
     floats.current = floats.current.filter((f) => f.life > 0);
 
-    // Camera follow (third person)
-    const desired = pos.current.clone().add(new THREE.Vector3(0, 4, 8));
+    // Camera follow (third person, orbits with mouse yaw)
+    const yaw = yawRef.current;
+    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * 8, 4, Math.cos(yaw) * 8));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
     camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
@@ -1060,7 +1091,8 @@ function Index() {
             color: "#ccc", fontSize: 11, maxWidth: 220,
           }}>
             <div style={{ color: "#7ee6ff", fontWeight: 700, marginBottom: 4 }}>Controles</div>
-            WASD moverse · Espacio saltar · Z atacar · Q/E pociones
+            WASD moverse · Ratón apuntar · Clic atacar · Espacio saltar · Q/E pociones
+            <div style={{ marginTop: 4, color: "#888" }}>(clic en la escena para bloquear el cursor)</div>
           </div>
 
           {/* Mobile controls */}
