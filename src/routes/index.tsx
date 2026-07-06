@@ -434,7 +434,14 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     animations: THREE.AnimationClip[];
   };
   const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
-  const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
+  const cloned = useMemo(() => {
+    const c = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+    // Michelle's rig faces +Z while the soldier faces -Z; rotate the clone
+    // once so both models share the same forward axis and the outer group
+    // rotation (driven by facingRef) works identically for male & female.
+    if (appearanceGender === "female") c.rotation.y = Math.PI;
+    return c;
+  }, [gltf.scene, appearanceGender]);
 
   // Cache each mesh's original base color so appearance tint can be recomputed
   // live without permanently darkening the material.
