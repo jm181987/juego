@@ -353,29 +353,33 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const shadowRef = useRef<THREE.Mesh>(null!);
   const swordRef = useRef<THREE.Group>(null!);
 
-  const { scene, animations } = useGLTF(soldierAsset.url) as unknown as {
+  const gltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
 
-  // Prepare the model once: enable shadows and give it a darker heroic tint
+  // Clone the scene WITH skeleton so multiple hero instances (or React strict-mode
+  // double-mounts) don't fight over one shared skinned mesh — this was the cause of
+  // the hero staying in T-pose while the shadow moved.
+  const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
+
   useEffect(() => {
-    scene.traverse((o) => {
+    cloned.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.castShadow = true;
         m.receiveShadow = true;
         const mat = m.material as THREE.MeshStandardMaterial | undefined;
         if (mat && "color" in mat && mat.color) {
-          // Darken slightly and add a subtle bronze tint for a grim look
           mat.color.multiplyScalar(0.85);
         }
       }
     });
-  }, [scene]);
+  }, [cloned]);
 
-  // Bind animations to our group ref — this is the canonical drei pattern.
-  const { actions } = useAnimations(animations, group);
+  // Bind animations to the cloned scene (fresh mixer per instance).
+  const { actions } = useAnimations(gltf.animations, cloned);
+
 
   const currentAction = useRef<string>("");
   const prevWalkPhase = useRef(0);
