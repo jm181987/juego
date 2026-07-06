@@ -1345,20 +1345,25 @@ function Index() {
     }
 
     function drawFlyer(e: Enemy) {
-      const x = Math.round(e.x - cameraX);
-      const y = Math.round(e.y - cameraY);
+      const s = e.w / 28;
+      const scrX = Math.round(e.x - cameraX);
+      const scrY = Math.round(e.y - cameraY);
       if (!e.alive) {
         if (e.squashT > 0) {
-          ctx.fillStyle = "#5c6270"; ctx.fillRect(x + 4, y + e.h - 6, e.w - 8, 6);
+          ctx.fillStyle = "#5c6270"; ctx.fillRect(scrX + 4, scrY + e.h - 6, e.w - 8, 6);
         }
         return;
       }
+      ctx.save();
+      ctx.translate(scrX, scrY);
+      ctx.scale(s, s);
+      const x = 0, y = 0, EW = 28;
       const flap = Math.sin(e.anim * 2) * 6;
       // Body
-      const g = ctx.createRadialGradient(x + e.w / 2, y + 12, 4, x + e.w / 2, y + 12, 14);
+      const g = ctx.createRadialGradient(x + EW / 2, y + 12, 4, x + EW / 2, y + 12, 14);
       g.addColorStop(0, "#e05c8a"); g.addColorStop(1, "#8b2a4a");
       ctx.fillStyle = g;
-      ctx.beginPath(); ctx.ellipse(x + e.w / 2, y + 12, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(x + EW / 2, y + 12, 12, 10, 0, 0, Math.PI * 2); ctx.fill();
       // Wings
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       ctx.beginPath();
@@ -1367,9 +1372,9 @@ function Index() {
       ctx.lineTo(x + 4, y + 14);
       ctx.closePath(); ctx.fill();
       ctx.beginPath();
-      ctx.moveTo(x + e.w - 4, y + 8);
-      ctx.lineTo(x + e.w + 6, y + 8 - flap);
-      ctx.lineTo(x + e.w - 4, y + 14);
+      ctx.moveTo(x + EW - 4, y + 8);
+      ctx.lineTo(x + EW + 6, y + 8 - flap);
+      ctx.lineTo(x + EW - 4, y + 14);
       ctx.closePath(); ctx.fill();
       // Eyes
       ctx.fillStyle = "#fff";
@@ -1380,10 +1385,11 @@ function Index() {
       // Beak
       ctx.fillStyle = "#ffd94a";
       ctx.beginPath();
-      ctx.moveTo(x + e.w / 2 - 2, y + 16);
-      ctx.lineTo(x + e.w / 2 + 2, y + 16);
-      ctx.lineTo(x + e.w / 2, y + 20);
+      ctx.moveTo(x + EW / 2 - 2, y + 16);
+      ctx.lineTo(x + EW / 2 + 2, y + 16);
+      ctx.lineTo(x + EW / 2, y + 20);
       ctx.closePath(); ctx.fill();
+      ctx.restore();
     }
 
     function drawCoin(c: Coin) {
