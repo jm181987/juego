@@ -115,9 +115,17 @@ type Enemy = Rect & {
   vx: number; vy: number; alive: boolean; squashT: number; anim: number;
   kind: "goomba" | "flyer" | "jumper";
   baseY?: number; jumpCd?: number;
+  hp: number; maxHp: number; hitFlash: number;
+  xp: number; gold: number; power: number;
 };
 type Coin = { x: number; y: number; taken: boolean; t: number; pop: number };
 type Hazard = Rect & { kind: "spike" | "lava" };
+type Loot = {
+  x: number; y: number; vx: number; vy: number; t: number;
+  kind: "gold" | "hpPotion" | "mpPotion" | "gem";
+  taken: boolean; life: number;
+};
+type Damage = { x: number; y: number; text: string; life: number; color: string; vy: number };
 type Block = Rect & {
   type: "ground" | "grass" | "brick" | "question" | "pipe" | "stone" | "platform" | "cloud";
   used?: boolean; bump?: number; pipeTop?: boolean; pipeLeft?: boolean;
@@ -163,12 +171,15 @@ function buildWorld(stageIdx: number) {
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
       else if (ch === "G") enemies.push({
         x, y: y - 34, w: 62, h: 62, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+        hp: 2, maxHp: 2, hitFlash: 0, xp: 10, gold: 3, power: 1,
       });
       else if (ch === "J") enemies.push({
         x, y: y - 34, w: 62, h: 62, vx: -0.5, vy: 0, alive: true, squashT: 0, anim: 0, kind: "jumper", jumpCd: 60 + Math.floor(Math.random() * 60),
+        hp: 3, maxHp: 3, hitFlash: 0, xp: 18, gold: 5, power: 2,
       });
       else if (ch === "K") enemies.push({
         x, y, w: 62, h: 52, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+        hp: 2, maxHp: 2, hitFlash: 0, xp: 15, gold: 4, power: 2,
       });
       else if (ch === "M") checkpoints.push({ x: x + TILE / 2, y, reached: false });
       else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
@@ -179,13 +190,22 @@ function buildWorld(stageIdx: number) {
 
 function Index() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [status, setStatus] = useState<"playing" | "win" | "dead" | "stageClear">("playing");
+  const [status, setStatus] = useState<"playing" | "win" | "dead" | "stageClear" | "levelUp">("playing");
   const [score, setScore] = useState(0);
   const [coinsCount, setCoinsCount] = useState(0);
   const [lives, setLives] = useState(3);
   const [stageIdx, setStageIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(STAGES[0].timeLimit);
   const [resetKey, setResetKey] = useState(0);
+  // RPG stats — persist across stage transitions via refs
+  const statsRef = useRef({
+    level: 1, xp: 0, xpNext: 30,
+    hp: 20, maxHp: 20, mp: 10, maxMp: 10,
+    str: 3, def: 1, gold: 0,
+    hpPotions: 2, mpPotions: 1,
+  });
+  const [, forceHudTick] = useState(0);
+  const hudTick = () => forceHudTick((n) => n + 1);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -219,6 +239,12 @@ function Index() {
     let time = 0;
     let timerAccum = 0;
     let stageCompleted = false;
+    let loot: Loot[] = [];
+    const stats = statsRef.current;
+    // Full heal on stage start
+    stats.hp = stats.maxHp;
+    stats.mp = stats.maxMp;
+    hudTick();
 
     // Stars for sky theme
     let stars: { x: number; y: number; s: number; tw: number }[] = [];
@@ -617,19 +643,68 @@ function Index() {
     }
 
     function die() {
-      if (player.invuln > 0) return;
+      // Full death (fall, lava, spikes, or hp<=0)
       localLives -= 1;
       setLives(localLives);
       cameraShake = 12;
       addParticles(player.x + 11, player.y + 15, 24, { color: "#ff3b3b", speed: 6, size: 4, life: 50 });
       addParticles(player.x + 11, player.y + 15, 12, { color: "#ffd94a", speed: 4, size: 3, life: 40 });
       if (localLives <= 0) { setStatus("dead"); running = false; }
-      else respawn();
+      else { stats.hp = stats.maxHp; stats.mp = stats.maxMp; hudTick(); respawn(); }
+    }
+
+    function takeDamage(amount: number, knockDir: number) {
+      if (player.invuln > 0) return;
+      const dmg = Math.max(1, amount - stats.def);
+      stats.hp -= dmg;
+      hudTick();
+      player.invuln = 90;
+      player.vy = -6; player.vx = knockDir * 5;
+      cameraShake = 6;
+      floatText(player.x + player.w / 2, player.y - 4, `-${dmg}`, "#ff5c5c");
+      addParticles(player.x + player.w / 2, player.y + 20, 10, { color: "#ff5c5c", size: 3, life: 24, speed: 3 });
+      if (stats.hp <= 0) { stats.hp = 0; die(); }
+    }
+
+    function gainXp(amount: number) {
+      stats.xp += amount;
+      floatText(player.x + player.w / 2, player.y - 10, `+${amount} XP`, "#a78bfa");
+      while (stats.xp >= stats.xpNext) {
+        stats.xp -= stats.xpNext;
+        stats.level += 1;
+        stats.xpNext = Math.floor(stats.xpNext * 1.6);
+        stats.maxHp += 6; stats.hp = stats.maxHp;
+        stats.maxMp += 3; stats.mp = stats.maxMp;
+        stats.str += 1; stats.def += 1;
+        floatText(player.x + player.w / 2, player.y - 30, `LEVEL ${stats.level}!`, "#ffd94a");
+        addParticles(player.x + player.w / 2, player.y + player.h / 2, 40, {
+          color: "#ffd94a", size: 4, life: 50, speed: 5, gravity: -0.05, shape: "star",
+        });
+        cameraShake = 8;
+      }
+      hudTick();
+    }
+
+    function spawnLoot(x: number, y: number, e: Enemy) {
+      // Gold coins
+      const gc = e.gold;
+      for (let i = 0; i < gc; i++) {
+        loot.push({
+          x, y, vx: (Math.random() - 0.5) * 4, vy: -3 - Math.random() * 2,
+          t: Math.random() * 6, kind: "gold", taken: false, life: 600,
+        });
+      }
+      // 25% chance of HP potion, 15% MP, 8% gem
+      const r = Math.random();
+      if (r < 0.08) loot.push({ x, y, vx: 0, vy: -4, t: 0, kind: "gem", taken: false, life: 900 });
+      else if (r < 0.23) loot.push({ x, y, vx: 0, vy: -3.5, t: 0, kind: "hpPotion", taken: false, life: 900 });
+      else if (r < 0.38) loot.push({ x, y, vx: 0, vy: -3.5, t: 0, kind: "mpPotion", taken: false, life: 900 });
     }
 
     function floatText(x: number, y: number, text: string, color = "#fff") {
       floatTexts.push({ x, y, text, life: 45, color });
     }
+
 
     function completeStage() {
       if (stageCompleted) return;
@@ -677,6 +752,29 @@ function Index() {
       const attackPressed = attackBtn && !player.prevAttack;
       const gpPressed = gpBtn && !player.prevGP;
       player.prevJump = jump; player.prevAttack = attackBtn; player.prevGP = gpBtn;
+
+      // Potion use — Q = HP potion, E = MP potion
+      const qPressed = !!keys["KeyQ"] && !(player as any).prevQ;
+      const ePressed = !!keys["KeyE"] && !(player as any).prevE;
+      (player as any).prevQ = !!keys["KeyQ"];
+      (player as any).prevE = !!keys["KeyE"];
+      if (qPressed && stats.hpPotions > 0 && stats.hp < stats.maxHp) {
+        stats.hpPotions--; stats.hp = Math.min(stats.maxHp, stats.hp + Math.floor(stats.maxHp * 0.5));
+        floatText(player.x + player.w/2, player.y - 4, "+HP", "#7ee085");
+        addParticles(player.x + player.w/2, player.y + player.h/2, 14, {
+          color: "#7ee085", size: 3, life: 30, speed: 3, gravity: -0.05, shape: "star",
+        });
+        hudTick();
+      }
+      if (ePressed && stats.mpPotions > 0 && stats.mp < stats.maxMp) {
+        stats.mpPotions--; stats.mp = Math.min(stats.maxMp, stats.mp + Math.floor(stats.maxMp * 0.6));
+        floatText(player.x + player.w/2, player.y - 4, "+MP", "#4ac1ff");
+        addParticles(player.x + player.w/2, player.y + player.h/2, 14, {
+          color: "#4ac1ff", size: 3, life: 30, speed: 3, gravity: -0.05, shape: "star",
+        });
+        hudTick();
+      }
+
 
       // Crouch
       player.crouching = player.onGround && down && player.groundPound === 0 && !player.diving;
@@ -883,9 +981,15 @@ function Index() {
             const dx = (e.x + e.w/2) - (player.x + player.w/2);
             const dy = (e.y + e.h/2) - (player.y + player.h/2);
             if (Math.abs(dx) < 60 && Math.abs(dy) < 40) {
-              e.alive = false; e.squashT = 30;
-              localScore += 100; setScore(localScore);
-              floatText(e.x + e.w/2, e.y - 4, "+100", "#ff7676");
+              const dmg = stats.str * 2;
+              e.hp -= dmg; e.hitFlash = 10;
+              floatText(e.x + e.w/2, e.y - 4, `${dmg}`, "#ffd94a");
+              if (e.hp <= 0) {
+                e.alive = false; e.squashT = 30;
+                localScore += 100; setScore(localScore);
+                gainXp(e.xp);
+                spawnLoot(e.x + e.w / 2, e.y + e.h / 2, e);
+              }
             }
           }
           player.comboTimer = 20; // reset combo
@@ -963,22 +1067,29 @@ function Index() {
           e.y = (e.baseY ?? e.y) + Math.sin(time * 0.05 + e.x * 0.01) * 24;
         }
 
-        // Attack / dive hitbox
+        if (e.hitFlash > 0) e.hitFlash--;
+
+        // Sword attack hitbox (extended reach thanks to weapon)
         const attacking = player.attack > 0;
-        if (attacking) {
-          const hx = player.x + (player.facing > 0 ? player.w - 4 : -14);
+        if (attacking && e.hitFlash === 0) {
+          const hx = player.x + (player.facing > 0 ? player.w - 8 : -30);
           const hy = player.y + 8;
-          const hw = 18, hh = 18;
+          const hw = 42, hh = 40;
           if (hx < e.x + e.w && hx + hw > e.x && hy < e.y + e.h && hy + hh > e.y) {
-            e.alive = false; e.squashT = 30;
-            const reward = e.kind === "flyer" ? 200 : 100;
-            localScore += reward; setScore(localScore);
-            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
-            addParticles(e.x + e.w / 2, e.y + 8, 12, {
-              color: "#fff", size: 3, life: 25, speed: 4, gravity: 0.3,
-            });
-            cameraShake = 4;
-            continue;
+            const dmg = stats.str + Math.floor(Math.random() * 2);
+            e.hp -= dmg; e.hitFlash = 10;
+            floatText(e.x + e.w / 2, e.y - 4, `${dmg}`, "#ffd94a");
+            addParticles(e.x + e.w / 2, e.y + 8, 8, { color: "#fff", size: 3, life: 20, speed: 4, gravity: 0.2 });
+            cameraShake = 3;
+            if (e.hp <= 0) {
+              e.alive = false; e.squashT = 30;
+              const reward = e.kind === "flyer" ? 200 : 100;
+              localScore += reward; setScore(localScore);
+              gainXp(e.xp);
+              spawnLoot(e.x + e.w / 2, e.y + e.h / 2, e);
+              cameraShake = 5;
+              continue;
+            }
           }
         }
 
@@ -988,23 +1099,76 @@ function Index() {
         ) {
           const stompable = e.kind === "goomba" || e.kind === "flyer" || e.kind === "jumper";
           if (stompable && player.vy > 1 && player.y + player.h - e.y < 20) {
-            e.alive = false; e.squashT = 30;
-            player.vy = jump ? -11 : -8.5; // higher bounce with jump held
+            const stompDmg = 2 + Math.floor(stats.str / 2);
+            e.hp -= stompDmg; e.hitFlash = 10;
+            player.vy = jump ? -11 : -8.5;
             player.squash = 0.7; player.stretch = 1.3;
-            const reward = e.kind === "flyer" ? 200 : 100;
-            localScore += reward; setScore(localScore);
-            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
-            addParticles(e.x + e.w / 2, e.y + 8, 10, {
-              color: e.kind === "flyer" ? "#c8ccd4" : "#8b4513",
-              size: 3, life: 25, speed: 3, gravity: 0.3,
-            });
-            cameraShake = 3;
-          } else die();
+            floatText(e.x + e.w / 2, e.y - 4, `${stompDmg}`, "#ffd94a");
+            addParticles(e.x + e.w / 2, e.y + 8, 6, { color: "#fff", size: 3, life: 20, speed: 2.5, gravity: 0.3 });
+            if (e.hp <= 0) {
+              e.alive = false; e.squashT = 30;
+              const reward = e.kind === "flyer" ? 200 : 100;
+              localScore += reward; setScore(localScore);
+              gainXp(e.xp);
+              spawnLoot(e.x + e.w / 2, e.y + e.h / 2, e);
+              cameraShake = 4;
+            }
+          } else if (player.invuln <= 0) {
+            const knock = player.x < e.x ? -1 : 1;
+            takeDamage(2 + e.power, knock);
+          }
         }
       }
 
+
+      // Loot drops physics + pickup
+      for (const l of loot) {
+        if (l.taken) continue;
+        l.life--;
+        if (l.life <= 0) { l.taken = true; continue; }
+        l.vy += 0.5;
+        if (l.vy > 10) l.vy = 10;
+        l.x += l.vx;
+        l.y += l.vy;
+        l.t += 0.15;
+        // Simple ground collision
+        const foot = { x: l.x - 4, y: l.y - 4, w: 8, h: 8 };
+        for (const b of collideBlocks(foot)) {
+          if (b.type === "platform" || b.type === "cloud") {
+            if (l.vy > 0 && foot.y + foot.h - l.vy <= b.y + 1) { l.y = b.y - 4; l.vy = 0; l.vx *= 0.8; }
+            continue;
+          }
+          if (l.vy > 0 && foot.y + foot.h - l.vy <= b.y + 2) { l.y = b.y - 4; l.vy = 0; l.vx *= 0.7; }
+          else { l.vx *= -0.5; l.x += l.vx; }
+        }
+        // Pickup
+        if (
+          player.x < l.x + 8 && player.x + player.w > l.x - 8 &&
+          player.y < l.y + 8 && player.y + player.h > l.y - 8
+        ) {
+          l.taken = true;
+          if (l.kind === "gold") {
+            stats.gold += 1; localScore += 25; setScore(localScore);
+            floatText(l.x, l.y - 4, "+1G", "#ffd94a");
+          } else if (l.kind === "gem") {
+            stats.gold += 10; localScore += 250; setScore(localScore);
+            floatText(l.x, l.y - 4, "+10G", "#c05af0");
+            addParticles(l.x, l.y, 12, { color: "#c05af0", size: 3, life: 30, speed: 3, gravity: 0.1, shape: "star" });
+          } else if (l.kind === "hpPotion") {
+            stats.hpPotions += 1;
+            floatText(l.x, l.y - 4, "+POCIÓN", "#7ee085");
+          } else if (l.kind === "mpPotion") {
+            stats.mpPotions += 1;
+            floatText(l.x, l.y - 4, "+MANÁ", "#4ac1ff");
+          }
+          hudTick();
+        }
+      }
+      loot = loot.filter((l) => !l.taken);
+
       // Coins
       for (const c of world.coins) {
+
         if (c.taken) { if (c.pop > 0) c.pop--; continue; }
         c.t += 0.18;
         if (
@@ -1244,14 +1408,16 @@ function Index() {
       const attacking = player.attack > 0;
       const wallSliding = player.wallSlide > 0 && !player.onGround;
 
-      // Palette
-      const SKIN = "#f4c9a0", SKIN_SHADE = "#c99268", SKIN_DARK = "#a06a45";
-      const HAIR = "#2a140a";
-      const CAP_HI = "#ff5d5d", CAP = "#dc2020", CAP_LO = "#8b1010";
-      const OVR_HI = "#3d84f0", OVR = "#1e58cc", OVR_LO = "#123578";
-      const SHIRT_HI = "#ff5d5d", SHIRT = "#dc2020", SHIRT_LO = "#8b1010";
-      const SHOE_HI = "#6a3410", SHOE = "#3a1608", SHOE_SOLE = "#1a0804";
-      const GLOVE_HI = "#ffffff", GLOVE_SH = "#c8c8d0";
+      // Palette — mystic RPG hero
+      const SKIN = "#f0c8a0", SKIN_SHADE = "#c99268", SKIN_DARK = "#8a5030";
+      const ROBE_HI = "#6a4ac0", ROBE = "#3a1c88", ROBE_LO = "#1a0a4a";
+      const HOOD_HI = "#4a2ca0", HOOD = "#22106a", HOOD_LO = "#0a0430";
+      const TRIM = "#ffd94a", TRIM_LO = "#a97a10";
+      const BOOT_HI = "#5a3a1a", BOOT = "#2a1608", BOOT_SOLE = "#100804";
+      const BELT = "#3a1a08", BELT_BUCKLE = "#d0a840";
+      const STAFF = "#5a3a1a", STAFF_HI = "#a07530";
+      const ORB = "#7ee0ff", ORB_CORE = "#ffffff";
+      const SWORD_STEEL = "#e8ecf4", SWORD_EDGE = "#8090b0", SWORD_HILT = "#a97a10";
 
       const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
         ctx.beginPath();
@@ -1268,74 +1434,82 @@ function Index() {
         return g;
       };
 
-      // ---- Head (drawn later on top of shoulders slightly) ----
-      // ---- BODY / TORSO ----
-      // Torso overalls (rounded)
-      ctx.fillStyle = linGrad(0, 28, 0, 50, [[0, OVR_HI], [0.35, OVR], [1, OVR_LO]]);
-      roundRect(6, 28, 32, 22, 6); ctx.fill();
+      // ---- CAPE behind (sways with speed) ----
+      const capeSway = Math.sin(time * 0.12) * 1.5 + player.vx * 0.4;
+      ctx.fillStyle = linGrad(0, 26, 0, 58, [[0, HOOD], [1, HOOD_LO]]);
+      ctx.beginPath();
+      ctx.moveTo(14, 28);
+      ctx.quadraticCurveTo(10 + capeSway, 42, 8 + capeSway, 58);
+      ctx.lineTo(36 - capeSway, 58);
+      ctx.quadraticCurveTo(34 - capeSway, 42, 30, 28);
+      ctx.closePath(); ctx.fill();
+      // Cape shine
+      ctx.strokeStyle = TRIM_LO; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(14, 30); ctx.quadraticCurveTo(11, 44, 9 + capeSway, 57); ctx.stroke();
 
-      // Red shirt visible at neckline and sleeves
-      ctx.fillStyle = linGrad(0, 26, 0, 38, [[0, SHIRT_HI], [1, SHIRT]]);
-      roundRect(14, 26, 16, 8, 4); ctx.fill();
+      // ---- ROBE / TORSO ----
+      ctx.fillStyle = linGrad(0, 26, 0, 52, [[0, ROBE_HI], [0.5, ROBE], [1, ROBE_LO]]);
+      // Flared robe body
+      ctx.beginPath();
+      ctx.moveTo(12, 28);
+      ctx.lineTo(32, 28);
+      ctx.quadraticCurveTo(36, 42, 38, 56);
+      ctx.lineTo(6, 56);
+      ctx.quadraticCurveTo(8, 42, 12, 28);
+      ctx.closePath(); ctx.fill();
+      // Gold trim at hem
+      ctx.strokeStyle = TRIM; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(6, 56); ctx.lineTo(38, 56); ctx.stroke();
+      // Central runic stripe
+      ctx.fillStyle = TRIM;
+      ctx.fillRect(21, 28, 2, 24);
+      ctx.fillStyle = TRIM_LO;
+      ctx.fillRect(22, 28, 1, 24);
+      // Rune marks
+      ctx.fillStyle = TRIM;
+      ctx.beginPath(); ctx.arc(22, 34, 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(22, 42, 1.2, 0, Math.PI * 2); ctx.fill();
+      // Belt
+      ctx.fillStyle = BELT;
+      ctx.fillRect(9, 42, 26, 3);
+      ctx.fillStyle = BELT_BUCKLE;
+      ctx.fillRect(20, 41.5, 4, 4);
+      ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(21, 42.5, 2, 2);
 
-      // Overall straps
-      ctx.fillStyle = OVR;
-      roundRect(11, 26, 5, 10, 2); ctx.fill();
-      roundRect(28, 26, 5, 10, 2); ctx.fill();
-      // Strap highlight
-      ctx.fillStyle = OVR_HI;
-      ctx.fillRect(12, 27, 1, 8); ctx.fillRect(29, 27, 1, 8);
-
-      // Overall bib seam
-      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.moveTo(22, 32); ctx.lineTo(22, 46); ctx.stroke();
-
-      // Yellow buttons (with shine)
-      const button = (bx: number, by: number) => {
-        ctx.fillStyle = "#ffcc22";
-        ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#7a4400";
-        ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath(); ctx.arc(bx - 0.7, by - 0.7, 0.7, 0, Math.PI * 2); ctx.fill();
-      };
-      button(14, 36); button(30, 36);
-
-      // Torso shadow under head
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
-      roundRect(10, 27, 24, 4, 2); ctx.fill();
-
-      // ---- ARMS + GLOVES ----
-      const drawArm = (side: -1 | 1, shoulderY: number, elbowOffX: number, elbowOffY: number, gloveX: number, gloveY: number) => {
-        const sx = side === 1 ? 34 : 10;
-        // Sleeve (red)
-        ctx.strokeStyle = SHIRT; ctx.lineWidth = 6;
+      // ---- ARMS + SLEEVES ----
+      const drawArm = (side: -1 | 1, shoulderY: number, elbowOffX: number, elbowOffY: number, handX: number, handY: number, holdWeapon = false) => {
+        const sx = side === 1 ? 32 : 12;
+        // Sleeve (flared, robe color)
+        ctx.strokeStyle = ROBE; ctx.lineWidth = 7;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(sx, shoulderY);
-        ctx.quadraticCurveTo(sx + elbowOffX * side, shoulderY + elbowOffY, gloveX, gloveY);
+        ctx.quadraticCurveTo(sx + elbowOffX * side, shoulderY + elbowOffY, handX, handY);
         ctx.stroke();
         // Sleeve highlight
-        ctx.strokeStyle = SHIRT_HI; ctx.lineWidth = 1.6;
+        ctx.strokeStyle = ROBE_HI; ctx.lineWidth = 1.8;
         ctx.beginPath();
         ctx.moveTo(sx - side, shoulderY + 1);
-        ctx.quadraticCurveTo(sx + elbowOffX * side - side, shoulderY + elbowOffY, gloveX - side, gloveY - 1);
+        ctx.quadraticCurveTo(sx + elbowOffX * side - side, shoulderY + elbowOffY, handX - side, handY - 1);
         ctx.stroke();
-        // Glove
-        ctx.fillStyle = linGrad(gloveX - 4, gloveY - 4, gloveX + 4, gloveY + 4, [[0, GLOVE_HI], [1, GLOVE_SH]]);
-        ctx.beginPath(); ctx.arc(gloveX, gloveY, 4.2, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 0.6; ctx.stroke();
-        // Thumb hint
-        ctx.fillStyle = GLOVE_SH;
-        ctx.beginPath(); ctx.arc(gloveX + side * 2.5, gloveY + 1.5, 1.6, 0, Math.PI * 2); ctx.fill();
+        // Cuff trim
+        ctx.strokeStyle = TRIM; ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.arc(handX, handY - 2, 4, 0, Math.PI * 2); ctx.stroke();
+        // Hand (skin)
+        ctx.fillStyle = SKIN_SHADE;
+        ctx.beginPath(); ctx.arc(handX, handY, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = SKIN;
+        ctx.beginPath(); ctx.arc(handX - side * 0.6, handY - 0.6, 2, 0, Math.PI * 2); ctx.fill();
       };
 
       if (attacking) {
-        drawArm(1, 32, 8, 2, 48, 32);   // forward punch
-        drawArm(-1, 34, 4, 6, 2, 40);
+        drawArm(1, 30, 8, 2, 46, 30, true);
+        drawArm(-1, 34, 3, 8, 10, 44);
       } else if (crouched) {
-        drawArm(1, 34, 3, 6, 36, 44);
-        drawArm(-1, 34, 3, 6, 8, 44);
+        drawArm(1, 34, 3, 6, 34, 44);
+        drawArm(-1, 34, 3, 6, 10, 44);
       } else if (wallSliding) {
         drawArm(1, 30, 6, 4, 40, 34);
         drawArm(-1, 34, 3, 6, 6, 44);
@@ -1354,24 +1528,71 @@ function Index() {
         drawArm(-1, 32, 4, 8, 8, 44 + b);
       }
 
-      // ---- LEGS + SHOES ----
+      // ---- WEAPON ----
+      // Staff in idle/walk (left-forward hand), Sword swing during attack
+      if (attacking) {
+        // Magic sword (glowing)
+        const sxb = 46, syb = 30;
+        // Blade
+        ctx.save();
+        ctx.translate(sxb, syb);
+        ctx.rotate(-0.4);
+        const bg = ctx.createLinearGradient(0, -18, 0, 6);
+        bg.addColorStop(0, ORB_CORE); bg.addColorStop(0.5, SWORD_STEEL); bg.addColorStop(1, SWORD_EDGE);
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.moveTo(-2, -22); ctx.lineTo(2, -22); ctx.lineTo(3, 4); ctx.lineTo(-3, 4);
+        ctx.closePath(); ctx.fill();
+        // Glow along blade
+        ctx.fillStyle = `rgba(126,224,255,${0.4 + Math.sin(time * 0.4) * 0.2})`;
+        ctx.fillRect(-3, -22, 6, 26);
+        // Cross-guard
+        ctx.fillStyle = SWORD_HILT;
+        ctx.fillRect(-6, 4, 12, 2);
+        // Hilt
+        ctx.fillStyle = "#3a1808"; ctx.fillRect(-1.5, 6, 3, 5);
+        // Pommel
+        ctx.fillStyle = TRIM; ctx.beginPath(); ctx.arc(0, 12, 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (!wallSliding && !crouched) {
+        // Staff (long, held slanted)
+        const gx = walking ? 8 + Math.sin(walkPhase) * 3 : 8;
+        const gy = 44;
+        const topX = gx + 1;
+        const topY = 8;
+        // Shaft
+        ctx.strokeStyle = STAFF; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(topX, topY); ctx.stroke();
+        ctx.strokeStyle = STAFF_HI; ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(gx - 0.6, gy); ctx.lineTo(topX - 0.6, topY); ctx.stroke();
+        // Orb crown
+        const orbPulse = 0.4 + Math.sin(time * 0.18) * 0.15;
+        const og = ctx.createRadialGradient(topX, topY - 3, 0.5, topX, topY - 3, 6);
+        og.addColorStop(0, ORB_CORE); og.addColorStop(0.4, ORB); og.addColorStop(1, "rgba(126,224,255,0)");
+        ctx.fillStyle = og;
+        ctx.fillRect(topX - 8, topY - 11, 16, 16);
+        ctx.fillStyle = ORB;
+        ctx.beginPath(); ctx.arc(topX, topY - 3, 2.4 + orbPulse, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = ORB_CORE;
+        ctx.beginPath(); ctx.arc(topX - 0.6, topY - 3.6, 1, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ---- LEGS + BOOTS ----
       const drawLeg = (side: -1 | 1, thighDrop: number) => {
-        const hx = side === 1 ? 27 : 17;
-        const kx = hx;
-        const ky = 50;
+        const hx = side === 1 ? 26 : 18;
         const fx = hx + side * 1;
         const fy = 58 - thighDrop;
-        // Pant (overall)
-        ctx.strokeStyle = OVR; ctx.lineWidth = 7; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.moveTo(hx, 46); ctx.quadraticCurveTo(kx, ky, fx, fy); ctx.stroke();
-        // Highlight
-        ctx.strokeStyle = OVR_HI; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(hx - side, 47); ctx.quadraticCurveTo(kx - side, ky, fx - side, fy - 1); ctx.stroke();
-        // Shoe (rounded, with sole)
-        ctx.fillStyle = linGrad(fx - 6, fy - 3, fx - 6, fy + 4, [[0, SHOE_HI], [1, SHOE]]);
+        // Pant (dark, hidden mostly under robe)
+        ctx.strokeStyle = HOOD; ctx.lineWidth = 5; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(hx, 50); ctx.quadraticCurveTo(hx, 54, fx, fy); ctx.stroke();
+        // Boot
+        ctx.fillStyle = linGrad(fx - 6, fy - 3, fx - 6, fy + 4, [[0, BOOT_HI], [1, BOOT]]);
         roundRect(fx - 6, fy - 3, 12, 6, 3); ctx.fill();
-        ctx.fillStyle = SHOE_SOLE;
+        ctx.fillStyle = BOOT_SOLE;
         roundRect(fx - 7, fy + 2, 14, 2, 1); ctx.fill();
+        // Boot buckle
+        ctx.fillStyle = TRIM;
+        ctx.fillRect(fx - 2, fy - 1, 4, 1.4);
       };
 
       if (crouched) {
@@ -1386,110 +1607,65 @@ function Index() {
         drawLeg(1, 0); drawLeg(-1, 0);
       }
 
-      // ---- HEAD ----
-      // Neck shadow
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      roundRect(17, 24, 10, 4, 2); ctx.fill();
-
-      // Head base (skin)
-      ctx.fillStyle = linGrad(0, 6, 0, 26, [[0, SKIN], [1, SKIN_SHADE]]);
-      roundRect(9, 6, 26, 20, 9); ctx.fill();
-
-      // Ear
-      ctx.fillStyle = SKIN_SHADE;
-      ctx.beginPath(); ctx.ellipse(9, 17, 2, 3, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = SKIN_DARK;
-      ctx.beginPath(); ctx.ellipse(9, 17, 0.9, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-
-      // Sideburn / hair
-      ctx.fillStyle = HAIR;
-      ctx.beginPath(); ctx.ellipse(11, 14, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(33, 14, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-      // Cap brim (front curve)
-      ctx.fillStyle = CAP_LO;
+      // ---- HEAD (partially in hood) ----
+      // Hood back layer
+      ctx.fillStyle = linGrad(0, -8, 0, 12, [[0, HOOD_HI], [0.5, HOOD], [1, HOOD_LO]]);
       ctx.beginPath();
-      ctx.moveTo(6, 10);
-      ctx.quadraticCurveTo(22, 14, 38, 10);
-      ctx.quadraticCurveTo(38, 12, 34, 13);
-      ctx.quadraticCurveTo(22, 15.5, 10, 13);
-      ctx.quadraticCurveTo(6, 12, 6, 10);
+      ctx.moveTo(8, 12);
+      ctx.quadraticCurveTo(6, -2, 22, -8);
+      ctx.quadraticCurveTo(38, -2, 36, 12);
+      ctx.quadraticCurveTo(30, 6, 22, 6);
+      ctx.quadraticCurveTo(14, 6, 8, 12);
       ctx.closePath(); ctx.fill();
 
-      // Cap dome (rounded top)
-      ctx.fillStyle = linGrad(0, -6, 0, 12, [[0, CAP_HI], [0.4, CAP], [1, CAP_LO]]);
+      // Face (in shadow)
+      ctx.fillStyle = linGrad(0, 8, 0, 24, [[0, SKIN_SHADE], [1, SKIN_DARK]]);
+      roundRect(12, 8, 20, 18, 7); ctx.fill();
+      // Inner hood shadow
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.beginPath();
-      ctx.moveTo(9, 10);
-      ctx.quadraticCurveTo(9, -6, 22, -6);
-      ctx.quadraticCurveTo(35, -6, 35, 10);
-      ctx.quadraticCurveTo(22, 6, 9, 10);
+      ctx.moveTo(11, 8); ctx.quadraticCurveTo(22, 4, 33, 8); ctx.lineTo(33, 14); ctx.quadraticCurveTo(22, 10, 11, 14);
       ctx.closePath(); ctx.fill();
 
-      // Cap gloss highlight
-      ctx.fillStyle = "rgba(255,255,255,0.28)";
-      ctx.beginPath(); ctx.ellipse(15, 0, 4, 2, -0.5, 0, Math.PI * 2); ctx.fill();
-
-      // M emblem circle
+      // Glowing eyes (mystic)
+      const eyeGlow = 0.7 + Math.sin(time * 0.15) * 0.3;
+      ctx.fillStyle = `rgba(126,224,255,${eyeGlow})`;
+      ctx.beginPath(); ctx.arc(18, 16, 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(26, 16, 1.6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#ffffff";
-      ctx.beginPath(); ctx.arc(22, 3, 3.6, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.5; ctx.stroke();
-      ctx.fillStyle = CAP;
-      ctx.font = "bold 6px 'Arial Black', sans-serif";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("M", 22, 3.6);
-      ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+      ctx.beginPath(); ctx.arc(18, 16, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(26, 16, 0.7, 0, Math.PI * 2); ctx.fill();
+      // Eye glow aura
+      ctx.fillStyle = `rgba(126,224,255,${eyeGlow * 0.25})`;
+      ctx.beginPath(); ctx.arc(18, 16, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(26, 16, 3.5, 0, Math.PI * 2); ctx.fill();
 
-      // Nose (big round)
-      ctx.fillStyle = linGrad(0, 14, 0, 22, [[0, SKIN], [1, SKIN_DARK]]);
-      ctx.beginPath(); ctx.ellipse(26, 19, 5, 4.2, 0, 0, Math.PI * 2); ctx.fill();
-      // Nose highlight
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.beginPath(); ctx.ellipse(24, 17.5, 1.6, 1, -0.4, 0, Math.PI * 2); ctx.fill();
+      // Nose hint
+      ctx.strokeStyle = "rgba(60,30,20,0.4)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(22, 18); ctx.lineTo(22, 21); ctx.stroke();
+      // Mouth line
+      ctx.strokeStyle = "rgba(40,20,10,0.6)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(20, 23); ctx.quadraticCurveTo(22, 24, 24, 23); ctx.stroke();
 
-      // Eye white
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.ellipse(20, 15, 2.4, 3, 0, 0, Math.PI * 2); ctx.fill();
-      // Iris
-      ctx.fillStyle = "#2a4fb5";
-      ctx.beginPath(); ctx.ellipse(20.5, 15.5, 1.5, 2, 0, 0, Math.PI * 2); ctx.fill();
-      // Pupil
-      ctx.fillStyle = "#000";
-      ctx.beginPath(); ctx.ellipse(20.5, 15.8, 0.8, 1.3, 0, 0, Math.PI * 2); ctx.fill();
-      // Eye shine
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.arc(20.2, 14.7, 0.5, 0, Math.PI * 2); ctx.fill();
-
-      // Eyebrow (thick, angled)
-      ctx.strokeStyle = HAIR; ctx.lineWidth = 2.2; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(17, 11.5); ctx.quadraticCurveTo(20, 10, 23, 11); ctx.stroke();
-
-      // Mustache — thick curly bushy under nose
-      ctx.fillStyle = HAIR;
+      // Hood front trim
+      ctx.strokeStyle = TRIM; ctx.lineWidth = 0.7;
       ctx.beginPath();
-      ctx.moveTo(13, 22);
-      ctx.quadraticCurveTo(14, 19, 20, 20);
-      ctx.quadraticCurveTo(24, 20.5, 30, 20);
-      ctx.quadraticCurveTo(34, 20, 34, 22);
-      ctx.quadraticCurveTo(33, 24.5, 30, 24);
-      ctx.quadraticCurveTo(24, 23, 20, 24);
-      ctx.quadraticCurveTo(14, 25, 13, 22);
-      ctx.closePath(); ctx.fill();
-      // Mustache highlight
-      ctx.fillStyle = "#4a2410";
-      ctx.beginPath(); ctx.ellipse(22, 21, 5, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.moveTo(11, 12); ctx.quadraticCurveTo(22, 7, 33, 12); ctx.stroke();
 
-      // Cheek blush
-      ctx.fillStyle = "rgba(220,80,80,0.28)";
-      ctx.beginPath(); ctx.ellipse(15, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(33, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-      // Lower lip hint
-      ctx.strokeStyle = "rgba(90,30,20,0.55)"; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.moveTo(20, 25.5); ctx.quadraticCurveTo(22, 26.6, 24, 25.5); ctx.stroke();
-      // Chin shadow
-      ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.beginPath(); ctx.ellipse(22, 27, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+      // Hood point at top (pointed hat feel)
+      ctx.fillStyle = HOOD_LO;
+      ctx.beginPath();
+      ctx.moveTo(22, -8); ctx.lineTo(26, -4); ctx.lineTo(22, -2); ctx.lineTo(18, -4);
+      ctx.closePath(); ctx.fill();
+
+      // Small floating rune spark (mana indicator)
+      if (stats.mp > 0 && time % 24 < 12) {
+        ctx.fillStyle = `rgba(126,224,255,${0.6 - (time % 24) / 24})`;
+        ctx.beginPath(); ctx.arc(22 + Math.sin(time * 0.2) * 3, -12 - (time % 24) * 0.3, 1.2, 0, Math.PI * 2); ctx.fill();
+      }
 
       ctx.restore();
+
 
       // Attack sfx swipe
       if (player.attack > 6) {
@@ -1640,6 +1816,57 @@ function Index() {
       }
     }
 
+    function drawLoot() {
+      for (const l of loot) {
+        if (l.taken) continue;
+        const x = Math.round(l.x - cameraX);
+        const y = Math.round(l.y - cameraY);
+        const bob = Math.sin(l.t) * 2;
+        const fade = l.life < 90 ? (l.life % 10 < 5 ? 0.35 : 1) : 1;
+        ctx.globalAlpha = fade;
+        if (l.kind === "gold") {
+          const g = ctx.createRadialGradient(x, y + bob, 1, x, y + bob, 8);
+          g.addColorStop(0, "#fff2a8"); g.addColorStop(0.5, "#ffd94a"); g.addColorStop(1, "#c07500");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.arc(x, y + bob, 6, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#7a4400"; ctx.lineWidth = 1; ctx.stroke();
+        } else if (l.kind === "gem") {
+          ctx.save(); ctx.translate(x, y + bob); ctx.rotate(l.t * 0.4);
+          const g = ctx.createLinearGradient(-6, -6, 6, 6);
+          g.addColorStop(0, "#e0a8ff"); g.addColorStop(1, "#7a2acc");
+          ctx.fillStyle = g;
+          ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(7, 0); ctx.lineTo(0, 8); ctx.lineTo(-7, 0); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = "#fff"; ctx.lineWidth = 0.8; ctx.stroke();
+          ctx.restore();
+        } else if (l.kind === "hpPotion" || l.kind === "mpPotion") {
+          const col = l.kind === "hpPotion" ? "#e63946" : "#4ac1ff";
+          const glow = l.kind === "hpPotion" ? "#ff8888" : "#8fe3ff";
+          // Bottle
+          ctx.fillStyle = "rgba(255,255,255,0.85)";
+          ctx.fillRect(x - 3, y - 8 + bob, 6, 3);
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.ellipse(x, y + 2 + bob, 5, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = glow;
+          ctx.beginPath(); ctx.ellipse(x - 1.5, y + bob, 1.2, 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.5)"; ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.ellipse(x, y + 2 + bob, 5, 7, 0, 0, Math.PI * 2); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawEnemyHpBar(e: Enemy) {
+      if (!e.alive || e.hp >= e.maxHp) return;
+      const x = Math.round(e.x - cameraX);
+      const y = Math.round(e.y - cameraY) - 8;
+      const w = e.w;
+      ctx.fillStyle = "rgba(0,0,0,0.6)"; ctx.fillRect(x, y, w, 4);
+      const pct = Math.max(0, e.hp / e.maxHp);
+      ctx.fillStyle = pct > 0.5 ? "#7ee085" : pct > 0.25 ? "#ffd94a" : "#ff5c5c";
+      ctx.fillRect(x + 1, y + 1, (w - 2) * pct, 2);
+    }
+
     function drawFlag() {
       if (!world.flag.x) return;
       const x = Math.round(world.flag.x - cameraX);
@@ -1700,9 +1927,17 @@ function Index() {
       drawCheckpoints();
       drawFlag();
       for (const c of world.coins) drawCoin(c);
+      drawLoot();
       for (const e of world.enemies) {
         if (e.kind === "goomba" || e.kind === "jumper") drawGoomba(e);
         else drawFlyer(e);
+        if (e.alive && e.hitFlash > 0) {
+          ctx.globalAlpha = e.hitFlash / 10 * 0.6;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(Math.round(e.x - cameraX), Math.round(e.y - cameraY), e.w, e.h);
+          ctx.globalAlpha = 1;
+        }
+        drawEnemyHpBar(e);
       }
       drawPlayer();
       drawParticles();
@@ -1748,6 +1983,12 @@ function Index() {
   const restart = () => {
     setScore(0); setCoinsCount(0); setLives(3); setStageIdx(0);
     setTimeLeft(STAGES[0].timeLimit);
+    statsRef.current = {
+      level: 1, xp: 0, xpNext: 30,
+      hp: 20, maxHp: 20, mp: 10, maxMp: 10,
+      str: 3, def: 1, gold: 0,
+      hpPotions: 2, mpPotions: 1,
+    };
     setStatus("playing"); setResetKey((k) => k + 1);
   };
 
@@ -1776,13 +2017,48 @@ function Index() {
 
       {/* HUD overlay */}
       <div className="pointer-events-none absolute top-0 left-0 right-0 p-3 md:p-5 flex justify-between items-start z-10">
-        <div className="flex flex-col gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
-          <div className="bg-black/40 backdrop-blur-sm rounded-xl px-3 md:px-4 py-1.5 md:py-2 border border-white/20">
-            <span className="text-yellow-300">★ {score.toString().padStart(6, "0")}</span>
+        <div className="flex flex-col gap-1.5 text-white font-black text-sm md:text-base drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
+          {/* Stats panel */}
+          <div className="bg-black/60 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/20 min-w-[190px] md:min-w-[240px]">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-yellow-300 text-xs md:text-sm">Nv. {statsRef.current.level}</span>
+              <span className="text-yellow-300 text-xs">★ {score.toString().padStart(6, "0")}</span>
+            </div>
+            {/* HP bar */}
+            <div className="flex items-center gap-1 text-[10px] md:text-xs">
+              <span className="text-red-300 w-6">HP</span>
+              <div className="flex-1 h-2.5 bg-black/60 rounded overflow-hidden border border-white/20">
+                <div className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all"
+                     style={{ width: `${(statsRef.current.hp / statsRef.current.maxHp) * 100}%` }} />
+              </div>
+              <span className="text-white/90 w-12 text-right">{statsRef.current.hp}/{statsRef.current.maxHp}</span>
+            </div>
+            {/* MP bar */}
+            <div className="flex items-center gap-1 text-[10px] md:text-xs mt-1">
+              <span className="text-cyan-300 w-6">MP</span>
+              <div className="flex-1 h-2 bg-black/60 rounded overflow-hidden border border-white/20">
+                <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all"
+                     style={{ width: `${(statsRef.current.mp / statsRef.current.maxMp) * 100}%` }} />
+              </div>
+              <span className="text-white/90 w-12 text-right">{statsRef.current.mp}/{statsRef.current.maxMp}</span>
+            </div>
+            {/* XP bar */}
+            <div className="flex items-center gap-1 text-[10px] md:text-xs mt-1">
+              <span className="text-purple-300 w-6">XP</span>
+              <div className="flex-1 h-1.5 bg-black/60 rounded overflow-hidden border border-white/20">
+                <div className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all"
+                     style={{ width: `${(statsRef.current.xp / statsRef.current.xpNext) * 100}%` }} />
+              </div>
+              <span className="text-white/90 w-12 text-right">{statsRef.current.xp}/{statsRef.current.xpNext}</span>
+            </div>
           </div>
-          <div className="flex gap-2 text-xs md:text-base">
-            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-yellow-300">◉ ×{coinsCount.toString().padStart(2, "0")}</span>
-            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-red-300">♥ ×{lives}</span>
+          {/* Row: gold, potions, lives */}
+          <div className="flex gap-1.5 text-[10px] md:text-xs flex-wrap">
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-yellow-300">💰 {statsRef.current.gold}</span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-green-300">🧪 {statsRef.current.hpPotions} <span className="opacity-60">(Q)</span></span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-cyan-300">🔮 {statsRef.current.mpPotions} <span className="opacity-60">(E)</span></span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-red-300">♥ ×{lives}</span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-yellow-200">◉ {coinsCount}</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
@@ -1797,9 +2073,10 @@ function Index() {
 
       {/* Desktop hint */}
       <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-10 hidden md:block text-white/80 font-mono text-xs text-center drop-shadow-[1px_1px_0_#000]">
-        ← → mover · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
-        doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
+        ← → mover · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z espada · X ground pound · <b>Q</b> poción HP · <b>E</b> poción MP<br />
+        derrota enemigos para ganar XP y oro · sube de nivel para más HP/MP/fuerza
       </div>
+
 
       {/* Mobile controls */}
       <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-end z-20 md:hidden pointer-events-none">
@@ -1808,13 +2085,20 @@ function Index() {
           <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-2xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▶</button>
           <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▼</button>
         </div>
-        <div className="flex gap-2 items-end pointer-events-auto">
-          <button {...holdKey("KeyZ")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-yellow-400 text-black rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">PUÑO</button>
-          <button {...holdKey("KeyX")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none leading-tight">POUND</button>
-          <button {...holdKey("ShiftLeft")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">RUN</button>
-          <button {...holdKey("Space")} className="w-18 h-18 min-w-[72px] min-h-[72px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">JUMP</button>
+        <div className="flex flex-col gap-2 items-end pointer-events-auto">
+          <div className="flex gap-2 items-center">
+            <button {...holdKey("KeyQ")} className="w-11 h-11 bg-green-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">🧪</button>
+            <button {...holdKey("KeyE")} className="w-11 h-11 bg-cyan-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">🔮</button>
+          </div>
+          <div className="flex gap-2 items-end">
+            <button {...holdKey("KeyZ")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-yellow-400 text-black rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">ESPADA</button>
+            <button {...holdKey("KeyX")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none leading-tight">POUND</button>
+            <button {...holdKey("ShiftLeft")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">RUN</button>
+            <button {...holdKey("Space")} className="w-18 h-18 min-w-[72px] min-h-[72px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">JUMP</button>
+          </div>
         </div>
       </div>
+
 
       {/* Modals */}
       {status === "stageClear" && (
