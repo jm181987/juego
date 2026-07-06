@@ -422,15 +422,17 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const appearanceGender = useGame((s) => s.appearance.gender);
-  // Use the SOLDIER rig for both genders: its Idle/Run/Walk clips are baked
-  // to this exact skeleton and bind pose, so animations always play. We
-  // reshape the soldier for the female look (hair + skirt + bust attached to
-  // the same Mixamo bones, so the outfit follows every animation for free).
+  // Male: soldier rig. Female: Michelle (Mixamo) rig. Both use mixamorig*
+  // bone names, so the soldier animation clips retarget cleanly onto either.
   const soldierGltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const gltf = soldierGltf;
+  const michelleGltf = useGLTF(michelleAsset.url) as unknown as {
+    scene: THREE.Group;
+    animations: THREE.AnimationClip[];
+  };
+  const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
   const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
 
   // Cache each mesh's original base color so appearance tint can be recomputed
