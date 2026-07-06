@@ -475,11 +475,17 @@ function Index() {
       x: world.spawn.x, y: world.spawn.y, w: 22, h: 30,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
+      crouching: false, groundPound: 0, gpCharge: 0,
+      wallSlide: 0, wallDir: 0, wallJumpLock: 0,
+      attack: 0, diving: false,
+      jumpCombo: 0, comboTimer: 0,
+      prevJump: false, prevAttack: false, prevGP: false,
+      hOffset: 0, // for crouch draw
     };
 
     const kd = (e: KeyboardEvent) => {
       keys[e.code] = true;
-      if (["ArrowLeft", "ArrowRight", "ArrowUp", "Space"].includes(e.code)) e.preventDefault();
+      if (["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space","KeyZ","KeyX","KeyC"].includes(e.code)) e.preventDefault();
     };
     const ku = (e: KeyboardEvent) => (keys[e.code] = false);
     window.addEventListener("keydown", kd);
