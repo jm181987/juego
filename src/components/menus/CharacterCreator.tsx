@@ -83,7 +83,7 @@ export function CharacterCreator() {
             padding: "10px 16px", background: "#0a0418", border: "1px solid #ff4050", color: "#ff8090",
             cursor: "pointer", letterSpacing: 2, textTransform: "uppercase", fontSize: 11,
           }}>Restablecer</button>
-          <button onClick={() => setMenu("pause")} style={{
+          <button onClick={() => setMenu(null)} style={{
             padding: "10px 24px", background: "linear-gradient(180deg, #a080ff, #6040cc)",
             color: "#fff", border: "none", cursor: "pointer",
             fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", fontSize: 13,
