@@ -903,8 +903,9 @@ function Scene({
     });
     floats.current = floats.current.filter((f) => f.life > 0);
 
-    // Camera follow (third person)
-    const desired = pos.current.clone().add(new THREE.Vector3(0, 4, 8));
+    // Camera follow (third person, orbits with mouse yaw)
+    const yaw = yawRef.current;
+    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * 8, 4, Math.cos(yaw) * 8));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
     camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
