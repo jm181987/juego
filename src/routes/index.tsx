@@ -1685,10 +1685,11 @@ function Index() {
       drawSky();
       for (const b of world.blocks) drawBlock(b);
       for (const h of world.hazards) drawHazard(h);
+      drawCheckpoints();
       drawFlag();
       for (const c of world.coins) drawCoin(c);
       for (const e of world.enemies) {
-        if (e.kind === "goomba") drawGoomba(e);
+        if (e.kind === "goomba" || e.kind === "jumper") drawGoomba(e);
         else drawFlyer(e);
       }
       drawPlayer();
