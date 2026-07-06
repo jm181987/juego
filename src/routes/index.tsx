@@ -583,46 +583,161 @@ function Index() {
 
       const left = keys["ArrowLeft"] || keys["KeyA"];
       const right = keys["ArrowRight"] || keys["KeyD"];
-      const jump = keys["ArrowUp"] || keys["Space"] || keys["KeyW"];
+      const jump = !!(keys["ArrowUp"] || keys["Space"] || keys["KeyW"]);
       const run = keys["ShiftLeft"] || keys["ShiftRight"];
+      const down = !!(keys["ArrowDown"] || keys["KeyS"]);
+      const attackBtn = !!(keys["KeyZ"] || keys["KeyJ"]);
+      const gpBtn = !!(keys["KeyX"] || keys["KeyK"]);
 
-      const maxSpeed = run ? 5.5 : 4;
-      const accel = player.onGround ? 0.55 : 0.35;
-      const friction = player.onGround ? 0.82 : 0.94;
+      const jumpPressed = jump && !player.prevJump;
+      const attackPressed = attackBtn && !player.prevAttack;
+      const gpPressed = gpBtn && !player.prevGP;
+      player.prevJump = jump; player.prevAttack = attackBtn; player.prevGP = gpBtn;
 
-      if (left) { player.vx = Math.max(player.vx - accel, -maxSpeed); player.facing = -1; }
-      else if (right) { player.vx = Math.min(player.vx + accel, maxSpeed); player.facing = 1; }
-      else { player.vx *= friction; if (Math.abs(player.vx) < 0.05) player.vx = 0; }
+      // Crouch
+      player.crouching = player.onGround && down && player.groundPound === 0 && !player.diving;
+
+      // Attack (punch/kick) — brief hitbox
+      if (attackPressed && player.attack <= 0 && player.groundPound === 0) {
+        player.attack = 14;
+        if (!player.onGround && (Math.abs(player.vx) > 2 || run)) {
+          // Dive: lunge forward
+          player.diving = true;
+          player.vx = player.facing * 7.5;
+          player.vy = Math.max(player.vy, -2);
+        }
+      }
+      if (player.attack > 0) player.attack--;
+      if (player.onGround) player.diving = false;
+
+      // Ground pound
+      if (gpPressed && !player.onGround && player.groundPound === 0) {
+        player.groundPound = 1; // charging
+        player.gpCharge = 14;
+        player.vx = 0; player.vy = 0;
+      }
+      if (player.groundPound === 1) {
+        player.gpCharge--;
+        if (player.gpCharge <= 0) player.groundPound = 2; // slamming
+      }
+
+      // Movement: locked during GP/dive/wallJumpLock
+      const inputLocked = player.groundPound > 0 || player.wallJumpLock > 0;
+      const crouchSlow = player.crouching ? 0.4 : 1;
+      const maxSpeed = (run ? 5.8 : 4) * crouchSlow;
+      const accel = (player.onGround ? 0.55 : 0.32) * crouchSlow;
+      const friction = player.onGround ? (player.crouching ? 0.7 : 0.82) : 0.96;
+
+      if (!inputLocked) {
+        if (left) { player.vx = Math.max(player.vx - accel, -maxSpeed); player.facing = -1; }
+        else if (right) { player.vx = Math.min(player.vx + accel, maxSpeed); player.facing = 1; }
+        else if (!player.diving) { player.vx *= friction; if (Math.abs(player.vx) < 0.05) player.vx = 0; }
+      }
+      if (player.wallJumpLock > 0) player.wallJumpLock--;
 
       if (player.onGround) player.coyote = 8; else if (player.coyote > 0) player.coyote--;
-      if (jump) player.jumpBuffer = 8; else if (player.jumpBuffer > 0) player.jumpBuffer--;
+      if (jumpPressed) player.jumpBuffer = 8; else if (player.jumpBuffer > 0) player.jumpBuffer--;
 
-      if (player.jumpBuffer > 0 && player.coyote > 0) {
-        player.vy = -11.5;
+      // Combo timer for triple jump
+      if (player.comboTimer > 0) player.comboTimer--;
+      else if (player.onGround) player.jumpCombo = 0;
+
+      // Ground / coyote jump
+      if (player.jumpBuffer > 0 && player.coyote > 0 && player.groundPound === 0) {
+        const running = Math.abs(player.vx) > 3.5;
+        let jv = -11.5;
+        let sfxColor = "#e0d7c0";
+        // Backflip: crouch + jump while stationary/slow
+        if (player.crouching && !running) {
+          jv = -15;
+          player.vx = -player.facing * 3;
+          player.jumpCombo = 0;
+          sfxColor = "#7ee085";
+          floatText(player.x + 11, player.y - 4, "BACKFLIP!", "#7ee085");
+        }
+        // Long jump: crouch + jump while running
+        else if (player.crouching && running) {
+          jv = -8;
+          player.vx = player.facing * 9;
+          player.jumpCombo = 0;
+          sfxColor = "#ffd94a";
+          floatText(player.x + 11, player.y - 4, "LONG JUMP!", "#ffd94a");
+        }
+        // Triple jump
+        else if (player.jumpCombo === 2 && running) {
+          jv = -14.5;
+          player.jumpCombo = 0;
+          sfxColor = "#ff7676";
+          floatText(player.x + 11, player.y - 4, "TRIPLE!", "#ff7676");
+          addParticles(player.x + 11, player.y + 8, 16, { color: "#ffd94a", speed: 4, size: 3, life: 30, shape: "star" });
+        }
+        // Double jump
+        else if (player.jumpCombo === 1) {
+          jv = -12.5;
+          player.jumpCombo = 2;
+          player.comboTimer = 20;
+          sfxColor = "#4ac1ff";
+        }
+        else {
+          player.jumpCombo = 1;
+          player.comboTimer = 20;
+        }
+        player.vy = jv;
         player.coyote = 0; player.jumpBuffer = 0; player.onGround = false;
         player.squash = 0.7; player.stretch = 1.3;
         addParticles(player.x + 11, player.y + player.h, 6, {
-          color: "#e0d7c0", size: 3, life: 20, spread: Math.PI, speed: 2, gravity: 0.15,
+          color: sfxColor, size: 3, life: 20, spread: Math.PI, speed: 2, gravity: 0.15,
         });
       }
-      if (!jump && player.vy < -4) player.vy = -4;
+      // Wall jump
+      else if (player.jumpBuffer > 0 && !player.onGround && player.wallSlide > 0 && player.groundPound === 0) {
+        player.vy = -11.5;
+        player.vx = -player.wallDir * 6.5;
+        player.facing = -player.wallDir;
+        player.wallJumpLock = 8;
+        player.jumpBuffer = 0; player.wallSlide = 0;
+        player.jumpCombo = 1; player.comboTimer = 20;
+        floatText(player.x + 11, player.y - 4, "WALL JUMP!", "#4ac1ff");
+        addParticles(player.x + 11 + player.wallDir * 6, player.y + 12, 8, {
+          color: "#c8ccd4", size: 3, life: 22, speed: 2.5, gravity: 0.2,
+        });
+      }
+      if (!jump && player.vy < -4 && player.groundPound === 0) player.vy = -4;
 
       // Sky theme = lower gravity, higher jumps feel floaty
-      const grav = stage.theme === "sky" ? 0.42 : 0.55;
+      const gravBase = stage.theme === "sky" ? 0.42 : 0.55;
+      let grav = gravBase;
+      if (player.groundPound === 1) grav = 0; // freeze in air while charging
+      if (player.groundPound === 2) grav = 1.4; // slam
+      if (player.wallSlide > 0) grav = 0.18; // slide slowly
       player.vy += grav;
-      if (player.vy > 13) player.vy = 13;
+      const maxFall = player.groundPound === 2 ? 18 : 13;
+      if (player.vy > maxFall) player.vy = maxFall;
 
       // X move
       player.x += player.vx;
       if (player.x < 0) { player.x = 0; player.vx = 0; }
       if (player.x + player.w > LEVEL_W) player.x = LEVEL_W - player.w;
+      let hitWallDir = 0;
       for (const b of collideBlocks(player)) {
-        // Platforms are one-way (no side collision)
         if (b.type === "platform" || b.type === "cloud") continue;
-        if (player.vx > 0) player.x = b.x - player.w;
-        else if (player.vx < 0) player.x = b.x + b.w;
+        if (player.vx > 0) { player.x = b.x - player.w; hitWallDir = 1; }
+        else if (player.vx < 0) { player.x = b.x + b.w; hitWallDir = -1; }
         player.vx = 0;
       }
+      // Wall slide: pressing into wall while airborne + falling
+      if (!player.onGround && player.vy > 0 && hitWallDir !== 0 &&
+          ((hitWallDir === 1 && right) || (hitWallDir === -1 && left)) &&
+          player.groundPound === 0) {
+        player.wallSlide = 6;
+        player.wallDir = hitWallDir;
+        if (time % 4 === 0) {
+          addParticles(player.x + (hitWallDir > 0 ? player.w : 0), player.y + 20, 1, {
+            color: "#e0d7c0", size: 2, life: 20, vx: -hitWallDir * 0.6, vy: -0.4, gravity: 0.15,
+          });
+        }
+      } else if (player.wallSlide > 0) player.wallSlide--;
+
       if (player.onGround && Math.abs(player.vx) > 2 && time % 5 === 0) {
         addParticles(player.x + 11 - player.facing * 6, player.y + player.h - 2, 1, {
           color: stage.theme === "cave" ? "#6b6b6b" : "#d9cfb5",
@@ -635,7 +750,6 @@ function Index() {
       player.y += player.vy;
       player.onGround = false;
       for (const b of collideBlocks(player)) {
-        // Platform: only land from above
         if (b.type === "platform" || b.type === "cloud") {
           const prevBottom = player.y - player.vy + player.h;
           if (player.vy > 0 && prevBottom <= b.y + 1) {
@@ -643,7 +757,19 @@ function Index() {
           }
           continue;
         }
-        if (player.vy > 0) { player.y = b.y - player.h; player.vy = 0; player.onGround = true; }
+        if (player.vy > 0) {
+          player.y = b.y - player.h;
+          // Ground pound break brick
+          if (player.groundPound === 2 && b.type === "brick") {
+            b.bump = 12;
+            // Remove brick
+            const idx = world.blocks.indexOf(b);
+            if (idx >= 0) world.blocks.splice(idx, 1);
+            localScore += 50; setScore(localScore);
+            addParticles(b.x + 16, b.y + 8, 14, { color: "#c94a1a", size: 3, life: 30, speed: 4, gravity: 0.3 });
+          }
+          player.vy = 0; player.onGround = true;
+        }
         else if (player.vy < 0) {
           player.y = b.y + b.h; player.vy = 0;
           if (b.type === "question" && !b.used) {
@@ -659,10 +785,28 @@ function Index() {
         }
       }
       if (!wasOnGround && player.onGround) {
-        player.squash = 1.3; player.stretch = 0.75; player.landPulse = 8;
-        addParticles(player.x + 11, player.y + player.h - 2, 4, {
-          color: "#e0d7c0", size: 3, life: 18, spread: Math.PI, speed: 1.5, gravity: 0.15,
+        const hard = player.groundPound === 2;
+        player.squash = hard ? 1.6 : 1.3; player.stretch = hard ? 0.5 : 0.75;
+        player.landPulse = hard ? 14 : 8;
+        addParticles(player.x + 11, player.y + player.h - 2, hard ? 18 : 4, {
+          color: "#e0d7c0", size: 3, life: 22, spread: Math.PI, speed: hard ? 4 : 1.5, gravity: 0.15,
         });
+        if (hard) {
+          cameraShake = 8;
+          // Damage enemies in radius
+          for (const e of world.enemies) {
+            if (!e.alive) continue;
+            const dx = (e.x + e.w/2) - (player.x + player.w/2);
+            const dy = (e.y + e.h/2) - (player.y + player.h/2);
+            if (Math.abs(dx) < 60 && Math.abs(dy) < 40) {
+              e.alive = false; e.squashT = 30;
+              localScore += 100; setScore(localScore);
+              floatText(e.x + e.w/2, e.y - 4, "+100", "#ff7676");
+            }
+          }
+          player.comboTimer = 20; // reset combo
+        }
+        player.groundPound = 0;
       }
       player.squash += (1 - player.squash) * 0.25;
       player.stretch += (1 - player.stretch) * 0.25;
@@ -679,6 +823,7 @@ function Index() {
           player.y < h.y + h.h && player.y + player.h > h.y
         ) die();
       }
+
 
       // Camera
       const target = player.x - 260;
