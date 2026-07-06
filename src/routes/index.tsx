@@ -600,9 +600,9 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       chest.position.y = 0.09 * U;
       chest.castShadow = true;
       attach(b.spine2, chest);
-      attach(b.spine2, mkSphere(0.13 * U, clothMat, [-0.13 * U, 0.18 * U, 0.22 * U]));
-      attach(b.spine2, mkSphere(0.13 * U, clothMat, [0.13 * U, 0.18 * U, 0.22 * U]));
-      attach(b.spine2, mkBox(0.035 * U, 0.44 * U, 0.006 * U, accentMat, [0, 0.14 * U, 0.26 * U]));
+      attach(b.spine2, mkSphere(0.13 * U, clothMat, [-0.13 * U, 0.18 * U, -0.22 * U]));
+      attach(b.spine2, mkSphere(0.13 * U, clothMat, [0.13 * U, 0.18 * U, -0.22 * U]));
+      attach(b.spine2, mkBox(0.035 * U, 0.44 * U, 0.006 * U, accentMat, [0, 0.14 * U, -0.26 * U]));
     }
 
     // Arms
