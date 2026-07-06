@@ -1903,9 +1903,10 @@ function Scene({
     // Attack
     if (attackCd.current > 0) attackCd.current -= dt;
     if (attackTimer.current > 0) attackTimer.current -= dt * 4;
-    if (k.attack && attackCd.current <= 0) {
+    if (k.attack && attackCd.current <= 0 && gs.stamina >= 12) {
       attackCd.current = ATTACK_COOLDOWN;
       attackTimer.current = 1;
+      gs.setStamina(gs.stamina - 12);
       playSwing();
       const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
       for (const e of enemies.current) {
@@ -1924,6 +1925,8 @@ function Scene({
             if (e.hp <= 0) {
               e.alive = false;
               playDeath(genderFor(e.kind));
+              gs.recordKill(e.kind);
+
               const xp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 40 : 25;
               const gold = e.kind === "brute" ? 20 : e.kind === "wraith" ? 12 : 6;
               st.xp += xp; st.gold += gold;
