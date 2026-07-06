@@ -113,8 +113,8 @@ const TILE = 32;
 type Rect = { x: number; y: number; w: number; h: number };
 type Enemy = Rect & {
   vx: number; vy: number; alive: boolean; squashT: number; anim: number;
-  kind: "goomba" | "flyer";
-  baseY?: number;
+  kind: "goomba" | "flyer" | "jumper";
+  baseY?: number; jumpCd?: number;
 };
 type Coin = { x: number; y: number; taken: boolean; t: number; pop: number };
 type Hazard = Rect & { kind: "spike" | "lava" };
