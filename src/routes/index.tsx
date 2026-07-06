@@ -350,7 +350,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   walkPhaseRef: React.MutableRefObject<number>;
 }) {
   const group = useRef<THREE.Group>(null!);
-  const shadowRef = useRef<THREE.Mesh>(null!);
+  
   const swordRef = useRef<THREE.Group>(null!);
 
   const gltf = useGLTF(soldierAsset.url) as unknown as {
