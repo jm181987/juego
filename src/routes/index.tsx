@@ -6,6 +6,18 @@ import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
 import { playSwing, playDeath, genderFor } from "@/lib/sfx";
+import { useGame, type SaveSlot } from "@/game/store";
+import { StatBar, BatteryPill } from "@/components/hud/Bars";
+import { Minimap, type MiniBlip } from "@/components/hud/Minimap";
+import { QuestCompass, type CompassMark } from "@/components/hud/QuestCompass";
+import { PauseMenu } from "@/components/menus/PauseMenu";
+import { SettingsPanel } from "@/components/menus/SettingsPanel";
+import { CharacterCreator } from "@/components/menus/CharacterCreator";
+import { Inventory } from "@/components/menus/Inventory";
+import { Journal } from "@/components/menus/Journal";
+import { SaveLoadPanel } from "@/components/menus/SaveLoadPanel";
+import { PostFX } from "@/game/PostFX";
+
 
 
 
