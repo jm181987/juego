@@ -696,8 +696,8 @@ function GoblinBody({ s, leftArm, rightArm, leftLeg, rightLeg, head }: LimbRefs)
           <meshStandardMaterial color={skin} roughness={0.85} />
         </mesh>
         {/* Nose */}
-        <mesh position={[0, 0, 0.19 * s]}>
-          <coneGeometry args={[0.025 * s, 0.08 * s, 4]} rotation={[Math.PI / 2, 0, 0]} />
+        <mesh position={[0, 0, 0.19 * s]} rotation={[Math.PI / 2, 0, 0]}>
+          <coneGeometry args={[0.025 * s, 0.08 * s, 4]} />
           <meshStandardMaterial color={skinShade} roughness={0.9} />
         </mesh>
         {/* Eyes (whites + pupils) */}
