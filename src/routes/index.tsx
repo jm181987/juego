@@ -745,7 +745,8 @@ function Scene({
       const toP = pos.current.clone().sub(e.pos);
       const dist = toP.length();
       if (dist < 12) {
-        const speed = e.kind === "wraith" ? 4 : e.kind === "brute" ? 2.5 : 3.5;
+        const baseSpeed = e.kind === "wraith" ? 4 : e.kind === "brute" ? 2.5 : 3.5;
+        const speed = baseSpeed * (0.9 + diff * 0.15);
         const dir = toP.normalize();
         if (e.kind === "wraith") {
           // Wraiths float toward player
