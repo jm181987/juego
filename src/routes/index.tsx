@@ -1005,98 +1005,219 @@ function useAmbientMusic(active: boolean, worldIdx: number, difficulty: number) 
     let ctx: AudioContext;
     try { ctx = new AC(); } catch { return; }
 
-    // Per-world palette: root freq + chord intervals + tempo + filter
-    const palettes: { root: number; intervals: number[]; filter: number; wave: OscillatorType; drumRate: number }[] = [
-      { root: 110, intervals: [0, 7, 12], filter: 700, wave: "sawtooth", drumRate: 2.0 },   // Bosque
-      { root: 92,  intervals: [0, 3, 10], filter: 500, wave: "triangle", drumRate: 1.5 },   // Cementerio
-      { root: 82,  intervals: [0, 6, 10], filter: 900, wave: "sawtooth", drumRate: 2.6 },   // Cavernas
-      { root: 73,  intervals: [0, 3, 6],  filter: 600, wave: "square",   drumRate: 2.2 },   // Cripta
-      { root: 130, intervals: [0, 4, 11], filter: 800, wave: "triangle", drumRate: 1.8 },   // Cielos
-      { root: 65,  intervals: [0, 1, 6],  filter: 450, wave: "sawtooth", drumRate: 2.4 },   // Vacío
-      { root: 98,  intervals: [0, 3, 8],  filter: 750, wave: "triangle", drumRate: 2.8 },   // Hielo
-      { root: 55,  intervals: [0, 1, 6, 10], filter: 400, wave: "sawtooth", drumRate: 3.4 }, // Abismo
+    // Per-world palette: dark/dissonant intervals (tritones, minor 2nds, minor 9ths)
+    const palettes: { root: number; intervals: number[]; filter: number; wave: OscillatorType }[] = [
+      { root: 82,  intervals: [0, 1, 6, 13],     filter: 620, wave: "sawtooth" }, // Bosque
+      { root: 69,  intervals: [0, 1, 6, 11],     filter: 480, wave: "sawtooth" }, // Cementerio
+      { root: 62,  intervals: [0, 6, 11, 13],    filter: 720, wave: "sawtooth" }, // Cavernas
+      { root: 58,  intervals: [0, 1, 6, 10, 13], filter: 520, wave: "square"   }, // Cripta
+      { root: 92,  intervals: [0, 1, 6, 8],      filter: 660, wave: "sawtooth" }, // Cielos
+      { root: 49,  intervals: [0, 1, 6, 13],     filter: 380, wave: "sawtooth" }, // Vacío
+      { root: 78,  intervals: [0, 1, 6, 11],     filter: 600, wave: "sawtooth" }, // Hielo
+      { root: 41,  intervals: [0, 1, 6, 7, 13],  filter: 300, wave: "sawtooth" }, // Abismo
     ];
     const p = palettes[Math.min(worldIdx, palettes.length - 1)];
 
     const master = ctx.createGain();
     master.gain.value = 0;
-    master.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 1.2);
+    master.gain.linearRampToValueAtTime(0.22, ctx.currentTime + 1.5);
+    master.connect(ctx.destination);
+
+    // Slight distortion for grit
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 128) - 1;
+      curve[i] = Math.tanh(x * 2);
+    }
+    shaper.curve = curve;
+    shaper.connect(master);
 
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
     filter.frequency.value = p.filter;
-    filter.Q.value = 4;
-    filter.connect(master);
-    master.connect(ctx.destination);
+    filter.Q.value = 8;
+    filter.connect(shaper);
 
-    // Drone chord
-    const oscs: OscillatorNode[] = [];
-    const gains: GainNode[] = [];
+    // Slow filter wobble
+    const filterLfo = ctx.createOscillator();
+    const filterLfoGain = ctx.createGain();
+    filterLfo.frequency.value = 0.08;
+    filterLfoGain.gain.value = p.filter * 0.4;
+    filterLfo.connect(filterLfoGain).connect(filter.frequency);
+    filterLfo.start();
+
+    const oscs: OscillatorNode[] = [filterLfo];
+
+    // Dissonant drone chord (heavily detuned pairs)
     p.intervals.forEach((semi, i) => {
-      const o = ctx.createOscillator();
-      o.type = p.wave;
-      o.frequency.value = p.root * Math.pow(2, semi / 12);
-      const g = ctx.createGain();
-      g.gain.value = 0.15 / (i + 1);
-      // Slow detune LFO for eeriness
-      const lfo = ctx.createOscillator();
-      const lfoGain = ctx.createGain();
-      lfo.frequency.value = 0.1 + i * 0.07;
-      lfoGain.gain.value = 4;
-      lfo.connect(lfoGain).connect(o.detune);
-      lfo.start();
-      o.connect(g).connect(filter);
-      o.start();
-      oscs.push(o); gains.push(g);
+      const freq = p.root * Math.pow(2, semi / 12);
+      [-8, 0, 9].forEach((det, j) => {
+        const o = ctx.createOscillator();
+        o.type = p.wave;
+        o.frequency.value = freq;
+        o.detune.value = det;
+        const g = ctx.createGain();
+        g.gain.value = 0.09 / (i + 1);
+        const lfo = ctx.createOscillator();
+        const lfoGain = ctx.createGain();
+        lfo.frequency.value = 0.07 + i * 0.05 + j * 0.03;
+        lfoGain.gain.value = 8;
+        lfo.connect(lfoGain).connect(o.detune);
+        lfo.start();
+        o.connect(g).connect(filter);
+        o.start();
+        oscs.push(o, lfo);
+      });
     });
 
-    // Heartbeat / drum pulse, faster with difficulty
-    const bpm = 40 + difficulty * 8;
+    // Sub-bass rumble (very low, slow amplitude tremor)
+    {
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.value = p.root / 2;
+      const sg = ctx.createGain();
+      sg.gain.value = 0.25;
+      const trem = ctx.createOscillator();
+      const tremGain = ctx.createGain();
+      trem.frequency.value = 0.3 + Math.random() * 0.4;
+      tremGain.gain.value = 0.18;
+      trem.connect(tremGain).connect(sg.gain);
+      trem.start();
+      sub.connect(sg).connect(master);
+      sub.start();
+      oscs.push(sub, trem);
+    }
+
+    // Noise buffer (pink-ish) for wind and whispers
+    const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const nd = noiseBuf.getChannelData(0);
+    let lastN = 0;
+    for (let i = 0; i < nd.length; i++) {
+      const white = Math.random() * 2 - 1;
+      lastN = (lastN + 0.02 * white) / 1.02;
+      nd[i] = lastN * 3;
+    }
+
+    // Continuous wind
+    const wind = ctx.createBufferSource();
+    wind.buffer = noiseBuf; wind.loop = true;
+    const windFilter = ctx.createBiquadFilter();
+    windFilter.type = "bandpass";
+    windFilter.frequency.value = 500;
+    windFilter.Q.value = 1.2;
+    const windGain = ctx.createGain();
+    windGain.gain.value = 0.06;
+    const windLfo = ctx.createOscillator();
+    const windLfoGain = ctx.createGain();
+    windLfo.frequency.value = 0.15;
+    windLfoGain.gain.value = 0.05;
+    windLfo.connect(windLfoGain).connect(windGain.gain);
+    windLfo.start();
+    wind.connect(windFilter).connect(windGain).connect(master);
+    wind.start();
+    oscs.push(windLfo);
+
+    // Heartbeat (double thump, accelerates with difficulty)
+    const bpm = 42 + difficulty * 10;
     const beatInt = 60 / bpm;
-    let beatTimer: ReturnType<typeof setInterval> | null = null;
-    const kick = () => {
-      const t = ctx.currentTime;
+    const kick = (offset = 0, vol = 0.4) => {
+      const t = ctx.currentTime + offset;
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.frequency.setValueAtTime(90, t);
-      o.frequency.exponentialRampToValueAtTime(35, t + 0.25);
-      g.gain.setValueAtTime(0.35, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      o.frequency.setValueAtTime(80, t);
+      o.frequency.exponentialRampToValueAtTime(30, t + 0.22);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
       o.connect(g).connect(master);
-      o.start(t); o.stop(t + 0.4);
+      o.start(t); o.stop(t + 0.35);
     };
-    beatTimer = setInterval(kick, beatInt * 1000);
+    const beatTimer = setInterval(() => { kick(0, 0.45); kick(0.12, 0.28); }, beatInt * 1000);
 
-    // Occasional dissonant stab
+    // Dissonant metallic stab (random)
     const stabTimer = setInterval(() => {
-      if (Math.random() > 0.3) return;
+      if (Math.random() > 0.45) return;
       const t = ctx.currentTime;
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = "sawtooth";
-      o.frequency.value = p.root * Math.pow(2, (p.intervals[1] + 1) / 12) * 2;
+      o.type = "square";
+      const stabSemi = p.intervals[1 + Math.floor(Math.random() * (p.intervals.length - 1))];
+      o.frequency.value = p.root * Math.pow(2, (stabSemi + 12) / 12) * 2;
       g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.05, t + 0.05);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
-      o.connect(g).connect(filter);
-      o.start(t); o.stop(t + 1.3);
-    }, 3500);
+      g.gain.linearRampToValueAtTime(0.07, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+      const sFilter = ctx.createBiquadFilter();
+      sFilter.type = "bandpass";
+      sFilter.frequency.value = 1500 + Math.random() * 2000;
+      sFilter.Q.value = 12;
+      o.connect(g).connect(sFilter).connect(master);
+      o.start(t); o.stop(t + 1.7);
+    }, 2800);
 
-    // Resume on user gesture (autoplay policy)
+    // Whisper bursts (short bandpassed noise)
+    const whisperTimer = setInterval(() => {
+      if (Math.random() > 0.35) return;
+      const t = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      src.buffer = noiseBuf;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 900 + Math.random() * 1800;
+      bp.Q.value = 20;
+      const g = ctx.createGain();
+      const dur = 0.4 + Math.random() * 0.6;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.12, t + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      // Panning
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = (Math.random() * 2 - 1) * 0.9;
+      src.connect(bp).connect(g).connect(pan).connect(master);
+      src.start(t); src.stop(t + dur + 0.1);
+    }, 4200);
+
+    // Rare screams (rising pitch)
+    const screamTimer = setInterval(() => {
+      if (Math.random() > 0.18) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(180 + Math.random() * 120, t);
+      o.frequency.exponentialRampToValueAtTime(900 + Math.random() * 400, t + 1.2);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.09, t + 0.3);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 700;
+      bp.Q.value = 4;
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = (Math.random() * 2 - 1) * 0.8;
+      o.connect(g).connect(bp).connect(pan).connect(master);
+      o.start(t); o.stop(t + 1.5);
+    }, 9000);
+
     const resume = () => { ctx.resume().catch(() => {}); };
     window.addEventListener("pointerdown", resume);
     window.addEventListener("keydown", resume);
     resume();
 
     return () => {
-      if (beatTimer) clearInterval(beatTimer);
+      clearInterval(beatTimer);
       clearInterval(stabTimer);
+      clearInterval(whisperTimer);
+      clearInterval(screamTimer);
       window.removeEventListener("pointerdown", resume);
       window.removeEventListener("keydown", resume);
       try {
         master.gain.cancelScheduledValues(ctx.currentTime);
         master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
-        setTimeout(() => { oscs.forEach((o) => { try { o.stop(); } catch {} }); ctx.close().catch(() => {}); }, 500);
+        setTimeout(() => {
+          oscs.forEach((o) => { try { (o as any).stop?.(); } catch {} });
+          try { wind.stop(); } catch {}
+          ctx.close().catch(() => {});
+        }, 500);
       } catch { /* noop */ }
     };
   }, [active, worldIdx, difficulty]);
