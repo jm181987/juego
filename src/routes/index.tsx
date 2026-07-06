@@ -565,7 +565,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       attach(leg, mkCap(0.14 * U, legLen, skinMat));
       if (foot) {
         const boot = new THREE.Mesh(new THREE.BoxGeometry(0.2 * U, 0.12 * U, 0.42 * U), clothMat);
-        boot.position.set(0, 0.06 * U, 0.14 * U);
+        boot.position.set(0, 0.06 * U, -0.14 * U);
         boot.castShadow = true;
         attach(foot, boot);
       }
