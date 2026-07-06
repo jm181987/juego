@@ -415,21 +415,17 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     prevWalkPhase.current = wp;
     const atk = attackingRef.current;
 
-    if (atk > 0) {
-      switchTo("Run", 0.05, 2.4);
-    } else if (walking) {
+    if (walking) {
       switchTo("Run", 0.18, 1.35);
     } else {
       switchTo("Idle", 0.22, 1);
     }
 
     if (swordRef.current) {
-      const swing = atk > 0 ? Math.sin(atk * Math.PI) * 1.8 : 0;
-      swordRef.current.rotation.z = -0.6 - swing;
-    }
-
-    if (shadowRef.current) {
-      shadowRef.current.position.set(posRef.current.x, posRef.current.y + 0.02, posRef.current.z);
+      // Overhead-to-forward slash independent of locomotion animation.
+      const swing = atk > 0 ? Math.sin((1 - atk) * Math.PI) : 0;
+      swordRef.current.rotation.z = -0.6 - swing * 1.6;
+      swordRef.current.rotation.x = swing * 1.2;
     }
   });
 
@@ -461,13 +457,10 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           </mesh>
         </group>
       </group>
-      <mesh ref={shadowRef} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
-        <circleGeometry args={[0.6, 24]} />
-        <meshBasicMaterial color="#000" transparent opacity={0.5} depthWrite={false} />
-      </mesh>
     </>
   );
 }
+
 
 
 
