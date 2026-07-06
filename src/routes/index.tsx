@@ -2495,7 +2495,7 @@ function Index() {
       )}
 
       {/* Menu overlays */}
-      {activeMenu === "pause" && (
+      {activeMenu === "pause" && status !== "menu" && (
         <PauseMenu
           onQuit={() => { setMenu(null); setStatus("menu"); }}
           onSave={() => { doSave(0); setMenu(null); }}
