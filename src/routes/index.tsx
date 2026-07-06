@@ -1337,19 +1337,34 @@ function Scene({
   // Mouse look + click to attack. Works with pointer lock; falls back to
   // cursor position relative to canvas center when lock is unavailable (iframes).
   const yawRef = useRef(0);
+  const pitchRef = useRef(0.35); // radians, positive = looking down more
+  const camDistRef = useRef(9);
+  const camYawOffsetRef = useRef(0); // extra yaw added only while Alt held
   useEffect(() => {
     const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
     if (!canvas) return;
     let locked = false;
     const onMove = (e: MouseEvent) => {
+      const free = keysRef.current.camFree;
       if (locked && document.pointerLockElement === canvas) {
-        yawRef.current -= e.movementX * 0.0035;
+        if (free) {
+          camYawOffsetRef.current -= e.movementX * 0.0035;
+          pitchRef.current = Math.max(-0.4, Math.min(1.2, pitchRef.current + e.movementY * 0.0025));
+        } else {
+          yawRef.current -= e.movementX * 0.0035;
+        }
       } else {
-        // Fallback: aim by cursor horizontal offset from canvas center
         const rect = canvas.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
         const dx = e.clientX - cx;
-        yawRef.current -= (dx / rect.width) * 0.08;
+        const dy = e.clientY - cy;
+        if (free) {
+          camYawOffsetRef.current -= (dx / rect.width) * 0.08;
+          pitchRef.current = Math.max(-0.4, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
+        } else {
+          yawRef.current -= (dx / rect.width) * 0.08;
+        }
       }
     };
     const onDown = (e: MouseEvent) => {
@@ -1362,18 +1377,26 @@ function Scene({
     const onUp = (e: MouseEvent) => {
       if (e.button === 0) keysRef.current.attack = false;
     };
+    const onWheel = (e: WheelEvent) => {
+      if (!keysRef.current.camFree) return;
+      camDistRef.current = Math.max(4, Math.min(18, camDistRef.current + e.deltaY * 0.01));
+      e.preventDefault();
+    };
     const onLockChange = () => { locked = document.pointerLockElement === canvas; };
     document.addEventListener("mousemove", onMove);
     canvas.addEventListener("mousedown", onDown as any);
+    canvas.addEventListener("wheel", onWheel as any, { passive: false });
     window.addEventListener("mouseup", onUp);
     document.addEventListener("pointerlockchange", onLockChange);
     return () => {
       document.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mousedown", onDown as any);
+      canvas.removeEventListener("wheel", onWheel as any);
       window.removeEventListener("mouseup", onUp);
       document.removeEventListener("pointerlockchange", onLockChange);
     };
   }, [keysRef]);
+
 
   useFrame((state, dt) => {
     dt = Math.min(dt, 0.05);
