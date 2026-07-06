@@ -668,6 +668,10 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const lightActive = flashlightOn && battery > 0;
   const lightIntensity = lightActive ? 16 * Math.min(1, battery / 30) : 0;
 
+  // Michelle.glb is authored facing the opposite way from the soldier rig;
+  // rotate only the visible model, not the movement/facing controller.
+  const modelYawOffset = appearanceGender === "female" ? Math.PI : 0;
+
   // Michelle.glb already has proper feminine proportions, so no extra squish.
   const scaleX = 1.05 * appearance.build;
   const scaleY = 1.05 * appearance.height;
@@ -675,7 +679,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
   return (
     <group ref={group} scale={[scaleX, scaleY, scaleZ]}>
-      <group rotation={[0, 0, 0]}>
+      <group rotation={[0, modelYawOffset, 0]}>
         <primitive object={cloned} />
       </group>
 
