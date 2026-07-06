@@ -381,20 +381,14 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           mat.color.multiplyScalar(0.85);
         }
       }
-      const name = o.name;
-      if (name === "mixamorigRightArm" || name === "mixamorig:RightArm") bonesRef.current.rightArm = o;
-      else if (name === "mixamorigRightForeArm" || name === "mixamorig:RightForeArm") bonesRef.current.rightForeArm = o;
-      else if (name === "mixamorigSpine1" || name === "mixamorig:Spine1") bonesRef.current.spine1 = o;
-      else if (name === "mixamorigRightHand" || name === "mixamorig:RightHand") bonesRef.current.rightHand = o;
+      const name = (o.name || "").replace(/[:_]/g, "");
+      if (name === "mixamorigRightArm") bonesRef.current.rightArm = o;
+      else if (name === "mixamorigRightForeArm") bonesRef.current.rightForeArm = o;
+      else if (name === "mixamorigSpine1") bonesRef.current.spine1 = o;
+      else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
     });
-    // Attach sword to the right hand bone so it follows the arm swing.
-    if (bonesRef.current.rightHand && swordRef.current) {
-      bonesRef.current.rightHand.add(swordRef.current);
-      swordRef.current.position.set(0, 0.05, 0.08);
-      swordRef.current.rotation.set(Math.PI / 2, 0, 0);
-      swordRef.current.scale.setScalar(1);
-    }
   }, [cloned]);
+
 
   const { actions } = useAnimations(gltf.animations, cloned);
   const currentAction = useRef<string>("");
@@ -440,23 +434,16 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
   useFrame(() => {
     const b = bonesRef.current;
-    // Cache base rotations from the currently-playing clip on first sight.
     if (b.rightArm && !b.base.rightArm) b.base.rightArm = b.rightArm.rotation.clone();
     if (b.rightForeArm && !b.base.rightForeArm) b.base.rightForeArm = b.rightForeArm.rotation.clone();
     if (b.spine1 && !b.base.spine1) b.base.spine1 = b.spine1.rotation.clone();
 
-    // attackingRef is 1 → 0 across the attack window; s is 0 → 1 → 0 slash curve.
     const atk = Math.max(0, Math.min(1, attackingRef.current));
     const s = atk > 0 ? Math.sin((1 - atk) * Math.PI) : 0;
 
     if (b.rightArm) {
       const base = b.base.rightArm!;
-      // Raise shoulder, then chop down/forward.
-      b.rightArm.rotation.set(
-        base.x - s * 1.6,
-        base.y,
-        base.z + s * 0.4,
-      );
+      b.rightArm.rotation.set(base.x - s * 1.6, base.y, base.z + s * 0.4);
     }
     if (b.rightForeArm) {
       const base = b.base.rightForeArm!;
@@ -466,7 +453,22 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       const base = b.base.spine1!;
       b.spine1.rotation.set(base.x + s * 0.15, base.y - s * 0.35, base.z);
     }
+
+    // Make the sword follow the right-hand bone in world space.
+    if (b.rightHand && swordRef.current && group.current) {
+      b.rightHand.updateWorldMatrix(true, false);
+      const hand = b.rightHand.matrixWorld;
+      // Convert hand world matrix into local space of the hero group.
+      group.current.updateWorldMatrix(true, false);
+      const invParent = group.current.matrixWorld.clone().invert();
+      const local = invParent.multiply(hand);
+      local.decompose(swordRef.current.position, swordRef.current.quaternion, swordRef.current.scale);
+      // Offset so the grip sits in the hand.
+      swordRef.current.translateY(0.05);
+      swordRef.current.rotateX(Math.PI / 2);
+    }
   }, 1);
+
 
   return (
     <group ref={group} scale={1.05}>
