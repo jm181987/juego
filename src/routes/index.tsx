@@ -2011,13 +2011,48 @@ function Index() {
 
       {/* HUD overlay */}
       <div className="pointer-events-none absolute top-0 left-0 right-0 p-3 md:p-5 flex justify-between items-start z-10">
-        <div className="flex flex-col gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
-          <div className="bg-black/40 backdrop-blur-sm rounded-xl px-3 md:px-4 py-1.5 md:py-2 border border-white/20">
-            <span className="text-yellow-300">★ {score.toString().padStart(6, "0")}</span>
+        <div className="flex flex-col gap-1.5 text-white font-black text-sm md:text-base drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
+          {/* Stats panel */}
+          <div className="bg-black/60 backdrop-blur-sm rounded-xl px-3 py-2 border border-white/20 min-w-[190px] md:min-w-[240px]">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-yellow-300 text-xs md:text-sm">Nv. {statsRef.current.level}</span>
+              <span className="text-yellow-300 text-xs">★ {score.toString().padStart(6, "0")}</span>
+            </div>
+            {/* HP bar */}
+            <div className="flex items-center gap-1 text-[10px] md:text-xs">
+              <span className="text-red-300 w-6">HP</span>
+              <div className="flex-1 h-2.5 bg-black/60 rounded overflow-hidden border border-white/20">
+                <div className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all"
+                     style={{ width: `${(statsRef.current.hp / statsRef.current.maxHp) * 100}%` }} />
+              </div>
+              <span className="text-white/90 w-12 text-right">{statsRef.current.hp}/{statsRef.current.maxHp}</span>
+            </div>
+            {/* MP bar */}
+            <div className="flex items-center gap-1 text-[10px] md:text-xs mt-1">
+              <span className="text-cyan-300 w-6">MP</span>
+              <div className="flex-1 h-2 bg-black/60 rounded overflow-hidden border border-white/20">
+                <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 transition-all"
+                     style={{ width: `${(statsRef.current.mp / statsRef.current.maxMp) * 100}%` }} />
+              </div>
+              <span className="text-white/90 w-12 text-right">{statsRef.current.mp}/{statsRef.current.maxMp}</span>
+            </div>
+            {/* XP bar */}
+            <div className="flex items-center gap-1 text-[10px] md:text-xs mt-1">
+              <span className="text-purple-300 w-6">XP</span>
+              <div className="flex-1 h-1.5 bg-black/60 rounded overflow-hidden border border-white/20">
+                <div className="h-full bg-gradient-to-r from-purple-600 to-purple-400 transition-all"
+                     style={{ width: `${(statsRef.current.xp / statsRef.current.xpNext) * 100}%` }} />
+              </div>
+              <span className="text-white/90 w-12 text-right">{statsRef.current.xp}/{statsRef.current.xpNext}</span>
+            </div>
           </div>
-          <div className="flex gap-2 text-xs md:text-base">
-            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-yellow-300">◉ ×{coinsCount.toString().padStart(2, "0")}</span>
-            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-red-300">♥ ×{lives}</span>
+          {/* Row: gold, potions, lives */}
+          <div className="flex gap-1.5 text-[10px] md:text-xs flex-wrap">
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-yellow-300">💰 {statsRef.current.gold}</span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-green-300">🧪 {statsRef.current.hpPotions} <span className="opacity-60">(Q)</span></span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-cyan-300">🔮 {statsRef.current.mpPotions} <span className="opacity-60">(E)</span></span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-red-300">♥ ×{lives}</span>
+            <span className="bg-black/50 rounded px-2 py-1 border border-white/20 text-yellow-200">◉ {coinsCount}</span>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
@@ -2032,9 +2067,10 @@ function Index() {
 
       {/* Desktop hint */}
       <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-10 hidden md:block text-white/80 font-mono text-xs text-center drop-shadow-[1px_1px_0_#000]">
-        ← → mover · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
-        doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
+        ← → mover · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z espada · X ground pound · <b>Q</b> poción HP · <b>E</b> poción MP<br />
+        derrota enemigos para ganar XP y oro · sube de nivel para más HP/MP/fuerza
       </div>
+
 
       {/* Mobile controls */}
       <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-end z-20 md:hidden pointer-events-none">
