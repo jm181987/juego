@@ -650,10 +650,10 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const lightActive = flashlightOn && battery > 0;
   const lightIntensity = lightActive ? 16 * Math.min(1, battery / 30) : 0;
 
-  const isFemale = appearance.gender === "female";
-  const scaleX = 1.05 * appearance.build * (isFemale ? 0.9 : 1);
-  const scaleY = 1.05 * appearance.height * (isFemale ? 1.02 : 1);
-  const scaleZ = 1.05 * appearance.build * (isFemale ? 0.88 : 1);
+  // Michelle.glb already has proper feminine proportions, so no extra squish.
+  const scaleX = 1.05 * appearance.build;
+  const scaleY = 1.05 * appearance.height;
+  const scaleZ = 1.05 * appearance.build;
 
   return (
     <group ref={group} scale={[scaleX, scaleY, scaleZ]}>
