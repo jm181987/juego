@@ -1776,24 +1776,34 @@ function Scene({
   }, [keysRef]);
 
 
+  const tickAccumRef = useRef({ dt: 0, staminaDelta: 0, batteryDelta: 0, playtime: 0 });
   useFrame((state, dt) => {
     dt = Math.min(dt, 0.05);
     // Pause: skip all game logic while a menu is open.
     const gs = useGame.getState();
     if (gs.paused) return;
-    gs.addPlaytime(dt);
 
-    // Stamina / battery drain — cheap direct set via getState() to avoid
-    // React re-renders per frame; HUD reads the store on its own tick.
+    // Accumulate stamina/battery/playtime and flush at ~6Hz to avoid
+    // hundreds of zustand set() (and HUD re-renders) per second.
     const running = keysRef.current.run && !!(keysRef.current.fwd || keysRef.current.back || keysRef.current.left || keysRef.current.right);
     const canRun = running && gs.stamina > 5;
-    if (canRun) gs.setStamina(gs.stamina - dt * 22);
-    else if (!keysRef.current.attack) gs.setStamina(gs.stamina + dt * 14);
-    if (gs.flashlightOn) {
-      const nb = gs.battery - dt * 1.6;
-      gs.setBattery(nb);
-      if (nb <= 0) gs.setFlashlight(false);
+    const acc = tickAccumRef.current;
+    acc.playtime += dt;
+    if (canRun) acc.staminaDelta -= dt * 22;
+    else if (!keysRef.current.attack) acc.staminaDelta += dt * 14;
+    if (gs.flashlightOn) acc.batteryDelta -= dt * 1.6;
+    acc.dt += dt;
+    if (acc.dt >= 0.16) {
+      gs.addPlaytime(acc.playtime);
+      if (acc.staminaDelta !== 0) gs.setStamina(gs.stamina + acc.staminaDelta);
+      if (acc.batteryDelta !== 0) {
+        const nb = gs.battery + acc.batteryDelta;
+        gs.setBattery(nb);
+        if (nb <= 0 && gs.flashlightOn) gs.setFlashlight(false);
+      }
+      acc.dt = 0; acc.staminaDelta = 0; acc.batteryDelta = 0; acc.playtime = 0;
     }
+
 
     const k = keysRef.current;
     const st = statsRef.current;
