@@ -261,9 +261,10 @@ const ATTACK_COOLDOWN = 0.4;
 type Keys = {
   fwd: boolean; back: boolean; left: boolean; right: boolean;
   jump: boolean; attack: boolean; pot1: boolean; pot2: boolean;
+  camFree: boolean;
 };
 function useKeys() {
-  const keys = useRef<Keys>({ fwd: false, back: false, left: false, right: false, jump: false, attack: false, pot1: false, pot2: false });
+  const keys = useRef<Keys>({ fwd: false, back: false, left: false, right: false, jump: false, attack: false, pot1: false, pot2: false, camFree: false });
   useEffect(() => {
     const map = (e: KeyboardEvent, v: boolean) => {
       const k = e.key.toLowerCase();
@@ -275,7 +276,9 @@ function useKeys() {
       if (k === "z" || k === "j") keys.current.attack = v;
       if (k === "q") keys.current.pot1 = v;
       if (k === "e") keys.current.pot2 = v;
+      if (k === "alt") { keys.current.camFree = v; e.preventDefault(); }
     };
+
     const dn = (e: KeyboardEvent) => map(e, true);
     const up = (e: KeyboardEvent) => map(e, false);
     window.addEventListener("keydown", dn);
