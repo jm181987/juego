@@ -5,7 +5,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
-import michelleAsset from "@/assets/michelle.glb.asset.json";
+
 import { playSwing, playDeath, genderFor } from "@/lib/sfx";
 import { useGame, type SaveSlot } from "@/game/store";
 import { StatBar, BatteryPill } from "@/components/hud/Bars";
@@ -382,7 +382,7 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
 }
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
 useGLTF.preload(soldierAsset.url);
-useGLTF.preload(michelleAsset.url);
+useGLTF.preload(soldierAsset.url);
 
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
