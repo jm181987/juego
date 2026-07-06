@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Sky, Stars, Text } from "@react-three/drei";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
-import hero0 from "@/assets/hero_0.png.asset.json";
-import hero1 from "@/assets/hero_1.png.asset.json";
-import hero2 from "@/assets/hero_2.png.asset.json";
-import hero3 from "@/assets/hero_3.png.asset.json";
+import soldierAsset from "@/assets/soldier.glb.asset.json";
+
+
 
 
 export const Route = createFileRoute("/")({
@@ -340,7 +339,9 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
   return false;
 }
 
-/* ---------------- HERO (photoreal sprite billboard from reference image) ---------------- */
+/* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
+useGLTF.preload(soldierAsset.url);
+
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
   facingRef: React.MutableRefObject<number>;
@@ -348,113 +349,90 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   walkPhaseRef: React.MutableRefObject<number>;
 }) {
   const group = useRef<THREE.Group>(null!);
-  const plane = useRef<THREE.Mesh>(null!);
   const shadowRef = useRef<THREE.Mesh>(null!);
-  const { camera } = useThree();
 
-  // Load the 4 reference frames as textures
-  const [tex0, tex1, tex2, tex3] = useLoader(THREE.TextureLoader, [
-    hero0.url, hero1.url, hero2.url, hero3.url,
-  ]);
-  const textures = useMemo(() => {
-    const list = [tex0, tex1, tex2, tex3];
-    for (const t of list) {
-      t.colorSpace = THREE.SRGBColorSpace;
-      t.magFilter = THREE.LinearFilter;
-      t.minFilter = THREE.LinearMipmapLinearFilter;
-      t.anisotropy = 8;
-      t.needsUpdate = true;
-    }
-    return list;
-  }, [tex0, tex1, tex2, tex3]);
+  // Load the rigged model. Clone the scene so multiple instances / re-renders
+  // don't share skeleton state.
+  const gltf = useGLTF(soldierAsset.url) as unknown as {
+    scene: THREE.Group;
+    animations: THREE.AnimationClip[];
+  };
+  const cloned = useMemo(() => {
+    // Deep clone with skeleton preserved
+    const src = gltf.scene;
+    const clone = src.clone(true);
+    clone.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) {
+        (o as THREE.Mesh).castShadow = true;
+        (o as THREE.Mesh).receiveShadow = true;
+      }
+    });
+    return clone;
+  }, [gltf.scene]);
 
-  // Sprite dimensions: keep hero ~2.4 units tall; width follows source aspect
-  const HERO_HEIGHT = 2.4;
-  const dims = useMemo(() => textures.map((t) => {
-    const img = t.image as HTMLImageElement | undefined;
-    const ar = img && img.width ? img.width / img.height : 0.42;
-    return { w: HERO_HEIGHT * ar, h: HERO_HEIGHT };
-  }), [textures]);
+  const { actions, mixer } = useAnimations(gltf.animations, cloned);
 
-  const prevWalk = useRef(0);
-  const frameIdx = useRef(0);
+  // The Soldier model ships with Idle, Walk, Run animations
+  const currentAction = useRef<string>("Idle");
+  const prevWalkPhase = useRef(0);
+
+  useEffect(() => {
+    const idle = actions["Idle"];
+    if (idle) { idle.reset().fadeIn(0.2).play(); }
+    return () => { Object.values(actions).forEach((a) => a?.stop()); };
+  }, [actions]);
+
+  const switchTo = (name: string, fade = 0.2, timeScale = 1) => {
+    if (currentAction.current === name) return;
+    const next = actions[name];
+    const prev = actions[currentAction.current];
+    if (!next) return;
+    next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).fadeIn(fade).play();
+    if (prev) prev.fadeOut(fade);
+    currentAction.current = name;
+  };
 
   useFrame((_state, dt) => {
-    if (!group.current || !plane.current) return;
+    if (!group.current) return;
 
-    // Anchor sprite: feet at posRef.y, so plane center at posRef.y + HERO_HEIGHT/2
-    group.current.position.set(posRef.current.x, posRef.current.y + HERO_HEIGHT / 2 - 0.05, posRef.current.z);
+    // Position + facing. Soldier model's forward is -Z; add PI so facingRef aligns.
+    group.current.position.set(posRef.current.x, posRef.current.y, posRef.current.z);
+    group.current.rotation.y = facingRef.current + Math.PI;
 
-    // Billboard: rotate plane to face camera (yaw only so feet stay on ground)
-    const dx = camera.position.x - group.current.position.x;
-    const dz = camera.position.z - group.current.position.z;
-    plane.current.rotation.y = Math.atan2(dx, dz);
-
-    // Frame selection
     const wp = walkPhaseRef.current;
-    const walking = Math.abs(wp - prevWalk.current) > 0.0005;
-    prevWalk.current = wp;
+    const walking = Math.abs(wp - prevWalkPhase.current) > 0.0005;
+    prevWalkPhase.current = wp;
     const atk = attackingRef.current;
 
-    let idx: number;
     if (atk > 0) {
-      // Alternate attack/wind-up frames for slash motion
-      idx = atk > 0.5 ? 3 : 1;
+      // Punch-like: play Run animation at 2x for a quick striking motion (Soldier has no attack clip)
+      switchTo("Run", 0.08, 2.2);
     } else if (walking) {
-      // Cycle walk frames: 2 (running forward) ↔ 1 (mid-stride)
-      idx = Math.floor(wp * 4) % 2 === 0 ? 2 : 1;
+      switchTo("Run", 0.15, 1.4);
     } else {
-      idx = 0; // idle standing
+      switchTo("Idle", 0.25, 1);
     }
 
-    if (idx !== frameIdx.current) {
-      frameIdx.current = idx;
-      const mat = plane.current.material as THREE.MeshBasicMaterial;
-      mat.map = textures[idx];
-      mat.needsUpdate = true;
-      // Rescale plane to match this frame's aspect
-      const d = dims[idx];
-      plane.current.scale.set(d.w, d.h, 1);
-    }
+    mixer.update(dt);
 
-    // Flip sprite based on facing vs camera so hero appears to walk correctly
-    const facingVec = new THREE.Vector3(Math.sin(facingRef.current), 0, Math.cos(facingRef.current));
-    const camRight = new THREE.Vector3().subVectors(camera.position, group.current.position);
-    // rotate camRight 90deg (right-hand of camera->hero)
-    const right = new THREE.Vector3(-camRight.z, 0, camRight.x).normalize();
-    const side = facingVec.dot(right);
-    plane.current.scale.x = Math.abs(plane.current.scale.x) * (side >= 0 ? 1 : -1);
-
-    // Subtle vertical bob when moving
-    if (walking) group.current.position.y += Math.sin(wp * 20) * 0.03;
-
-    // Shadow follows on ground
     if (shadowRef.current) {
       shadowRef.current.position.set(posRef.current.x, posRef.current.y + 0.02, posRef.current.z);
     }
   });
 
-  const initial = dims[0];
   return (
-    <group ref={group}>
-      <mesh ref={plane} scale={[initial.w, initial.h, 1]}>
-        <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial
-          map={textures[0]}
-          transparent
-          alphaTest={0.35}
-          side={THREE.DoubleSide}
-          toneMapped={false}
-        />
-      </mesh>
-      {/* Ground shadow disc (rendered in world space, not billboarded) */}
+    <group>
+      <group ref={group} scale={1.05}>
+        <primitive object={cloned} />
+      </group>
       <mesh ref={shadowRef} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
-        <circleGeometry args={[0.55, 24]} />
+        <circleGeometry args={[0.6, 24]} />
         <meshBasicMaterial color="#000" transparent opacity={0.45} depthWrite={false} />
       </mesh>
     </group>
   );
 }
+
 
 
 /* ---------------- ENEMY ---------------- */
