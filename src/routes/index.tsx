@@ -526,6 +526,57 @@ function FloatingText({ ft }: { ft: FloatText }) {
   );
 }
 
+/* ---------------- SCARE FX ---------------- */
+function ScareFX({ scare, playerRef }: { scare?: WorldDef["scare"]; playerRef: React.MutableRefObject<THREE.Vector3> }) {
+  const flickerRef = useRef<THREE.PointLight>(null!);
+  const redRef = useRef<THREE.PointLight>(null!);
+  const whisperRef = useRef<THREE.Group>(null!);
+  const nextFlickerAt = useRef(0);
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (scare?.flicker && flickerRef.current) {
+      if (t > nextFlickerAt.current) {
+        flickerRef.current.intensity = Math.random() < 0.5 ? 0 : 3 + Math.random() * 4;
+        nextFlickerAt.current = t + 0.05 + Math.random() * 0.35;
+      }
+      flickerRef.current.position.set(playerRef.current.x + Math.sin(t * 0.7) * 6, playerRef.current.y + 4, playerRef.current.z + Math.cos(t * 0.5) * 6);
+    }
+    if (scare?.redLight && redRef.current) {
+      redRef.current.intensity = 1.5 + Math.sin(t * 4) * 1 + Math.random() * 0.5;
+      redRef.current.position.set(playerRef.current.x, playerRef.current.y + 3, playerRef.current.z);
+    }
+    if (scare?.whispers && whisperRef.current) {
+      whisperRef.current.position.set(playerRef.current.x + Math.sin(t * 0.3) * 8, playerRef.current.y + 2 + Math.sin(t * 0.9) * 1.5, playerRef.current.z + Math.cos(t * 0.4) * 8);
+      whisperRef.current.rotation.y = -Math.atan2(whisperRef.current.position.x - playerRef.current.x, whisperRef.current.position.z - playerRef.current.z);
+      const mat = (whisperRef.current.children[0] as THREE.Mesh)?.material as THREE.MeshBasicMaterial;
+      if (mat) mat.opacity = 0.15 + Math.abs(Math.sin(t * 0.8)) * 0.35;
+    }
+  });
+  return (
+    <>
+      {scare?.flicker && <pointLight ref={flickerRef} color="#e0d0ff" intensity={0} distance={20} />}
+      {scare?.redLight && <pointLight ref={redRef} color="#ff1010" intensity={1.5} distance={18} />}
+      {scare?.whispers && (
+        <group ref={whisperRef}>
+          <mesh>
+            <planeGeometry args={[1.6, 2.4]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.2} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0.25, 0.6, 0.02]}>
+            <sphereGeometry args={[0.09, 8, 8]} />
+            <meshBasicMaterial color="#ff2020" />
+          </mesh>
+          <mesh position={[-0.25, 0.6, 0.02]}>
+            <sphereGeometry args={[0.09, 8, 8]} />
+            <meshBasicMaterial color="#ff2020" />
+          </mesh>
+        </group>
+      )}
+    </>
+  );
+}
+
+
 /* ---------------- MAIN SCENE ---------------- */
 function Scene({
   world,
