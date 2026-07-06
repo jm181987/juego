@@ -186,7 +186,17 @@ function Index() {
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = true;
+    (ctx as any).imageSmoothingQuality = "high";
+
+    // Fullscreen sizing
+    const setCanvasSize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      ctx.imageSmoothingEnabled = true;
+      (ctx as any).imageSmoothingQuality = "high";
+    };
+    setCanvasSize();
 
     const world = buildWorld(stageIdx);
     const { LEVEL_W, LEVEL_H, stage } = world;
@@ -207,17 +217,22 @@ function Index() {
     let stageCompleted = false;
 
     // Stars for sky theme
-    const stars: { x: number; y: number; s: number; tw: number }[] = [];
-    if (stage.theme === "sky") {
-      for (let i = 0; i < 120; i++) {
-        stars.push({
-          x: Math.random() * LEVEL_W,
-          y: Math.random() * canvas.height * 0.7,
-          s: Math.random() * 2 + 0.5,
-          tw: Math.random() * Math.PI * 2,
-        });
+    let stars: { x: number; y: number; s: number; tw: number }[] = [];
+    const rebuildStars = () => {
+      stars = [];
+      if (stage.theme === "sky") {
+        for (let i = 0; i < 180; i++) {
+          stars.push({
+            x: Math.random() * LEVEL_W,
+            y: Math.random() * canvas.height * 0.7,
+            s: Math.random() * 2 + 0.5,
+            tw: Math.random() * Math.PI * 2,
+          });
+        }
       }
-    }
+    };
+    rebuildStars();
+
 
     // ---------- Sprite / background caches ----------
     function makeCanvas(w: number, h: number) {
