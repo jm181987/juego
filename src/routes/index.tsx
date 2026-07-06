@@ -469,27 +469,33 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const { actions } = useAnimations(gltf.animations, cloned);
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
   const currentAction = useRef<string>("");
   const prevWalkPhase = useRef(0);
 
   const switchTo = (name: string, fade = 0.2, timeScale = 1) => {
-    const next = actions[name];
+    const next = actionsRef.current[name];
     if (!next) return;
     if (currentAction.current === name) {
       next.setEffectiveTimeScale(timeScale);
       return;
     }
-    const prev = actions[currentAction.current];
+    const prev = actionsRef.current[currentAction.current];
     next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).fadeIn(fade).play();
     if (prev) prev.fadeOut(fade);
     currentAction.current = name;
   };
 
+  // Bind Idle once on mount. Do NOT re-bind on re-render — that causes a
+  // brief T-pose flash when the parent forces a rerender (e.g. after killing
+  // an enemy) because cleanup stops every action for a frame.
   useEffect(() => {
     switchTo("Idle", 0);
-    return () => { Object.values(actions).forEach((a) => a?.stop()); };
+    return () => { Object.values(actionsRef.current).forEach((a) => a?.stop()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions]);
+  }, []);
+
 
   // Priority 1: run AFTER the animation mixer so our bone offsets aren't
   // overwritten by the clip evaluator.
