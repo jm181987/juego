@@ -641,33 +641,44 @@ function Scene({
 
   const potPrev = useRef({ q: false, e: false });
 
-  // Mouse look + click to attack
+  // Mouse look + click to attack. Works with pointer lock; falls back to
+  // cursor position relative to canvas center when lock is unavailable (iframes).
   const yawRef = useRef(0);
   useEffect(() => {
-    const canvas = document.querySelector("canvas");
+    const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
     if (!canvas) return;
+    let locked = false;
     const onMove = (e: MouseEvent) => {
-      if (document.pointerLockElement === canvas) {
+      if (locked && document.pointerLockElement === canvas) {
         yawRef.current -= e.movementX * 0.0035;
+      } else {
+        // Fallback: aim by cursor horizontal offset from canvas center
+        const rect = canvas.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const dx = e.clientX - cx;
+        yawRef.current -= (dx / rect.width) * 0.08;
       }
     };
     const onDown = (e: MouseEvent) => {
-      if (document.pointerLockElement !== canvas) {
-        (canvas as HTMLCanvasElement).requestPointerLock?.();
-        return;
+      if (e.button !== 0) return;
+      if (!locked) {
+        try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
       }
-      if (e.button === 0) keysRef.current.attack = true;
+      keysRef.current.attack = true;
     };
     const onUp = (e: MouseEvent) => {
       if (e.button === 0) keysRef.current.attack = false;
     };
+    const onLockChange = () => { locked = document.pointerLockElement === canvas; };
     document.addEventListener("mousemove", onMove);
     canvas.addEventListener("mousedown", onDown as any);
     window.addEventListener("mouseup", onUp);
+    document.addEventListener("pointerlockchange", onLockChange);
     return () => {
       document.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mousedown", onDown as any);
       window.removeEventListener("mouseup", onUp);
+      document.removeEventListener("pointerlockchange", onLockChange);
     };
   }, [keysRef]);
 
@@ -958,6 +969,114 @@ function Scene({
   );
 }
 
+/* ---------------- MUSIC (procedural dark ambient per world) ---------------- */
+function useAmbientMusic(active: boolean, worldIdx: number, difficulty: number) {
+  useEffect(() => {
+    if (!active) return;
+    const AC = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext | undefined;
+    if (!AC) return;
+    let ctx: AudioContext;
+    try { ctx = new AC(); } catch { return; }
+
+    // Per-world palette: root freq + chord intervals + tempo + filter
+    const palettes: { root: number; intervals: number[]; filter: number; wave: OscillatorType; drumRate: number }[] = [
+      { root: 110, intervals: [0, 7, 12], filter: 700, wave: "sawtooth", drumRate: 2.0 },   // Bosque
+      { root: 92,  intervals: [0, 3, 10], filter: 500, wave: "triangle", drumRate: 1.5 },   // Cementerio
+      { root: 82,  intervals: [0, 6, 10], filter: 900, wave: "sawtooth", drumRate: 2.6 },   // Cavernas
+      { root: 73,  intervals: [0, 3, 6],  filter: 600, wave: "square",   drumRate: 2.2 },   // Cripta
+      { root: 130, intervals: [0, 4, 11], filter: 800, wave: "triangle", drumRate: 1.8 },   // Cielos
+      { root: 65,  intervals: [0, 1, 6],  filter: 450, wave: "sawtooth", drumRate: 2.4 },   // Vacío
+      { root: 98,  intervals: [0, 3, 8],  filter: 750, wave: "triangle", drumRate: 2.8 },   // Hielo
+      { root: 55,  intervals: [0, 1, 6, 10], filter: 400, wave: "sawtooth", drumRate: 3.4 }, // Abismo
+    ];
+    const p = palettes[Math.min(worldIdx, palettes.length - 1)];
+
+    const master = ctx.createGain();
+    master.gain.value = 0;
+    master.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 1.2);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = p.filter;
+    filter.Q.value = 4;
+    filter.connect(master);
+    master.connect(ctx.destination);
+
+    // Drone chord
+    const oscs: OscillatorNode[] = [];
+    const gains: GainNode[] = [];
+    p.intervals.forEach((semi, i) => {
+      const o = ctx.createOscillator();
+      o.type = p.wave;
+      o.frequency.value = p.root * Math.pow(2, semi / 12);
+      const g = ctx.createGain();
+      g.gain.value = 0.15 / (i + 1);
+      // Slow detune LFO for eeriness
+      const lfo = ctx.createOscillator();
+      const lfoGain = ctx.createGain();
+      lfo.frequency.value = 0.1 + i * 0.07;
+      lfoGain.gain.value = 4;
+      lfo.connect(lfoGain).connect(o.detune);
+      lfo.start();
+      o.connect(g).connect(filter);
+      o.start();
+      oscs.push(o); gains.push(g);
+    });
+
+    // Heartbeat / drum pulse, faster with difficulty
+    const bpm = 40 + difficulty * 8;
+    const beatInt = 60 / bpm;
+    let beatTimer: ReturnType<typeof setInterval> | null = null;
+    const kick = () => {
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.setValueAtTime(90, t);
+      o.frequency.exponentialRampToValueAtTime(35, t + 0.25);
+      g.gain.setValueAtTime(0.35, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      o.connect(g).connect(master);
+      o.start(t); o.stop(t + 0.4);
+    };
+    beatTimer = setInterval(kick, beatInt * 1000);
+
+    // Occasional dissonant stab
+    const stabTimer = setInterval(() => {
+      if (Math.random() > 0.3) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sawtooth";
+      o.frequency.value = p.root * Math.pow(2, (p.intervals[1] + 1) / 12) * 2;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+      o.connect(g).connect(filter);
+      o.start(t); o.stop(t + 1.3);
+    }, 3500);
+
+    // Resume on user gesture (autoplay policy)
+    const resume = () => { ctx.resume().catch(() => {}); };
+    window.addEventListener("pointerdown", resume);
+    window.addEventListener("keydown", resume);
+    resume();
+
+    return () => {
+      if (beatTimer) clearInterval(beatTimer);
+      clearInterval(stabTimer);
+      window.removeEventListener("pointerdown", resume);
+      window.removeEventListener("keydown", resume);
+      try {
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+        setTimeout(() => { oscs.forEach((o) => { try { o.stop(); } catch {} }); ctx.close().catch(() => {}); }, 500);
+      } catch { /* noop */ }
+    };
+  }, [active, worldIdx, difficulty]);
+}
+
+
+
 /* ---------------- HUD ---------------- */
 function Bar({ value, max, color, label }: { value: number; max: number; color: string; label: string }) {
   const pct = Math.max(0, Math.min(1, value / max));
@@ -981,6 +1100,7 @@ function Index() {
   const statsRef = useRef<Stats>(initialStats());
   const keysRef = useKeys();
   const world = WORLDS[worldIdx];
+  useAmbientMusic(status === "play", worldIdx, world.difficulty);
   const checkpointRef = useRef<Vec3>(world.spawn);
 
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
