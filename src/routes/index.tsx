@@ -753,6 +753,29 @@ function Index() {
       const gpPressed = gpBtn && !player.prevGP;
       player.prevJump = jump; player.prevAttack = attackBtn; player.prevGP = gpBtn;
 
+      // Potion use — Q = HP potion, E = MP potion
+      const qPressed = !!keys["KeyQ"] && !(player as any).prevQ;
+      const ePressed = !!keys["KeyE"] && !(player as any).prevE;
+      (player as any).prevQ = !!keys["KeyQ"];
+      (player as any).prevE = !!keys["KeyE"];
+      if (qPressed && stats.hpPotions > 0 && stats.hp < stats.maxHp) {
+        stats.hpPotions--; stats.hp = Math.min(stats.maxHp, stats.hp + Math.floor(stats.maxHp * 0.5));
+        floatText(player.x + player.w/2, player.y - 4, "+HP", "#7ee085");
+        addParticles(player.x + player.w/2, player.y + player.h/2, 14, {
+          color: "#7ee085", size: 3, life: 30, speed: 3, gravity: -0.05, shape: "star",
+        });
+        hudTick();
+      }
+      if (ePressed && stats.mpPotions > 0 && stats.mp < stats.maxMp) {
+        stats.mpPotions--; stats.mp = Math.min(stats.maxMp, stats.mp + Math.floor(stats.maxMp * 0.6));
+        floatText(player.x + player.w/2, player.y - 4, "+MP", "#4ac1ff");
+        addParticles(player.x + player.w/2, player.y + player.h/2, 14, {
+          color: "#4ac1ff", size: 3, life: 30, speed: 3, gravity: -0.05, shape: "star",
+        });
+        hudTick();
+      }
+
+
       // Crouch
       player.crouching = player.onGround && down && player.groundPound === 0 && !player.diving;
 
