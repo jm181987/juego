@@ -489,18 +489,18 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       swordRef.current.quaternion.copy(tmpQuat).multiply(handOffsetQuat);
     }
 
-    // Same treatment for the flashlight held in the left hand.
+    // Flashlight: follow the left hand position, but keep it always aimed to
+    // where the character is facing (hero-forward = local -Z), so the beam
+    // never swings around with hand animation.
     if (b.leftHand && flashlightRef.current && group.current) {
       b.leftHand.getWorldPosition(tmpPos);
-      b.leftHand.getWorldQuaternion(tmpQuat);
       group.current.worldToLocal(tmpPos);
-      group.current.getWorldQuaternion(tmpParentQuat).invert();
-      tmpQuat.premultiply(tmpParentQuat);
-      tmpOffset.copy(flashOffsetPos).applyQuaternion(tmpQuat);
+      tmpOffset.set(0.06, -0.02, -0.08); // slight offset forward of the hand
       flashlightRef.current.position.copy(tmpPos).add(tmpOffset);
-      flashlightRef.current.quaternion.copy(tmpQuat).multiply(flashOffsetQuat);
+      flashlightRef.current.rotation.set(Math.PI / 2, 0, 0);
     }
   });
+
 
 
   const spotRef = useRef<THREE.SpotLight>(null!);
