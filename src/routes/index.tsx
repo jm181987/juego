@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
@@ -390,12 +390,16 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 }) {
   const group = useRef<THREE.Group>(null!);
   const swordRef = useRef<THREE.Group>(null!);
+  const hairRef = useRef<THREE.Group>(null!);
+  const skirtRef = useRef<THREE.Group>(null!);
   const bonesRef = useRef<{
     rightArm?: THREE.Object3D;
     rightForeArm?: THREE.Object3D;
     spine1?: THREE.Object3D;
     rightHand?: THREE.Object3D;
     leftHand?: THREE.Object3D;
+    head?: THREE.Object3D;
+    hips?: THREE.Object3D;
     base: {
       rightArm?: THREE.Euler;
       rightForeArm?: THREE.Euler;
@@ -440,6 +444,8 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       else if (name === "mixamorigSpine1") bonesRef.current.spine1 = o;
       else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
       else if (name === "mixamorigLeftHand") bonesRef.current.leftHand = o;
+      else if (name === "mixamorigHead") bonesRef.current.head = o;
+      else if (name === "mixamorigHips") bonesRef.current.hips = o;
     });
   }, [cloned]);
 
@@ -463,27 +469,33 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const { actions } = useAnimations(gltf.animations, cloned);
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
   const currentAction = useRef<string>("");
   const prevWalkPhase = useRef(0);
 
   const switchTo = (name: string, fade = 0.2, timeScale = 1) => {
-    const next = actions[name];
+    const next = actionsRef.current[name];
     if (!next) return;
     if (currentAction.current === name) {
       next.setEffectiveTimeScale(timeScale);
       return;
     }
-    const prev = actions[currentAction.current];
+    const prev = actionsRef.current[currentAction.current];
     next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).fadeIn(fade).play();
     if (prev) prev.fadeOut(fade);
     currentAction.current = name;
   };
 
+  // Bind Idle once on mount. Do NOT re-bind on re-render — that causes a
+  // brief T-pose flash when the parent forces a rerender (e.g. after killing
+  // an enemy) because cleanup stops every action for a frame.
   useEffect(() => {
     switchTo("Idle", 0);
-    return () => { Object.values(actions).forEach((a) => a?.stop()); };
+    return () => { Object.values(actionsRef.current).forEach((a) => a?.stop()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions]);
+  }, []);
+
 
   // Priority 1: run AFTER the animation mixer so our bone offsets aren't
   // overwritten by the clip evaluator.
@@ -511,9 +523,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const tmpQuat = useRef(new THREE.Quaternion()).current;
   const tmpParentQuat = useRef(new THREE.Quaternion()).current;
   const tmpOffset = useRef(new THREE.Vector3()).current;
-  const handOffsetPos = useRef(new THREE.Vector3(0.04, -0.03, 0.03)).current;
+  // Palm sits ~15cm past the wrist along the fingers (+Y in Mixamo hand
+  // local space). Rotating the sword -90° around Z aligns its +Y (blade) with
+  // the hand's +X (grip axis when the fingers curl around the hilt), so the
+  // hilt sits inside the palm and the blade extends forward.
+  const handOffsetPos = useRef(new THREE.Vector3(0, 0.14, 0)).current;
   const handOffsetQuat = useRef(
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, -Math.PI / 2, Math.PI / 2)),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2)),
   ).current;
 
   useFrame(() => {
@@ -566,6 +582,26 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       flashlightRef.current.position.copy(tmpPos).add(tmpOffset);
       flashlightRef.current.rotation.set(Math.PI / 2, 0, 0);
     }
+
+    // Female overlays: hair follows the head bone, skirt follows the hips.
+    if (b.head && hairRef.current && group.current) {
+      b.head.getWorldPosition(tmpPos);
+      b.head.getWorldQuaternion(tmpQuat);
+      group.current.worldToLocal(tmpPos);
+      group.current.getWorldQuaternion(tmpParentQuat).invert();
+      tmpQuat.premultiply(tmpParentQuat);
+      hairRef.current.position.copy(tmpPos);
+      hairRef.current.quaternion.copy(tmpQuat);
+    }
+    if (b.hips && skirtRef.current && group.current) {
+      b.hips.getWorldPosition(tmpPos);
+      b.hips.getWorldQuaternion(tmpQuat);
+      group.current.worldToLocal(tmpPos);
+      group.current.getWorldQuaternion(tmpParentQuat).invert();
+      tmpQuat.premultiply(tmpParentQuat);
+      skirtRef.current.position.copy(tmpPos);
+      skirtRef.current.quaternion.copy(tmpQuat);
+    }
   });
 
 
@@ -587,8 +623,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const lightActive = flashlightOn && battery > 0;
   const lightIntensity = lightActive ? 16 * Math.min(1, battery / 30) : 0;
 
+  const isFemale = appearance.gender === "female";
+  const scaleX = 1.05 * appearance.build * (isFemale ? 0.9 : 1);
+  const scaleY = 1.05 * appearance.height * (isFemale ? 1.02 : 1);
+  const scaleZ = 1.05 * appearance.build * (isFemale ? 0.88 : 1);
+
   return (
-    <group ref={group} scale={[1.05 * appearance.build, 1.05 * appearance.height, 1.05 * appearance.build]}>
+    <group ref={group} scale={[scaleX, scaleY, scaleZ]}>
       <primitive object={cloned} />
       {/* Linterna sujeta por la mano izquierda: cuerpo + haz de luz hacia adelante */}
       <group ref={flashlightRef} visible={lightActive}>
@@ -647,9 +688,49 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           <meshStandardMaterial color="#4a3218" metalness={0.7} roughness={0.4} />
         </mesh>
       </group>
+
+      {/* Female overlays — head-bone-locked long hair + hips-bone-locked skirt. */}
+      <group ref={hairRef} visible={isFemale}>
+        {/* Back hair mass */}
+        <mesh castShadow position={[0, -0.02, -0.08]}>
+          <sphereGeometry args={[0.16, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.75]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+        {/* Ponytail down the back */}
+        <mesh castShadow position={[0, -0.25, -0.14]}>
+          <capsuleGeometry args={[0.055, 0.35, 4, 8]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+        {/* Side locks */}
+        <mesh castShadow position={[-0.13, -0.1, 0.02]}>
+          <boxGeometry args={[0.06, 0.28, 0.09]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+        <mesh castShadow position={[0.13, -0.1, 0.02]}>
+          <boxGeometry args={[0.06, 0.28, 0.09]} />
+          <meshStandardMaterial color={appearance.hairTint} roughness={1} />
+        </mesh>
+      </group>
+      <group ref={skirtRef} visible={isFemale}>
+        <mesh castShadow position={[0, -0.28, 0]}>
+          <coneGeometry args={[0.42, 0.55, 16, 1, true]} />
+          <meshStandardMaterial color={appearance.clothTint} roughness={0.95} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, -0.54, 0]}>
+          <torusGeometry args={[0.4, 0.02, 6, 20]} />
+          <meshStandardMaterial color={appearance.accentTint} metalness={0.5} roughness={0.5} />
+        </mesh>
+      </group>
     </group>
   );
 }
+
+const MageMemo = React.memo(Mage);
+
+
+
+
+
 
 
 
@@ -667,17 +748,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 function EnemyMesh({ e }: { e: Enemy }) {
   const ref = useRef<THREE.Group>(null!);
   const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
-  const bodyMatRef = useRef<THREE.MeshStandardMaterial>(null!);
-  const accentMatRef = useRef<THREE.MeshStandardMaterial>(null!);
-  const cfg = useMemo(() => {
-    if (e.kind === "brute") {
-      return { scale: 1.25, body: "#2a1a12", accent: "#ff3018", weapon: "greatsword" as const };
-    }
-    if (e.kind === "wraith") {
-      return { scale: 1.05, body: "#24142f", accent: "#7cf9ff", weapon: "staff" as const };
-    }
-    return { scale: 0.95, body: "#1a1410", accent: "#ff6a22", weapon: "sword" as const };
-  }, [e.kind]);
+  const leftArm = useRef<THREE.Group>(null!);
+  const rightArm = useRef<THREE.Group>(null!);
+  const leftLeg = useRef<THREE.Group>(null!);
+  const rightLeg = useRef<THREE.Group>(null!);
+  const head = useRef<THREE.Group>(null!);
+  const phase = useRef(Math.random() * 10);
+  const baseScale = e.kind === "brute" ? 1.15 : e.kind === "wraith" ? 1.0 : 0.95;
 
   useFrame((_state, dt) => {
     if (!ref.current) return;
@@ -688,101 +765,33 @@ function EnemyMesh({ e }: { e: Enemy }) {
     const dz = e.pos.z - lastPos.current.z;
     const speed = Math.hypot(dx, dz) / Math.max(dt, 0.0001);
     if (Math.abs(dx) + Math.abs(dz) > 0.0005) {
-      // Model faces +Z by default; +PI so it looks toward its travel direction.
       ref.current.rotation.y = Math.atan2(dx, dz) + Math.PI;
     }
     lastPos.current.set(e.pos.x, e.pos.y, e.pos.z);
 
+    const stride = Math.min(1, speed / 3);
+    phase.current += dt * (2 + stride * 5);
+    const swing = Math.sin(phase.current) * (0.15 + stride * 0.7);
+    if (leftArm.current) leftArm.current.rotation.x = swing;
+    if (rightArm.current) rightArm.current.rotation.x = -swing;
+    if (leftLeg.current) leftLeg.current.rotation.x = -swing * 0.9;
+    if (rightLeg.current) rightLeg.current.rotation.x = swing * 0.9;
+    if (head.current) head.current.rotation.z = Math.sin(phase.current * 0.5) * 0.04;
+
     const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
-    if (bodyMatRef.current) {
-      bodyMatRef.current.emissiveIntensity = 0.2 + flash * 1.5;
-    }
-    if (accentMatRef.current) {
-      accentMatRef.current.emissiveIntensity = 0.6 + flash * 2.2 + Math.sin(performance.now() * 0.006 + e.id) * 0.12;
-    }
+    ref.current.scale.setScalar(baseScale * (1 + flash * 0.08));
   });
 
+  const limbs = { s: 1, leftArm, rightArm, leftLeg, rightLeg, head };
   return (
-    <group ref={ref} scale={cfg.scale}>
-      <mesh position={[0, 0.9, 0]} castShadow>
-        <capsuleGeometry args={[0.32, 0.85, 4, 10]} />
-        <meshStandardMaterial ref={bodyMatRef} color={cfg.body} emissive={cfg.body} emissiveIntensity={0.2} roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 1.62, 0]} castShadow>
-        <sphereGeometry args={[0.23, 14, 12]} />
-        <meshStandardMaterial color={cfg.body} emissive={cfg.body} emissiveIntensity={0.22} roughness={1} />
-      </mesh>
-      <mesh position={[-0.07, 1.64, 0.2]}>
-        <sphereGeometry args={[0.028, 8, 8]} />
-        <meshStandardMaterial ref={accentMatRef} color={cfg.accent} emissive={cfg.accent} emissiveIntensity={0.8} />
-      </mesh>
-      <mesh position={[0.07, 1.64, 0.2]}>
-        <sphereGeometry args={[0.028, 8, 8]} />
-        <meshStandardMaterial color={cfg.accent} emissive={cfg.accent} emissiveIntensity={0.8} />
-      </mesh>
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.7, 20]} />
-        <meshBasicMaterial color={cfg.accent} transparent opacity={0.16} depthWrite={false} />
-      </mesh>
-
-      {cfg.weapon === "sword" && (
-        <group position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
-          <mesh position={[0, -0.15, 0]} castShadow>
-            <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
-            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.02, 0]} castShadow>
-            <boxGeometry args={[0.38, 0.055, 0.07]} />
-            <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 0.7, 0]} castShadow>
-            <boxGeometry args={[0.08, 1.25, 0.02]} />
-            <meshStandardMaterial color="#b8bcc4" metalness={0.85} roughness={0.3} />
-          </mesh>
-        </group>
-      )}
-
-      {cfg.weapon === "greatsword" && (
-        <group position={[0.6, 1.05, 0.15]} rotation={[0, 0, -0.55]}>
-          <mesh position={[0, -0.2, 0]} castShadow>
-            <cylinderGeometry args={[0.05, 0.05, 0.4, 10]} />
-            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.02, 0]} castShadow>
-            <boxGeometry args={[0.5, 0.07, 0.08]} />
-            <meshStandardMaterial color="#a8862a" metalness={0.75} roughness={0.35} />
-          </mesh>
-          <mesh position={[0, 1.0, 0]} castShadow>
-            <boxGeometry args={[0.11, 1.85, 0.025]} />
-            <meshStandardMaterial color="#d0d4dc" metalness={0.9} roughness={0.2} />
-          </mesh>
-          <mesh position={[0, 1.95, 0]} castShadow>
-            <coneGeometry args={[0.055, 0.22, 4]} />
-            <meshStandardMaterial color="#d0d4dc" metalness={0.9} roughness={0.2} />
-          </mesh>
-        </group>
-      )}
-
-      {cfg.weapon === "staff" && (
-        <group position={[0.5, 1.1, 0.15]} rotation={[0, 0, -0.5]}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.03, 0.035, 1.9, 8]} />
-            <meshStandardMaterial color="#3a2410" roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 0.98, 0]} castShadow>
-            <torusGeometry args={[0.09, 0.022, 6, 14]} />
-            <meshStandardMaterial color="#3a2410" roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 1.06, 0]}>
-            <sphereGeometry args={[0.08, 12, 12]} />
-            <meshStandardMaterial color="#a060ff" emissive="#a060ff" emissiveIntensity={1.1} roughness={0.2} />
-          </mesh>
-        </group>
-      )}
+    <group ref={ref} scale={baseScale}>
+      {e.kind === "goblin" && <GoblinBody {...limbs} />}
+      {e.kind === "wraith" && <WraithBody {...limbs} id={e.id} />}
+      {e.kind === "brute" && <BruteBody {...limbs} />}
 
       {/* Health bar */}
       {e.alive && e.hp < e.maxHp && (
-        <group position={[0, 2.4, 0]}>
+        <group position={[0, 3, 0]}>
           <mesh>
             <planeGeometry args={[1, 0.12]} />
             <meshBasicMaterial color="#200" />
@@ -1969,7 +1978,7 @@ function Scene({
       {/* Goal */}
       <Goal pos={world.goal} />
       {/* Mage */}
-      <Mage posRef={pos} facingRef={facing} attackingRef={attackTimer} walkPhaseRef={walkPhase} />
+      <MageMemo posRef={pos} facingRef={facing} attackingRef={attackTimer} walkPhaseRef={walkPhase} />
       {/* Floating texts */}
       {floats.current.map((f) => (
         <FloatingText key={f.id} ft={f} />
