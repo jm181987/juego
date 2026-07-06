@@ -1778,6 +1778,23 @@ function Scene({
 
   useFrame((state, dt) => {
     dt = Math.min(dt, 0.05);
+    // Pause: skip all game logic while a menu is open.
+    const gs = useGame.getState();
+    if (gs.paused) return;
+    gs.addPlaytime(dt);
+
+    // Stamina / battery drain — cheap direct set via getState() to avoid
+    // React re-renders per frame; HUD reads the store on its own tick.
+    const running = keysRef.current.run && !!(keysRef.current.fwd || keysRef.current.back || keysRef.current.left || keysRef.current.right);
+    const canRun = running && gs.stamina > 5;
+    if (canRun) gs.setStamina(gs.stamina - dt * 22);
+    else if (!keysRef.current.attack) gs.setStamina(gs.stamina + dt * 14);
+    if (gs.flashlightOn) {
+      const nb = gs.battery - dt * 1.6;
+      gs.setBattery(nb);
+      if (nb <= 0) gs.setFlashlight(false);
+    }
+
     const k = keysRef.current;
     const st = statsRef.current;
 
@@ -1791,15 +1808,22 @@ function Scene({
     const inputLen = Math.hypot(mx, mz);
     // Player always faces the camera-forward direction (where the mouse is aiming)
     facing.current = camYaw + Math.PI;
+    // Expose to HUD (parent-owned refs)
+    sharedPosRef.current.x = pos.current.x;
+    sharedPosRef.current.y = pos.current.y;
+    sharedPosRef.current.z = pos.current.z;
+    sharedFacingRef.current = facing.current;
+    sharedEnemiesRef.current = enemies.current;
     // Air control: full speed on ground, slightly reduced smoothing in air
     const control = grounded.current ? 1 : AIR_CONTROL;
+    const speed = MOVE_SPEED * (canRun ? 1.55 : 1);
     if (inputLen > 0) {
       mx /= inputLen; mz /= inputLen;
       const s = Math.sin(camYaw), c = Math.cos(camYaw);
       const wx = mx * c + mz * s;
       const wz = -mx * s + mz * c;
-      const targetX = wx * MOVE_SPEED;
-      const targetZ = wz * MOVE_SPEED;
+      const targetX = wx * speed;
+      const targetZ = wz * speed;
       // Lerp toward target for snappy but not jittery movement
       const alpha = grounded.current ? 1 : 0.25 * control;
       vel.current.x = vel.current.x + (targetX - vel.current.x) * alpha;
@@ -1809,6 +1833,7 @@ function Scene({
       vel.current.x *= 0.6;
       vel.current.z *= 0.6;
     }
+
 
     // Coyote time + jump buffer
     coyoteTimer.current = grounded.current ? COYOTE_TIME : Math.max(0, coyoteTimer.current - dt);
