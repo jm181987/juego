@@ -491,18 +491,31 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   // Live re-tint whenever appearance changes.
   const appearance = useGame((s) => s.appearance);
   useEffect(() => {
-    const tintFor = (role: "cloth" | "skin" | "hair" | "accent") =>
-      role === "skin" ? appearance.skinTint
-      : role === "hair" ? appearance.hairTint
-      : role === "accent" ? appearance.accentTint
-      : appearance.clothTint;
+    // "Sensual" female override: vino/rojo profundo + acentos dorados y piel cálida.
+    const isFemale = appearanceGender === "female";
+    const sensualCloth = "#6b1420"; // vino intenso
+    const sensualAccent = "#d4a24a"; // dorado
+    const sensualSkin = "#d9a48a"; // piel cálida
+    const tintFor = (role: "cloth" | "skin" | "hair" | "accent") => {
+      if (isFemale) {
+        if (role === "cloth") return sensualCloth;
+        if (role === "accent") return sensualAccent;
+        if (role === "skin") return sensualSkin;
+      }
+      return role === "skin" ? appearance.skinTint
+        : role === "hair" ? appearance.hairTint
+        : role === "accent" ? appearance.accentTint
+        : appearance.clothTint;
+    };
     const tmp = new THREE.Color();
     for (const rec of matCacheRef.current) {
       tmp.set(tintFor(rec.role));
-      // Blend original toward tint (70% tint, 30% original) then darken slightly.
-      rec.mat.color.copy(rec.base).lerp(tmp, 0.7).multiplyScalar(0.9);
+      const blend = isFemale ? 0.85 : 0.7;
+      const darken = isFemale ? 0.95 : 0.9;
+      rec.mat.color.copy(rec.base).lerp(tmp, blend).multiplyScalar(darken);
     }
-  }, [appearance, cloned]);
+  }, [appearance, cloned, appearanceGender]);
+
 
   // (Female body pass removed: Michelle GLB is used directly for the female look.)
 
