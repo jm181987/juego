@@ -338,7 +338,6 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
   }
   return false;
 }
-
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
 useGLTF.preload(soldierAsset.url);
 
@@ -350,52 +349,58 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 }) {
   const group = useRef<THREE.Group>(null!);
   const shadowRef = useRef<THREE.Mesh>(null!);
+  const swordRef = useRef<THREE.Group>(null!);
 
-  // Load the rigged model. Clone the scene so multiple instances / re-renders
-  // don't share skeleton state.
-  const gltf = useGLTF(soldierAsset.url) as unknown as {
+  const { scene, animations } = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const cloned = useMemo(() => {
-    // Deep clone with skeleton preserved
-    const src = gltf.scene;
-    const clone = src.clone(true);
-    clone.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) {
-        (o as THREE.Mesh).castShadow = true;
-        (o as THREE.Mesh).receiveShadow = true;
+
+  // Prepare the model once: enable shadows and give it a darker heroic tint
+  useEffect(() => {
+    scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+        const mat = m.material as THREE.MeshStandardMaterial | undefined;
+        if (mat && "color" in mat && mat.color) {
+          // Darken slightly and add a subtle bronze tint for a grim look
+          mat.color.multiplyScalar(0.85);
+        }
       }
     });
-    return clone;
-  }, [gltf.scene]);
+  }, [scene]);
 
-  const { actions, mixer } = useAnimations(gltf.animations, cloned);
+  // Bind animations to our group ref — this is the canonical drei pattern.
+  const { actions } = useAnimations(animations, group);
 
-  // The Soldier model ships with Idle, Walk, Run animations
-  const currentAction = useRef<string>("Idle");
+  const currentAction = useRef<string>("");
   const prevWalkPhase = useRef(0);
 
-  useEffect(() => {
-    const idle = actions["Idle"];
-    if (idle) { idle.reset().fadeIn(0.2).play(); }
-    return () => { Object.values(actions).forEach((a) => a?.stop()); };
-  }, [actions]);
-
   const switchTo = (name: string, fade = 0.2, timeScale = 1) => {
-    if (currentAction.current === name) return;
     const next = actions[name];
-    const prev = actions[currentAction.current];
     if (!next) return;
+    if (currentAction.current === name) {
+      next.setEffectiveTimeScale(timeScale);
+      return;
+    }
+    const prev = actions[currentAction.current];
     next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).fadeIn(fade).play();
     if (prev) prev.fadeOut(fade);
     currentAction.current = name;
   };
 
-  useFrame((_state, dt) => {
+  useEffect(() => {
+    switchTo("Idle", 0);
+    return () => { Object.values(actions).forEach((a) => a?.stop()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actions]);
+
+  useFrame(() => {
     if (!group.current) return;
 
-    // Position + facing. Soldier model's forward is -Z; add PI so facingRef aligns.
+    // Follow the player position; face the aim direction.
     group.current.position.set(posRef.current.x, posRef.current.y, posRef.current.z);
     group.current.rotation.y = facingRef.current + Math.PI;
 
@@ -405,15 +410,17 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     const atk = attackingRef.current;
 
     if (atk > 0) {
-      // Punch-like: play Run animation at 2x for a quick striking motion (Soldier has no attack clip)
-      switchTo("Run", 0.08, 2.2);
+      switchTo("Run", 0.05, 2.4);
     } else if (walking) {
-      switchTo("Run", 0.15, 1.4);
+      switchTo("Run", 0.18, 1.35);
     } else {
-      switchTo("Idle", 0.25, 1);
+      switchTo("Idle", 0.22, 1);
     }
 
-    mixer.update(dt);
+    if (swordRef.current) {
+      const swing = atk > 0 ? Math.sin(atk * Math.PI) * 1.8 : 0;
+      swordRef.current.rotation.z = -0.6 - swing;
+    }
 
     if (shadowRef.current) {
       shadowRef.current.position.set(posRef.current.x, posRef.current.y + 0.02, posRef.current.z);
@@ -421,17 +428,41 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   });
 
   return (
-    <group>
+    <>
       <group ref={group} scale={1.05}>
-        <primitive object={cloned} />
+        <primitive object={scene} />
+        {/* Heroic sword bolted to the hero group (right-hand side) */}
+        <group ref={swordRef} position={[0.55, 1.0, 0.2]} rotation={[0, 0, -0.6]}>
+          {/* Grip */}
+          <mesh position={[0, -0.15, 0]} castShadow>
+            <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
+            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
+          </mesh>
+          {/* Crossguard */}
+          <mesh position={[0, 0.02, 0]} castShadow>
+            <boxGeometry args={[0.42, 0.06, 0.08]} />
+            <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
+          </mesh>
+          {/* Blade */}
+          <mesh position={[0, 0.75, 0]} castShadow>
+            <boxGeometry args={[0.09, 1.4, 0.02]} />
+            <meshStandardMaterial color="#c8ccd4" metalness={0.85} roughness={0.25} emissive="#3a4658" emissiveIntensity={0.15} />
+          </mesh>
+          {/* Pommel */}
+          <mesh position={[0, -0.32, 0]} castShadow>
+            <sphereGeometry args={[0.06, 12, 10]} />
+            <meshStandardMaterial color="#4a3218" metalness={0.7} roughness={0.4} />
+          </mesh>
+        </group>
       </group>
       <mesh ref={shadowRef} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
         <circleGeometry args={[0.6, 24]} />
-        <meshBasicMaterial color="#000" transparent opacity={0.45} depthWrite={false} />
+        <meshBasicMaterial color="#000" transparent opacity={0.5} depthWrite={false} />
       </mesh>
-    </group>
+    </>
   );
 }
+
 
 
 
