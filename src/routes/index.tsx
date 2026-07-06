@@ -357,12 +357,14 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     rightForeArm?: THREE.Object3D;
     spine1?: THREE.Object3D;
     rightHand?: THREE.Object3D;
+    leftHand?: THREE.Object3D;
     base: {
       rightArm?: THREE.Euler;
       rightForeArm?: THREE.Euler;
       spine1?: THREE.Euler;
     };
   }>({ base: {} });
+
 
   const gltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
