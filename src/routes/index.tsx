@@ -1128,6 +1128,62 @@ function Index() {
         for (let i = 0; i < h.w; i += step) {
           ctx.fillRect(x + i + step / 2 - 1, y + 2, 1, h.h - 4);
         }
+      } else if (h.kind === "lava") {
+        // Molten lava with animated surface + glow
+        const g = ctx.createLinearGradient(0, y, 0, y + h.h);
+        g.addColorStop(0, "#ffe680");
+        g.addColorStop(0.15, "#ff8a1a");
+        g.addColorStop(0.6, "#c8280a");
+        g.addColorStop(1, "#5a0a04");
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y + 2, h.w, h.h - 2);
+        // wavy surface
+        ctx.fillStyle = "#ffd94a";
+        ctx.beginPath();
+        ctx.moveTo(x, y + 4);
+        for (let i = 0; i <= h.w; i += 4) {
+          const wy = y + 3 + Math.sin((time * 0.15 + (h.x + i) * 0.08)) * 1.8;
+          ctx.lineTo(x + i, wy);
+        }
+        ctx.lineTo(x + h.w, y + 6); ctx.lineTo(x, y + 6);
+        ctx.closePath(); ctx.fill();
+        // glow
+        const glow = ctx.createRadialGradient(x + h.w / 2, y, 2, x + h.w / 2, y, h.w * 0.7);
+        glow.addColorStop(0, "rgba(255,180,60,0.35)");
+        glow.addColorStop(1, "rgba(255,120,0,0)");
+        ctx.fillStyle = glow;
+        ctx.fillRect(x - 8, y - 12, h.w + 16, 20);
+        // occasional embers
+        if (Math.random() < 0.15) {
+          addParticles(h.x + Math.random() * h.w, h.y + 2, 1, {
+            color: "#ffb04a", size: 2, life: 30, vy: -1.2 - Math.random(), vx: (Math.random() - 0.5) * 0.6, gravity: -0.02,
+          });
+        }
+      }
+    }
+
+    function drawCheckpoints() {
+      for (const cp of world.checkpoints) {
+        const x = Math.round(cp.x - cameraX);
+        const y = Math.round(cp.y - cameraY);
+        // pole
+        ctx.fillStyle = "#c0c8d4";
+        ctx.fillRect(x - 1, y - 4, 3, TILE * 4 + 4);
+        // top ball
+        ctx.fillStyle = cp.reached ? "#7ee085" : "#8090a0";
+        ctx.beginPath(); ctx.arc(x, y - 6, 5, 0, Math.PI * 2); ctx.fill();
+        // flag
+        const wave = Math.sin(time * 0.12 + cp.x * 0.01) * 3;
+        ctx.fillStyle = cp.reached ? "#22c55e" : "#94a3b8";
+        ctx.beginPath();
+        ctx.moveTo(x + 1, y);
+        ctx.lineTo(x + 26 + wave, y + 10);
+        ctx.lineTo(x + 1, y + 22);
+        ctx.closePath(); ctx.fill();
+        if (cp.reached) {
+          ctx.fillStyle = "#fff"; ctx.font = "bold 11px monospace";
+          ctx.fillText("✓", x + 8, y + 15);
+        }
       }
     }
 
