@@ -1228,13 +1228,16 @@ function Index() {
       } else if (wallSliding) {
         ctx.fillRect(18, 12, 5, 6); ctx.fillRect(-1, 18, 4, 5);
       } else if (walking) {
-        const armSwing = walkFrame % 2 === 0 ? 0 : 2;
+        const armSwing = Math.sin(walkPhase) * 2.2;
         ctx.fillRect(-1, 15 + armSwing, 4, 7);
         ctx.fillRect(19, 15 - armSwing, 4, 7);
       } else if (airborne) {
-        ctx.fillRect(-2, 11, 4, 7); ctx.fillRect(20, 11, 4, 7);
+        const t = Math.min(1, Math.abs(player.vy) / 10);
+        const up = player.vy < 0 ? 2 * t : 0;
+        ctx.fillRect(-2, 11 - up, 4, 7); ctx.fillRect(20, 11 - up, 4, 7);
       } else {
-        ctx.fillRect(-1, 16, 4, 7); ctx.fillRect(19, 16, 4, 7);
+        const breath = Math.sin(time * 0.08) * 0.4;
+        ctx.fillRect(-1, 16 + breath, 4, 7); ctx.fillRect(19, 16 + breath, 4, 7);
       }
 
       // Gloves (white)
