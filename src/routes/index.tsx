@@ -1100,6 +1100,7 @@ function Index() {
   const statsRef = useRef<Stats>(initialStats());
   const keysRef = useKeys();
   const world = WORLDS[worldIdx];
+  useAmbientMusic(status === "play", worldIdx, world.difficulty);
   const checkpointRef = useRef<Vec3>(world.spawn);
 
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
