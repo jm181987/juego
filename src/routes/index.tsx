@@ -1408,14 +1408,16 @@ function Index() {
       const attacking = player.attack > 0;
       const wallSliding = player.wallSlide > 0 && !player.onGround;
 
-      // Palette
-      const SKIN = "#f4c9a0", SKIN_SHADE = "#c99268", SKIN_DARK = "#a06a45";
-      const HAIR = "#2a140a";
-      const CAP_HI = "#ff5d5d", CAP = "#dc2020", CAP_LO = "#8b1010";
-      const OVR_HI = "#3d84f0", OVR = "#1e58cc", OVR_LO = "#123578";
-      const SHIRT_HI = "#ff5d5d", SHIRT = "#dc2020", SHIRT_LO = "#8b1010";
-      const SHOE_HI = "#6a3410", SHOE = "#3a1608", SHOE_SOLE = "#1a0804";
-      const GLOVE_HI = "#ffffff", GLOVE_SH = "#c8c8d0";
+      // Palette — mystic RPG hero
+      const SKIN = "#f0c8a0", SKIN_SHADE = "#c99268", SKIN_DARK = "#8a5030";
+      const ROBE_HI = "#6a4ac0", ROBE = "#3a1c88", ROBE_LO = "#1a0a4a";
+      const HOOD_HI = "#4a2ca0", HOOD = "#22106a", HOOD_LO = "#0a0430";
+      const TRIM = "#ffd94a", TRIM_LO = "#a97a10";
+      const BOOT_HI = "#5a3a1a", BOOT = "#2a1608", BOOT_SOLE = "#100804";
+      const BELT = "#3a1a08", BELT_BUCKLE = "#d0a840";
+      const STAFF = "#5a3a1a", STAFF_HI = "#a07530";
+      const ORB = "#7ee0ff", ORB_CORE = "#ffffff";
+      const SWORD_STEEL = "#e8ecf4", SWORD_EDGE = "#8090b0", SWORD_HILT = "#a97a10";
 
       const roundRect = (x: number, y: number, w: number, h: number, r: number) => {
         ctx.beginPath();
@@ -1432,74 +1434,82 @@ function Index() {
         return g;
       };
 
-      // ---- Head (drawn later on top of shoulders slightly) ----
-      // ---- BODY / TORSO ----
-      // Torso overalls (rounded)
-      ctx.fillStyle = linGrad(0, 28, 0, 50, [[0, OVR_HI], [0.35, OVR], [1, OVR_LO]]);
-      roundRect(6, 28, 32, 22, 6); ctx.fill();
+      // ---- CAPE behind (sways with speed) ----
+      const capeSway = Math.sin(time * 0.12) * 1.5 + player.vx * 0.4;
+      ctx.fillStyle = linGrad(0, 26, 0, 58, [[0, HOOD], [1, HOOD_LO]]);
+      ctx.beginPath();
+      ctx.moveTo(14, 28);
+      ctx.quadraticCurveTo(10 + capeSway, 42, 8 + capeSway, 58);
+      ctx.lineTo(36 - capeSway, 58);
+      ctx.quadraticCurveTo(34 - capeSway, 42, 30, 28);
+      ctx.closePath(); ctx.fill();
+      // Cape shine
+      ctx.strokeStyle = TRIM_LO; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(14, 30); ctx.quadraticCurveTo(11, 44, 9 + capeSway, 57); ctx.stroke();
 
-      // Red shirt visible at neckline and sleeves
-      ctx.fillStyle = linGrad(0, 26, 0, 38, [[0, SHIRT_HI], [1, SHIRT]]);
-      roundRect(14, 26, 16, 8, 4); ctx.fill();
+      // ---- ROBE / TORSO ----
+      ctx.fillStyle = linGrad(0, 26, 0, 52, [[0, ROBE_HI], [0.5, ROBE], [1, ROBE_LO]]);
+      // Flared robe body
+      ctx.beginPath();
+      ctx.moveTo(12, 28);
+      ctx.lineTo(32, 28);
+      ctx.quadraticCurveTo(36, 42, 38, 56);
+      ctx.lineTo(6, 56);
+      ctx.quadraticCurveTo(8, 42, 12, 28);
+      ctx.closePath(); ctx.fill();
+      // Gold trim at hem
+      ctx.strokeStyle = TRIM; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(6, 56); ctx.lineTo(38, 56); ctx.stroke();
+      // Central runic stripe
+      ctx.fillStyle = TRIM;
+      ctx.fillRect(21, 28, 2, 24);
+      ctx.fillStyle = TRIM_LO;
+      ctx.fillRect(22, 28, 1, 24);
+      // Rune marks
+      ctx.fillStyle = TRIM;
+      ctx.beginPath(); ctx.arc(22, 34, 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(22, 42, 1.2, 0, Math.PI * 2); ctx.fill();
+      // Belt
+      ctx.fillStyle = BELT;
+      ctx.fillRect(9, 42, 26, 3);
+      ctx.fillStyle = BELT_BUCKLE;
+      ctx.fillRect(20, 41.5, 4, 4);
+      ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.fillRect(21, 42.5, 2, 2);
 
-      // Overall straps
-      ctx.fillStyle = OVR;
-      roundRect(11, 26, 5, 10, 2); ctx.fill();
-      roundRect(28, 26, 5, 10, 2); ctx.fill();
-      // Strap highlight
-      ctx.fillStyle = OVR_HI;
-      ctx.fillRect(12, 27, 1, 8); ctx.fillRect(29, 27, 1, 8);
-
-      // Overall bib seam
-      ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.moveTo(22, 32); ctx.lineTo(22, 46); ctx.stroke();
-
-      // Yellow buttons (with shine)
-      const button = (bx: number, by: number) => {
-        ctx.fillStyle = "#ffcc22";
-        ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "#7a4400";
-        ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.stroke();
-        ctx.fillStyle = "rgba(255,255,255,0.7)";
-        ctx.beginPath(); ctx.arc(bx - 0.7, by - 0.7, 0.7, 0, Math.PI * 2); ctx.fill();
-      };
-      button(14, 36); button(30, 36);
-
-      // Torso shadow under head
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
-      roundRect(10, 27, 24, 4, 2); ctx.fill();
-
-      // ---- ARMS + GLOVES ----
-      const drawArm = (side: -1 | 1, shoulderY: number, elbowOffX: number, elbowOffY: number, gloveX: number, gloveY: number) => {
-        const sx = side === 1 ? 34 : 10;
-        // Sleeve (red)
-        ctx.strokeStyle = SHIRT; ctx.lineWidth = 6;
+      // ---- ARMS + SLEEVES ----
+      const drawArm = (side: -1 | 1, shoulderY: number, elbowOffX: number, elbowOffY: number, handX: number, handY: number, holdWeapon = false) => {
+        const sx = side === 1 ? 32 : 12;
+        // Sleeve (flared, robe color)
+        ctx.strokeStyle = ROBE; ctx.lineWidth = 7;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(sx, shoulderY);
-        ctx.quadraticCurveTo(sx + elbowOffX * side, shoulderY + elbowOffY, gloveX, gloveY);
+        ctx.quadraticCurveTo(sx + elbowOffX * side, shoulderY + elbowOffY, handX, handY);
         ctx.stroke();
         // Sleeve highlight
-        ctx.strokeStyle = SHIRT_HI; ctx.lineWidth = 1.6;
+        ctx.strokeStyle = ROBE_HI; ctx.lineWidth = 1.8;
         ctx.beginPath();
         ctx.moveTo(sx - side, shoulderY + 1);
-        ctx.quadraticCurveTo(sx + elbowOffX * side - side, shoulderY + elbowOffY, gloveX - side, gloveY - 1);
+        ctx.quadraticCurveTo(sx + elbowOffX * side - side, shoulderY + elbowOffY, handX - side, handY - 1);
         ctx.stroke();
-        // Glove
-        ctx.fillStyle = linGrad(gloveX - 4, gloveY - 4, gloveX + 4, gloveY + 4, [[0, GLOVE_HI], [1, GLOVE_SH]]);
-        ctx.beginPath(); ctx.arc(gloveX, gloveY, 4.2, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = 0.6; ctx.stroke();
-        // Thumb hint
-        ctx.fillStyle = GLOVE_SH;
-        ctx.beginPath(); ctx.arc(gloveX + side * 2.5, gloveY + 1.5, 1.6, 0, Math.PI * 2); ctx.fill();
+        // Cuff trim
+        ctx.strokeStyle = TRIM; ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.arc(handX, handY - 2, 4, 0, Math.PI * 2); ctx.stroke();
+        // Hand (skin)
+        ctx.fillStyle = SKIN_SHADE;
+        ctx.beginPath(); ctx.arc(handX, handY, 3.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = SKIN;
+        ctx.beginPath(); ctx.arc(handX - side * 0.6, handY - 0.6, 2, 0, Math.PI * 2); ctx.fill();
       };
 
       if (attacking) {
-        drawArm(1, 32, 8, 2, 48, 32);   // forward punch
-        drawArm(-1, 34, 4, 6, 2, 40);
+        drawArm(1, 30, 8, 2, 46, 30, true);
+        drawArm(-1, 34, 3, 8, 10, 44);
       } else if (crouched) {
-        drawArm(1, 34, 3, 6, 36, 44);
-        drawArm(-1, 34, 3, 6, 8, 44);
+        drawArm(1, 34, 3, 6, 34, 44);
+        drawArm(-1, 34, 3, 6, 10, 44);
       } else if (wallSliding) {
         drawArm(1, 30, 6, 4, 40, 34);
         drawArm(-1, 34, 3, 6, 6, 44);
@@ -1518,24 +1528,71 @@ function Index() {
         drawArm(-1, 32, 4, 8, 8, 44 + b);
       }
 
-      // ---- LEGS + SHOES ----
+      // ---- WEAPON ----
+      // Staff in idle/walk (left-forward hand), Sword swing during attack
+      if (attacking) {
+        // Magic sword (glowing)
+        const sxb = 46, syb = 30;
+        // Blade
+        ctx.save();
+        ctx.translate(sxb, syb);
+        ctx.rotate(-0.4);
+        const bg = ctx.createLinearGradient(0, -18, 0, 6);
+        bg.addColorStop(0, ORB_CORE); bg.addColorStop(0.5, SWORD_STEEL); bg.addColorStop(1, SWORD_EDGE);
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.moveTo(-2, -22); ctx.lineTo(2, -22); ctx.lineTo(3, 4); ctx.lineTo(-3, 4);
+        ctx.closePath(); ctx.fill();
+        // Glow along blade
+        ctx.fillStyle = `rgba(126,224,255,${0.4 + Math.sin(time * 0.4) * 0.2})`;
+        ctx.fillRect(-3, -22, 6, 26);
+        // Cross-guard
+        ctx.fillStyle = SWORD_HILT;
+        ctx.fillRect(-6, 4, 12, 2);
+        // Hilt
+        ctx.fillStyle = "#3a1808"; ctx.fillRect(-1.5, 6, 3, 5);
+        // Pommel
+        ctx.fillStyle = TRIM; ctx.beginPath(); ctx.arc(0, 12, 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      } else if (!wallSliding && !crouched) {
+        // Staff (long, held slanted)
+        const gx = walking ? 8 + Math.sin(walkPhase) * 3 : 8;
+        const gy = 44;
+        const topX = gx + 1;
+        const topY = 8;
+        // Shaft
+        ctx.strokeStyle = STAFF; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(topX, topY); ctx.stroke();
+        ctx.strokeStyle = STAFF_HI; ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(gx - 0.6, gy); ctx.lineTo(topX - 0.6, topY); ctx.stroke();
+        // Orb crown
+        const orbPulse = 0.4 + Math.sin(time * 0.18) * 0.15;
+        const og = ctx.createRadialGradient(topX, topY - 3, 0.5, topX, topY - 3, 6);
+        og.addColorStop(0, ORB_CORE); og.addColorStop(0.4, ORB); og.addColorStop(1, "rgba(126,224,255,0)");
+        ctx.fillStyle = og;
+        ctx.fillRect(topX - 8, topY - 11, 16, 16);
+        ctx.fillStyle = ORB;
+        ctx.beginPath(); ctx.arc(topX, topY - 3, 2.4 + orbPulse, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = ORB_CORE;
+        ctx.beginPath(); ctx.arc(topX - 0.6, topY - 3.6, 1, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ---- LEGS + BOOTS ----
       const drawLeg = (side: -1 | 1, thighDrop: number) => {
-        const hx = side === 1 ? 27 : 17;
-        const kx = hx;
-        const ky = 50;
+        const hx = side === 1 ? 26 : 18;
         const fx = hx + side * 1;
         const fy = 58 - thighDrop;
-        // Pant (overall)
-        ctx.strokeStyle = OVR; ctx.lineWidth = 7; ctx.lineCap = "round";
-        ctx.beginPath(); ctx.moveTo(hx, 46); ctx.quadraticCurveTo(kx, ky, fx, fy); ctx.stroke();
-        // Highlight
-        ctx.strokeStyle = OVR_HI; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.moveTo(hx - side, 47); ctx.quadraticCurveTo(kx - side, ky, fx - side, fy - 1); ctx.stroke();
-        // Shoe (rounded, with sole)
-        ctx.fillStyle = linGrad(fx - 6, fy - 3, fx - 6, fy + 4, [[0, SHOE_HI], [1, SHOE]]);
+        // Pant (dark, hidden mostly under robe)
+        ctx.strokeStyle = HOOD; ctx.lineWidth = 5; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(hx, 50); ctx.quadraticCurveTo(hx, 54, fx, fy); ctx.stroke();
+        // Boot
+        ctx.fillStyle = linGrad(fx - 6, fy - 3, fx - 6, fy + 4, [[0, BOOT_HI], [1, BOOT]]);
         roundRect(fx - 6, fy - 3, 12, 6, 3); ctx.fill();
-        ctx.fillStyle = SHOE_SOLE;
+        ctx.fillStyle = BOOT_SOLE;
         roundRect(fx - 7, fy + 2, 14, 2, 1); ctx.fill();
+        // Boot buckle
+        ctx.fillStyle = TRIM;
+        ctx.fillRect(fx - 2, fy - 1, 4, 1.4);
       };
 
       if (crouched) {
@@ -1550,110 +1607,65 @@ function Index() {
         drawLeg(1, 0); drawLeg(-1, 0);
       }
 
-      // ---- HEAD ----
-      // Neck shadow
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      roundRect(17, 24, 10, 4, 2); ctx.fill();
-
-      // Head base (skin)
-      ctx.fillStyle = linGrad(0, 6, 0, 26, [[0, SKIN], [1, SKIN_SHADE]]);
-      roundRect(9, 6, 26, 20, 9); ctx.fill();
-
-      // Ear
-      ctx.fillStyle = SKIN_SHADE;
-      ctx.beginPath(); ctx.ellipse(9, 17, 2, 3, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = SKIN_DARK;
-      ctx.beginPath(); ctx.ellipse(9, 17, 0.9, 1.6, 0, 0, Math.PI * 2); ctx.fill();
-
-      // Sideburn / hair
-      ctx.fillStyle = HAIR;
-      ctx.beginPath(); ctx.ellipse(11, 14, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(33, 14, 3, 5, 0, 0, Math.PI * 2); ctx.fill();
-
-      // Cap brim (front curve)
-      ctx.fillStyle = CAP_LO;
+      // ---- HEAD (partially in hood) ----
+      // Hood back layer
+      ctx.fillStyle = linGrad(0, -8, 0, 12, [[0, HOOD_HI], [0.5, HOOD], [1, HOOD_LO]]);
       ctx.beginPath();
-      ctx.moveTo(6, 10);
-      ctx.quadraticCurveTo(22, 14, 38, 10);
-      ctx.quadraticCurveTo(38, 12, 34, 13);
-      ctx.quadraticCurveTo(22, 15.5, 10, 13);
-      ctx.quadraticCurveTo(6, 12, 6, 10);
+      ctx.moveTo(8, 12);
+      ctx.quadraticCurveTo(6, -2, 22, -8);
+      ctx.quadraticCurveTo(38, -2, 36, 12);
+      ctx.quadraticCurveTo(30, 6, 22, 6);
+      ctx.quadraticCurveTo(14, 6, 8, 12);
       ctx.closePath(); ctx.fill();
 
-      // Cap dome (rounded top)
-      ctx.fillStyle = linGrad(0, -6, 0, 12, [[0, CAP_HI], [0.4, CAP], [1, CAP_LO]]);
+      // Face (in shadow)
+      ctx.fillStyle = linGrad(0, 8, 0, 24, [[0, SKIN_SHADE], [1, SKIN_DARK]]);
+      roundRect(12, 8, 20, 18, 7); ctx.fill();
+      // Inner hood shadow
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
       ctx.beginPath();
-      ctx.moveTo(9, 10);
-      ctx.quadraticCurveTo(9, -6, 22, -6);
-      ctx.quadraticCurveTo(35, -6, 35, 10);
-      ctx.quadraticCurveTo(22, 6, 9, 10);
+      ctx.moveTo(11, 8); ctx.quadraticCurveTo(22, 4, 33, 8); ctx.lineTo(33, 14); ctx.quadraticCurveTo(22, 10, 11, 14);
       ctx.closePath(); ctx.fill();
 
-      // Cap gloss highlight
-      ctx.fillStyle = "rgba(255,255,255,0.28)";
-      ctx.beginPath(); ctx.ellipse(15, 0, 4, 2, -0.5, 0, Math.PI * 2); ctx.fill();
-
-      // M emblem circle
+      // Glowing eyes (mystic)
+      const eyeGlow = 0.7 + Math.sin(time * 0.15) * 0.3;
+      ctx.fillStyle = `rgba(126,224,255,${eyeGlow})`;
+      ctx.beginPath(); ctx.arc(18, 16, 1.6, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(26, 16, 1.6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#ffffff";
-      ctx.beginPath(); ctx.arc(22, 3, 3.6, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 0.5; ctx.stroke();
-      ctx.fillStyle = CAP;
-      ctx.font = "bold 6px 'Arial Black', sans-serif";
-      ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText("M", 22, 3.6);
-      ctx.textAlign = "start"; ctx.textBaseline = "alphabetic";
+      ctx.beginPath(); ctx.arc(18, 16, 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(26, 16, 0.7, 0, Math.PI * 2); ctx.fill();
+      // Eye glow aura
+      ctx.fillStyle = `rgba(126,224,255,${eyeGlow * 0.25})`;
+      ctx.beginPath(); ctx.arc(18, 16, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(26, 16, 3.5, 0, Math.PI * 2); ctx.fill();
 
-      // Nose (big round)
-      ctx.fillStyle = linGrad(0, 14, 0, 22, [[0, SKIN], [1, SKIN_DARK]]);
-      ctx.beginPath(); ctx.ellipse(26, 19, 5, 4.2, 0, 0, Math.PI * 2); ctx.fill();
-      // Nose highlight
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.beginPath(); ctx.ellipse(24, 17.5, 1.6, 1, -0.4, 0, Math.PI * 2); ctx.fill();
+      // Nose hint
+      ctx.strokeStyle = "rgba(60,30,20,0.4)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(22, 18); ctx.lineTo(22, 21); ctx.stroke();
+      // Mouth line
+      ctx.strokeStyle = "rgba(40,20,10,0.6)"; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(20, 23); ctx.quadraticCurveTo(22, 24, 24, 23); ctx.stroke();
 
-      // Eye white
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.ellipse(20, 15, 2.4, 3, 0, 0, Math.PI * 2); ctx.fill();
-      // Iris
-      ctx.fillStyle = "#2a4fb5";
-      ctx.beginPath(); ctx.ellipse(20.5, 15.5, 1.5, 2, 0, 0, Math.PI * 2); ctx.fill();
-      // Pupil
-      ctx.fillStyle = "#000";
-      ctx.beginPath(); ctx.ellipse(20.5, 15.8, 0.8, 1.3, 0, 0, Math.PI * 2); ctx.fill();
-      // Eye shine
-      ctx.fillStyle = "#fff";
-      ctx.beginPath(); ctx.arc(20.2, 14.7, 0.5, 0, Math.PI * 2); ctx.fill();
-
-      // Eyebrow (thick, angled)
-      ctx.strokeStyle = HAIR; ctx.lineWidth = 2.2; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(17, 11.5); ctx.quadraticCurveTo(20, 10, 23, 11); ctx.stroke();
-
-      // Mustache — thick curly bushy under nose
-      ctx.fillStyle = HAIR;
+      // Hood front trim
+      ctx.strokeStyle = TRIM; ctx.lineWidth = 0.7;
       ctx.beginPath();
-      ctx.moveTo(13, 22);
-      ctx.quadraticCurveTo(14, 19, 20, 20);
-      ctx.quadraticCurveTo(24, 20.5, 30, 20);
-      ctx.quadraticCurveTo(34, 20, 34, 22);
-      ctx.quadraticCurveTo(33, 24.5, 30, 24);
-      ctx.quadraticCurveTo(24, 23, 20, 24);
-      ctx.quadraticCurveTo(14, 25, 13, 22);
-      ctx.closePath(); ctx.fill();
-      // Mustache highlight
-      ctx.fillStyle = "#4a2410";
-      ctx.beginPath(); ctx.ellipse(22, 21, 5, 0.7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.moveTo(11, 12); ctx.quadraticCurveTo(22, 7, 33, 12); ctx.stroke();
 
-      // Cheek blush
-      ctx.fillStyle = "rgba(220,80,80,0.28)";
-      ctx.beginPath(); ctx.ellipse(15, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(33, 20, 2.2, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-      // Lower lip hint
-      ctx.strokeStyle = "rgba(90,30,20,0.55)"; ctx.lineWidth = 0.6;
-      ctx.beginPath(); ctx.moveTo(20, 25.5); ctx.quadraticCurveTo(22, 26.6, 24, 25.5); ctx.stroke();
-      // Chin shadow
-      ctx.fillStyle = "rgba(0,0,0,0.12)";
-      ctx.beginPath(); ctx.ellipse(22, 27, 6, 1.5, 0, 0, Math.PI * 2); ctx.fill();
+      // Hood point at top (pointed hat feel)
+      ctx.fillStyle = HOOD_LO;
+      ctx.beginPath();
+      ctx.moveTo(22, -8); ctx.lineTo(26, -4); ctx.lineTo(22, -2); ctx.lineTo(18, -4);
+      ctx.closePath(); ctx.fill();
+
+      // Small floating rune spark (mana indicator)
+      if (stats.mp > 0 && time % 24 < 12) {
+        ctx.fillStyle = `rgba(126,224,255,${0.6 - (time % 24) / 24})`;
+        ctx.beginPath(); ctx.arc(22 + Math.sin(time * 0.2) * 3, -12 - (time % 24) * 0.3, 1.2, 0, Math.PI * 2); ctx.fill();
+      }
 
       ctx.restore();
+
 
       // Attack sfx swipe
       if (player.attack > 6) {
