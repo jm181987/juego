@@ -780,7 +780,7 @@ function Scene({
 
       // Contact damage
       if (dist < 1.1 && invuln.current <= 0) {
-        const dmg = Math.max(1, (e.kind === "brute" ? 20 : 12) - st.def);
+        const dmg = Math.max(1, Math.round(((e.kind === "brute" ? 20 : 12) * diff) - st.def));
         st.hp -= dmg;
         invuln.current = 0.8;
         spawnFloat(pos.current, `-${dmg}`, "#ff4040");
