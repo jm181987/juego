@@ -604,6 +604,70 @@ function EnemyMesh({ e }: { e: Enemy }) {
     <group ref={ref} scale={scale}>
       <primitive object={cloned} />
 
+      {/* Scary head accents: glowing eyes + hooded shadow / skull mask */}
+      {(() => {
+        const eyeColor = e.kind === "wraith" ? "#7cf9ff" : "#ff2a1a";
+        const eyeY = 1.72;
+        const eyeZ = 0.18;
+        const pulse = 0.9 + Math.sin(e.id * 1.3) * 0.1;
+        return (
+          <group>
+            <mesh position={[-0.07, eyeY, eyeZ]}>
+              <sphereGeometry args={[0.028, 8, 8]} />
+              <meshBasicMaterial color={eyeColor} />
+            </mesh>
+            <mesh position={[0.07, eyeY, eyeZ]}>
+              <sphereGeometry args={[0.028, 8, 8]} />
+              <meshBasicMaterial color={eyeColor} />
+            </mesh>
+            <pointLight color={eyeColor} intensity={0.6 * pulse} distance={1.4} position={[0, eyeY, eyeZ + 0.05]} />
+
+            {/* Hood / cowl casting a dark shadow over the face */}
+            {e.kind !== "brute" && (
+              <mesh position={[0, 1.78, -0.02]} rotation={[0.25, 0, 0]} castShadow>
+                <coneGeometry args={[0.28, 0.42, 12, 1, true]} />
+                <meshStandardMaterial
+                  color={e.kind === "wraith" ? "#0a0612" : "#0d0906"}
+                  roughness={1}
+                  side={THREE.DoubleSide}
+                />
+              </mesh>
+            )}
+
+            {/* Brute: horned iron helm */}
+            {e.kind === "brute" && (
+              <group position={[0, 1.78, 0]}>
+                <mesh castShadow>
+                  <sphereGeometry args={[0.19, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+                  <meshStandardMaterial color="#141014" metalness={0.7} roughness={0.55} />
+                </mesh>
+                <mesh position={[-0.16, 0.04, 0]} rotation={[0, 0, 0.9]} castShadow>
+                  <coneGeometry args={[0.04, 0.28, 8]} />
+                  <meshStandardMaterial color="#0a0a0a" metalness={0.8} roughness={0.4} />
+                </mesh>
+                <mesh position={[0.16, 0.04, 0]} rotation={[0, 0, -0.9]} castShadow>
+                  <coneGeometry args={[0.04, 0.28, 8]} />
+                  <meshStandardMaterial color="#0a0a0a" metalness={0.8} roughness={0.4} />
+                </mesh>
+              </group>
+            )}
+
+            {/* Ground aura — sickly fog disk */}
+            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+              <circleGeometry args={[0.7, 20]} />
+              <meshBasicMaterial
+                color={e.kind === "wraith" ? "#4020a0" : "#600810"}
+                transparent
+                opacity={0.22}
+                depthWrite={false}
+              />
+            </mesh>
+          </group>
+        );
+      })()}
+
+
+
       {/* Weapon prop bolted to the right side of the hero group. */}
       {weapon === "sword" && (
         <group position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
