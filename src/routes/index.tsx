@@ -268,22 +268,47 @@ const ATTACK_COOLDOWN = 0.4;
 type Keys = {
   fwd: boolean; back: boolean; left: boolean; right: boolean;
   jump: boolean; attack: boolean; pot1: boolean; pot2: boolean;
-  camFree: boolean;
+  camFree: boolean; run: boolean;
 };
 function useKeys() {
-  const keys = useRef<Keys>({ fwd: false, back: false, left: false, right: false, jump: false, attack: false, pot1: false, pot2: false, camFree: false });
+  const keys = useRef<Keys>({
+    fwd: false, back: false, left: false, right: false,
+    jump: false, attack: false, pot1: false, pot2: false,
+    camFree: false, run: false,
+  });
   useEffect(() => {
     const map = (e: KeyboardEvent, v: boolean) => {
-      const k = e.key.toLowerCase();
-      if (k === "w" || k === "arrowup") keys.current.fwd = v;
-      if (k === "s" || k === "arrowdown") keys.current.back = v;
-      if (k === "a" || k === "arrowleft") keys.current.left = v;
-      if (k === "d" || k === "arrowright") keys.current.right = v;
-      if (k === " ") { keys.current.jump = v; e.preventDefault(); }
-      if (k === "z" || k === "j") keys.current.attack = v;
-      if (k === "q") keys.current.pot1 = v;
-      if (k === "e") keys.current.pot2 = v;
-      if (k === "alt") { keys.current.camFree = v; e.preventDefault(); }
+      // Read bindings from store at event time (updated live via settings)
+      const b = useGame.getState().bindings;
+      const c = e.code;
+      // Movement / actions (rebindable)
+      if (c === b.fwd) keys.current.fwd = v;
+      else if (c === b.back) keys.current.back = v;
+      else if (c === b.left) keys.current.left = v;
+      else if (c === b.right) keys.current.right = v;
+      else if (c === b.jump) { keys.current.jump = v; e.preventDefault(); }
+      else if (c === b.attack) keys.current.attack = v;
+      else if (c === b.pot1) keys.current.pot1 = v;
+      else if (c === b.pot2) keys.current.pot2 = v;
+      else if (c === b.camFree) { keys.current.camFree = v; e.preventDefault(); }
+      else if (c === b.run) keys.current.run = v;
+
+      // Single-shot menu / toggle keys (only on keydown)
+      if (v) {
+        const s = useGame.getState();
+        if (c === b.pause) {
+          if (s.activeMenu) s.setMenu(null);
+          else s.setMenu("pause");
+        } else if (c === b.inventory) {
+          s.setMenu(s.activeMenu === "inventory" ? null : "inventory");
+        } else if (c === b.journal) {
+          s.setMenu(s.activeMenu === "journal" ? null : "journal");
+        } else if (c === b.flashlight) {
+          s.toggleFlashlight();
+        } else if (c === "KeyH") {
+          s.toggleHud();
+        }
+      }
     };
 
     const dn = (e: KeyboardEvent) => map(e, true);
@@ -294,6 +319,7 @@ function useKeys() {
   }, []);
   return keys;
 }
+
 
 /* ---------------- STATS ---------------- */
 type Stats = {
