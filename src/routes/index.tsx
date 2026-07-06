@@ -332,7 +332,7 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
   return false;
 }
 
-/* ---------------- MAGE ---------------- */
+/* ---------------- MAGE (proportioned humanoid) ---------------- */
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
   facingRef: React.MutableRefObject<number>;
@@ -341,63 +341,251 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 }) {
   const group = useRef<THREE.Group>(null!);
   const staff = useRef<THREE.Group>(null!);
-  const capeRef = useRef<THREE.Mesh>(null!);
-  useFrame((_, dt) => {
+  const capeRef = useRef<THREE.Group>(null!);
+  const leftLeg = useRef<THREE.Group>(null!);
+  const rightLeg = useRef<THREE.Group>(null!);
+  const leftArm = useRef<THREE.Group>(null!);
+  const rightArm = useRef<THREE.Group>(null!);
+  const head = useRef<THREE.Group>(null!);
+  const torso = useRef<THREE.Group>(null!);
+
+  useFrame(() => {
     if (!group.current) return;
+    const wp = walkPhaseRef.current;
+    const moving = Math.abs(Math.sin(wp * 10)) > 0.05;
+    // Rough "is walking" detection via recent phase change - fallback to always animating slightly
+    const swing = Math.sin(wp * 10);
+    const swingB = Math.sin(wp * 10 + Math.PI);
+
     group.current.position.copy(posRef.current);
     group.current.rotation.y = facingRef.current;
-    const bob = Math.sin(walkPhaseRef.current * 10) * 0.08;
+    const bob = Math.sin(wp * 20) * 0.04;
     group.current.position.y += bob;
-    if (staff.current) {
-      const atk = attackingRef.current;
+
+    if (torso.current) torso.current.rotation.y = swing * 0.08;
+    if (head.current) head.current.rotation.y = -swing * 0.05;
+
+    // Leg swing
+    if (leftLeg.current) leftLeg.current.rotation.x = swing * 0.7;
+    if (rightLeg.current) rightLeg.current.rotation.x = swingB * 0.7;
+
+    // Arm swing (opposite to legs); right arm holds staff/sword
+    if (leftArm.current) leftArm.current.rotation.x = swingB * 0.6;
+
+    const atk = attackingRef.current;
+    if (rightArm.current) {
       if (atk > 0) {
-        staff.current.rotation.x = -Math.sin(atk * Math.PI) * 1.8;
+        rightArm.current.rotation.x = -Math.sin(atk * Math.PI) * 2.2 - 0.3;
+        rightArm.current.rotation.z = -0.2;
       } else {
-        staff.current.rotation.x = Math.sin(walkPhaseRef.current * 10) * 0.2 - 0.2;
+        rightArm.current.rotation.x = swing * 0.6 - 0.2;
+        rightArm.current.rotation.z = 0;
       }
     }
-    if (capeRef.current) {
-      capeRef.current.rotation.x = Math.sin(walkPhaseRef.current * 6) * 0.15 + 0.1;
+    if (staff.current) {
+      if (atk > 0) {
+        staff.current.rotation.z = -Math.sin(atk * Math.PI) * 0.6;
+      } else {
+        staff.current.rotation.z = 0;
+      }
     }
+
+    if (capeRef.current) {
+      capeRef.current.rotation.x = Math.sin(wp * 6) * 0.18 + 0.15;
+      capeRef.current.rotation.z = Math.sin(wp * 4) * 0.05;
+    }
+
+    // Suppress unused warning
+    void moving;
   });
+
+  // Material presets
+  const robeCol = "#2a1050";
+  const robeTrim = "#7a4ecc";
+  const skinCol = "#d9b48a";
+  const bootCol = "#1a0e08";
+  const leatherCol = "#3a2418";
+  const goldCol = "#d4a53a";
+  const eyeGlow = "#8ff0ff";
+
   return (
     <group ref={group}>
-      {/* Robe (body) */}
-      <mesh position={[0, 0.6, 0]} castShadow>
-        <coneGeometry args={[0.55, 1.6, 12]} />
-        <meshStandardMaterial color="#3a1a5a" roughness={0.9} />
-      </mesh>
-      {/* Cape */}
-      <mesh ref={capeRef} position={[0, 0.9, -0.35]} castShadow>
-        <planeGeometry args={[1.1, 1.4]} />
-        <meshStandardMaterial color="#1a0838" roughness={1} side={THREE.DoubleSide} />
-      </mesh>
-      {/* Head + hood */}
-      <mesh position={[0, 1.55, 0]} castShadow>
-        <sphereGeometry args={[0.35, 16, 16]} />
-        <meshStandardMaterial color="#1a0838" roughness={0.8} />
-      </mesh>
-      {/* Glowing eyes */}
-      <mesh position={[0.12, 1.5, 0.28]}>
-        <sphereGeometry args={[0.05, 8, 8]} />
-        <meshStandardMaterial color="#7ee6ff" emissive="#7ee6ff" emissiveIntensity={2.5} />
-      </mesh>
-      <mesh position={[-0.12, 1.5, 0.28]}>
-        <sphereGeometry args={[0.05, 8, 8]} />
-        <meshStandardMaterial color="#7ee6ff" emissive="#7ee6ff" emissiveIntensity={2.5} />
-      </mesh>
-      {/* Staff/sword */}
-      <group ref={staff} position={[0.35, 1.0, 0.2]}>
-        <mesh position={[0.4, 0, 0]}>
-          <cylinderGeometry args={[0.05, 0.05, 1.6, 8]} />
-          <meshStandardMaterial color="#3a2a1a" />
+      {/* --- LEGS --- */}
+      <group ref={leftLeg} position={[-0.13, 0.75, 0]}>
+        {/* Thigh */}
+        <mesh position={[0, -0.28, 0]} castShadow>
+          <capsuleGeometry args={[0.11, 0.35, 4, 8]} />
+          <meshStandardMaterial color={robeCol} roughness={0.9} />
         </mesh>
-        <mesh position={[1.2, 0, 0]}>
-          <sphereGeometry args={[0.15, 12, 12]} />
-          <meshStandardMaterial color="#7ee6ff" emissive="#7ee6ff" emissiveIntensity={3} />
+        {/* Boot */}
+        <mesh position={[0, -0.72, 0.05]} castShadow>
+          <boxGeometry args={[0.22, 0.18, 0.34]} />
+          <meshStandardMaterial color={bootCol} roughness={0.6} metalness={0.1} />
         </mesh>
-        <pointLight position={[1.2, 0, 0]} color="#7ee6ff" intensity={1.5} distance={5} />
       </group>
+      <group ref={rightLeg} position={[0.13, 0.75, 0]}>
+        <mesh position={[0, -0.28, 0]} castShadow>
+          <capsuleGeometry args={[0.11, 0.35, 4, 8]} />
+          <meshStandardMaterial color={robeCol} roughness={0.9} />
+        </mesh>
+        <mesh position={[0, -0.72, 0.05]} castShadow>
+          <boxGeometry args={[0.22, 0.18, 0.34]} />
+          <meshStandardMaterial color={bootCol} roughness={0.6} metalness={0.1} />
+        </mesh>
+      </group>
+
+      {/* --- TORSO / ROBE --- */}
+      <group ref={torso} position={[0, 0.75, 0]}>
+        {/* Skirt of the robe (flared) */}
+        <mesh position={[0, 0.05, 0]} castShadow>
+          <cylinderGeometry args={[0.5, 0.32, 0.9, 16, 1, false]} />
+          <meshStandardMaterial color={robeCol} roughness={0.95} />
+        </mesh>
+        {/* Robe trim (bottom) */}
+        <mesh position={[0, -0.38, 0]}>
+          <torusGeometry args={[0.5, 0.03, 8, 24]} />
+          <meshStandardMaterial color={robeTrim} emissive={robeTrim} emissiveIntensity={0.4} />
+        </mesh>
+        {/* Upper torso */}
+        <mesh position={[0, 0.55, 0]} castShadow>
+          <capsuleGeometry args={[0.24, 0.4, 4, 12]} />
+          <meshStandardMaterial color={robeCol} roughness={0.9} />
+        </mesh>
+        {/* Belt */}
+        <mesh position={[0, 0.35, 0]} castShadow>
+          <cylinderGeometry args={[0.31, 0.31, 0.1, 16]} />
+          <meshStandardMaterial color={leatherCol} roughness={0.7} />
+        </mesh>
+        {/* Belt buckle */}
+        <mesh position={[0, 0.35, 0.31]}>
+          <boxGeometry args={[0.12, 0.08, 0.03]} />
+          <meshStandardMaterial color={goldCol} metalness={0.9} roughness={0.3} />
+        </mesh>
+        {/* Rune on chest */}
+        <mesh position={[0, 0.6, 0.24]}>
+          <ringGeometry args={[0.06, 0.09, 16]} />
+          <meshStandardMaterial color={eyeGlow} emissive={eyeGlow} emissiveIntensity={2.5} side={THREE.DoubleSide} />
+        </mesh>
+
+        {/* --- CAPE (from shoulders back) --- */}
+        <group ref={capeRef} position={[0, 0.5, -0.22]}>
+          <mesh castShadow position={[0, -0.35, 0]}>
+            <planeGeometry args={[1.05, 1.35, 3, 3]} />
+            <meshStandardMaterial color="#0a0418" roughness={1} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, -0.35, -0.01]}>
+            <planeGeometry args={[1.0, 1.3]} />
+            <meshStandardMaterial color={robeTrim} roughness={0.9} side={THREE.DoubleSide} transparent opacity={0.15} />
+          </mesh>
+        </group>
+
+        {/* --- ARMS --- */}
+        <group ref={leftArm} position={[-0.32, 0.7, 0]}>
+          {/* Sleeve/upper arm */}
+          <mesh position={[0, -0.22, 0]} castShadow>
+            <capsuleGeometry args={[0.09, 0.28, 4, 8]} />
+            <meshStandardMaterial color={robeCol} roughness={0.9} />
+          </mesh>
+          {/* Forearm */}
+          <mesh position={[0, -0.52, 0]} castShadow>
+            <capsuleGeometry args={[0.075, 0.24, 4, 8]} />
+            <meshStandardMaterial color={robeCol} roughness={0.9} />
+          </mesh>
+          {/* Hand */}
+          <mesh position={[0, -0.72, 0]} castShadow>
+            <sphereGeometry args={[0.08, 8, 8]} />
+            <meshStandardMaterial color={skinCol} roughness={0.8} />
+          </mesh>
+        </group>
+
+        <group ref={rightArm} position={[0.32, 0.7, 0]}>
+          <mesh position={[0, -0.22, 0]} castShadow>
+            <capsuleGeometry args={[0.09, 0.28, 4, 8]} />
+            <meshStandardMaterial color={robeCol} roughness={0.9} />
+          </mesh>
+          <mesh position={[0, -0.52, 0]} castShadow>
+            <capsuleGeometry args={[0.075, 0.24, 4, 8]} />
+            <meshStandardMaterial color={robeCol} roughness={0.9} />
+          </mesh>
+          <mesh position={[0, -0.72, 0]} castShadow>
+            <sphereGeometry args={[0.08, 8, 8]} />
+            <meshStandardMaterial color={skinCol} roughness={0.8} />
+          </mesh>
+
+          {/* --- STAFF (held in right hand) --- */}
+          <group ref={staff} position={[0, -0.72, 0.05]}>
+            {/* Shaft */}
+            <mesh position={[0, -0.4, 0]} rotation={[0, 0, 0]} castShadow>
+              <cylinderGeometry args={[0.035, 0.045, 1.7, 8]} />
+              <meshStandardMaterial color="#2a1a10" roughness={0.85} />
+            </mesh>
+            {/* Grip wrap */}
+            <mesh position={[0, -0.5, 0]}>
+              <cylinderGeometry args={[0.05, 0.05, 0.18, 8]} />
+              <meshStandardMaterial color={leatherCol} roughness={0.9} />
+            </mesh>
+            {/* Ornate cage holding orb */}
+            <mesh position={[0, 0.5, 0]}>
+              <torusGeometry args={[0.13, 0.02, 8, 16]} />
+              <meshStandardMaterial color={goldCol} metalness={0.9} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <torusGeometry args={[0.13, 0.02, 8, 16]} />
+              <meshStandardMaterial color={goldCol} metalness={0.9} roughness={0.3} />
+            </mesh>
+            {/* Crystal orb */}
+            <mesh position={[0, 0.5, 0]}>
+              <icosahedronGeometry args={[0.13, 0]} />
+              <meshStandardMaterial color={eyeGlow} emissive={eyeGlow} emissiveIntensity={2.5} transparent opacity={0.85} />
+            </mesh>
+            <pointLight position={[0, 0.5, 0]} color={eyeGlow} intensity={1.8} distance={6} />
+          </group>
+        </group>
+      </group>
+
+      {/* --- HEAD --- */}
+      <group ref={head} position={[0, 1.66, 0]}>
+        {/* Face (skin, shadowed by hood) */}
+        <mesh position={[0, 0, 0.02]} castShadow>
+          <sphereGeometry args={[0.19, 16, 16]} />
+          <meshStandardMaterial color={skinCol} roughness={0.85} />
+        </mesh>
+        {/* Neck */}
+        <mesh position={[0, -0.2, 0]} castShadow>
+          <cylinderGeometry args={[0.09, 0.11, 0.14, 10]} />
+          <meshStandardMaterial color={skinCol} roughness={0.85} />
+        </mesh>
+        {/* Beard */}
+        <mesh position={[0, -0.13, 0.15]} castShadow>
+          <sphereGeometry args={[0.15, 12, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+          <meshStandardMaterial color="#d0d0d8" roughness={1} />
+        </mesh>
+        {/* Hood (open cowl covering back and sides of head) */}
+        <mesh position={[0, 0.02, -0.03]} castShadow>
+          <sphereGeometry args={[0.28, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.75]} />
+          <meshStandardMaterial color="#0a0418" roughness={1} side={THREE.DoubleSide} />
+        </mesh>
+        {/* Hood brim casting face shadow */}
+        <mesh position={[0, 0.1, 0.14]} rotation={[0.4, 0, 0]}>
+          <ringGeometry args={[0.16, 0.28, 20, 1, 0, Math.PI]} />
+          <meshStandardMaterial color="#0a0418" roughness={1} side={THREE.DoubleSide} />
+        </mesh>
+        {/* Eyes */}
+        <mesh position={[0.075, 0.02, 0.19]}>
+          <sphereGeometry args={[0.028, 8, 8]} />
+          <meshStandardMaterial color={eyeGlow} emissive={eyeGlow} emissiveIntensity={3} />
+        </mesh>
+        <mesh position={[-0.075, 0.02, 0.19]}>
+          <sphereGeometry args={[0.028, 8, 8]} />
+          <meshStandardMaterial color={eyeGlow} emissive={eyeGlow} emissiveIntensity={3} />
+        </mesh>
+      </group>
+
+      {/* Ground shadow blob (subtle) */}
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.4, 16]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.35} />
+      </mesh>
     </group>
   );
 }
