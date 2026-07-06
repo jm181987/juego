@@ -748,17 +748,13 @@ const MageMemo = React.memo(Mage);
 function EnemyMesh({ e }: { e: Enemy }) {
   const ref = useRef<THREE.Group>(null!);
   const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
-  const bodyMatRef = useRef<THREE.MeshStandardMaterial>(null!);
-  const accentMatRef = useRef<THREE.MeshStandardMaterial>(null!);
-  const cfg = useMemo(() => {
-    if (e.kind === "brute") {
-      return { scale: 1.25, body: "#2a1a12", accent: "#ff3018", weapon: "greatsword" as const };
-    }
-    if (e.kind === "wraith") {
-      return { scale: 1.05, body: "#24142f", accent: "#7cf9ff", weapon: "staff" as const };
-    }
-    return { scale: 0.95, body: "#1a1410", accent: "#ff6a22", weapon: "sword" as const };
-  }, [e.kind]);
+  const leftArm = useRef<THREE.Group>(null!);
+  const rightArm = useRef<THREE.Group>(null!);
+  const leftLeg = useRef<THREE.Group>(null!);
+  const rightLeg = useRef<THREE.Group>(null!);
+  const head = useRef<THREE.Group>(null!);
+  const phase = useRef(Math.random() * 10);
+  const baseScale = e.kind === "brute" ? 1.15 : e.kind === "wraith" ? 1.0 : 0.95;
 
   useFrame((_state, dt) => {
     if (!ref.current) return;
@@ -769,101 +765,33 @@ function EnemyMesh({ e }: { e: Enemy }) {
     const dz = e.pos.z - lastPos.current.z;
     const speed = Math.hypot(dx, dz) / Math.max(dt, 0.0001);
     if (Math.abs(dx) + Math.abs(dz) > 0.0005) {
-      // Model faces +Z by default; +PI so it looks toward its travel direction.
       ref.current.rotation.y = Math.atan2(dx, dz) + Math.PI;
     }
     lastPos.current.set(e.pos.x, e.pos.y, e.pos.z);
 
+    const stride = Math.min(1, speed / 3);
+    phase.current += dt * (2 + stride * 5);
+    const swing = Math.sin(phase.current) * (0.15 + stride * 0.7);
+    if (leftArm.current) leftArm.current.rotation.x = swing;
+    if (rightArm.current) rightArm.current.rotation.x = -swing;
+    if (leftLeg.current) leftLeg.current.rotation.x = -swing * 0.9;
+    if (rightLeg.current) rightLeg.current.rotation.x = swing * 0.9;
+    if (head.current) head.current.rotation.z = Math.sin(phase.current * 0.5) * 0.04;
+
     const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
-    if (bodyMatRef.current) {
-      bodyMatRef.current.emissiveIntensity = 0.2 + flash * 1.5;
-    }
-    if (accentMatRef.current) {
-      accentMatRef.current.emissiveIntensity = 0.6 + flash * 2.2 + Math.sin(performance.now() * 0.006 + e.id) * 0.12;
-    }
+    ref.current.scale.setScalar(baseScale * (1 + flash * 0.08));
   });
 
+  const limbs = { s: 1, leftArm, rightArm, leftLeg, rightLeg, head };
   return (
-    <group ref={ref} scale={cfg.scale}>
-      <mesh position={[0, 0.9, 0]} castShadow>
-        <capsuleGeometry args={[0.32, 0.85, 4, 10]} />
-        <meshStandardMaterial ref={bodyMatRef} color={cfg.body} emissive={cfg.body} emissiveIntensity={0.2} roughness={0.95} />
-      </mesh>
-      <mesh position={[0, 1.62, 0]} castShadow>
-        <sphereGeometry args={[0.23, 14, 12]} />
-        <meshStandardMaterial color={cfg.body} emissive={cfg.body} emissiveIntensity={0.22} roughness={1} />
-      </mesh>
-      <mesh position={[-0.07, 1.64, 0.2]}>
-        <sphereGeometry args={[0.028, 8, 8]} />
-        <meshStandardMaterial ref={accentMatRef} color={cfg.accent} emissive={cfg.accent} emissiveIntensity={0.8} />
-      </mesh>
-      <mesh position={[0.07, 1.64, 0.2]}>
-        <sphereGeometry args={[0.028, 8, 8]} />
-        <meshStandardMaterial color={cfg.accent} emissive={cfg.accent} emissiveIntensity={0.8} />
-      </mesh>
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.7, 20]} />
-        <meshBasicMaterial color={cfg.accent} transparent opacity={0.16} depthWrite={false} />
-      </mesh>
-
-      {cfg.weapon === "sword" && (
-        <group position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
-          <mesh position={[0, -0.15, 0]} castShadow>
-            <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
-            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.02, 0]} castShadow>
-            <boxGeometry args={[0.38, 0.055, 0.07]} />
-            <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 0.7, 0]} castShadow>
-            <boxGeometry args={[0.08, 1.25, 0.02]} />
-            <meshStandardMaterial color="#b8bcc4" metalness={0.85} roughness={0.3} />
-          </mesh>
-        </group>
-      )}
-
-      {cfg.weapon === "greatsword" && (
-        <group position={[0.6, 1.05, 0.15]} rotation={[0, 0, -0.55]}>
-          <mesh position={[0, -0.2, 0]} castShadow>
-            <cylinderGeometry args={[0.05, 0.05, 0.4, 10]} />
-            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.02, 0]} castShadow>
-            <boxGeometry args={[0.5, 0.07, 0.08]} />
-            <meshStandardMaterial color="#a8862a" metalness={0.75} roughness={0.35} />
-          </mesh>
-          <mesh position={[0, 1.0, 0]} castShadow>
-            <boxGeometry args={[0.11, 1.85, 0.025]} />
-            <meshStandardMaterial color="#d0d4dc" metalness={0.9} roughness={0.2} />
-          </mesh>
-          <mesh position={[0, 1.95, 0]} castShadow>
-            <coneGeometry args={[0.055, 0.22, 4]} />
-            <meshStandardMaterial color="#d0d4dc" metalness={0.9} roughness={0.2} />
-          </mesh>
-        </group>
-      )}
-
-      {cfg.weapon === "staff" && (
-        <group position={[0.5, 1.1, 0.15]} rotation={[0, 0, -0.5]}>
-          <mesh castShadow>
-            <cylinderGeometry args={[0.03, 0.035, 1.9, 8]} />
-            <meshStandardMaterial color="#3a2410" roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 0.98, 0]} castShadow>
-            <torusGeometry args={[0.09, 0.022, 6, 14]} />
-            <meshStandardMaterial color="#3a2410" roughness={0.85} />
-          </mesh>
-          <mesh position={[0, 1.06, 0]}>
-            <sphereGeometry args={[0.08, 12, 12]} />
-            <meshStandardMaterial color="#a060ff" emissive="#a060ff" emissiveIntensity={1.1} roughness={0.2} />
-          </mesh>
-        </group>
-      )}
+    <group ref={ref} scale={baseScale}>
+      {e.kind === "goblin" && <GoblinBody {...limbs} />}
+      {e.kind === "wraith" && <WraithBody {...limbs} id={e.id} />}
+      {e.kind === "brute" && <BruteBody {...limbs} />}
 
       {/* Health bar */}
       {e.alive && e.hp < e.maxHp && (
-        <group position={[0, 2.4, 0]}>
+        <group position={[0, 3, 0]}>
           <mesh>
             <planeGeometry args={[1, 0.12]} />
             <meshBasicMaterial color="#200" />
