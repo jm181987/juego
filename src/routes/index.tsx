@@ -468,7 +468,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       swordRef.current.translateY(0.05);
       swordRef.current.rotateX(Math.PI / 2);
     }
-  }, 1);
+  });
 
 
   return (
