@@ -512,13 +512,14 @@ function EnemyMesh({ e }: { e: Enemy }) {
   const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
   const baseColors = useRef(new Map<THREE.Material, THREE.Color>());
 
-  // Per-kind visual identity
+  // Per-kind visual identity — darker, more menacing palette
   const tint = useMemo(() => {
-    if (e.kind === "brute") return new THREE.Color("#8a6a4a"); // heavy warrior — warm bronze/leather
-    if (e.kind === "wraith") return new THREE.Color("#b0a0d8"); // pale sorceress — cool violet
-    return new THREE.Color("#6a5a44"); // bandit — muted brown
+    if (e.kind === "brute") return new THREE.Color("#2a1a12"); // blackened blood-iron
+    if (e.kind === "wraith") return new THREE.Color("#3a2f4a"); // decayed violet shroud
+    return new THREE.Color("#1a1410"); // bandit — charred leather
   }, [e.kind]);
   const scale = e.kind === "brute" ? 1.25 : e.kind === "wraith" ? 1.05 : 0.95;
+
 
   useEffect(() => {
     cloned.traverse((o) => {
