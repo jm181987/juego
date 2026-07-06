@@ -1480,6 +1480,7 @@ function Index() {
       cancelAnimationFrame(raf);
       window.removeEventListener("keydown", kd);
       window.removeEventListener("keyup", ku);
+      window.removeEventListener("resize", onResize);
       running = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
