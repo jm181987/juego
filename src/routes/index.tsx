@@ -171,12 +171,15 @@ function buildWorld(stageIdx: number) {
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
       else if (ch === "G") enemies.push({
         x, y: y - 34, w: 62, h: 62, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+        hp: 2, maxHp: 2, hitFlash: 0, xp: 10, gold: 3, power: 1,
       });
       else if (ch === "J") enemies.push({
         x, y: y - 34, w: 62, h: 62, vx: -0.5, vy: 0, alive: true, squashT: 0, anim: 0, kind: "jumper", jumpCd: 60 + Math.floor(Math.random() * 60),
+        hp: 3, maxHp: 3, hitFlash: 0, xp: 18, gold: 5, power: 2,
       });
       else if (ch === "K") enemies.push({
         x, y, w: 62, h: 52, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+        hp: 2, maxHp: 2, hitFlash: 0, xp: 15, gold: 4, power: 2,
       });
       else if (ch === "M") checkpoints.push({ x: x + TILE / 2, y, reached: false });
       else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
