@@ -676,23 +676,23 @@ function Scene({
     const k = keysRef.current;
     const st = statsRef.current;
 
-    // Movement direction relative to camera yaw (fixed follow cam)
-    const camYaw = Math.atan2(camera.position.x - pos.current.x, camera.position.z - pos.current.z);
+    // Movement direction relative to mouse yaw
+    const camYaw = yawRef.current;
     let mx = 0, mz = 0;
     if (k.fwd) mz -= 1;
     if (k.back) mz += 1;
     if (k.left) mx -= 1;
     if (k.right) mx += 1;
     const inputLen = Math.hypot(mx, mz);
+    // Player always faces the camera-forward direction (where the mouse is aiming)
+    facing.current = camYaw + Math.PI;
     if (inputLen > 0) {
       mx /= inputLen; mz /= inputLen;
-      // rotate by camYaw
       const s = Math.sin(camYaw), c = Math.cos(camYaw);
       const wx = mx * c + mz * s;
       const wz = -mx * s + mz * c;
       vel.current.x = wx * MOVE_SPEED;
       vel.current.z = wz * MOVE_SPEED;
-      facing.current = Math.atan2(wx, wz);
       walkPhase.current += dt;
     } else {
       vel.current.x *= 0.7;
