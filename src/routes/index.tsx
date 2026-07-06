@@ -533,6 +533,13 @@ function EnemyMesh({ e }: { e: Enemy }) {
           const cloneMat = mat.clone();
           baseColors.current.set(cloneMat, cloneMat.color.clone().multiply(tint));
           cloneMat.color.copy(baseColors.current.get(cloneMat)!);
+          cloneMat.roughness = 1;
+          cloneMat.metalness = 0.05;
+          // subtle sickly emissive glow so enemies read as "wrong" even in shadow
+          cloneMat.emissive = e.kind === "wraith"
+            ? new THREE.Color("#20102a")
+            : new THREE.Color("#100804");
+          cloneMat.emissiveIntensity = 0.35;
           m.material = cloneMat;
         }
       }
