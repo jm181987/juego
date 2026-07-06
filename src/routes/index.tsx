@@ -390,12 +390,16 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 }) {
   const group = useRef<THREE.Group>(null!);
   const swordRef = useRef<THREE.Group>(null!);
+  const hairRef = useRef<THREE.Group>(null!);
+  const skirtRef = useRef<THREE.Group>(null!);
   const bonesRef = useRef<{
     rightArm?: THREE.Object3D;
     rightForeArm?: THREE.Object3D;
     spine1?: THREE.Object3D;
     rightHand?: THREE.Object3D;
     leftHand?: THREE.Object3D;
+    head?: THREE.Object3D;
+    hips?: THREE.Object3D;
     base: {
       rightArm?: THREE.Euler;
       rightForeArm?: THREE.Euler;
