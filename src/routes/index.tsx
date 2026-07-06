@@ -1038,22 +1038,29 @@ function Index() {
           e.y = (e.baseY ?? e.y) + Math.sin(time * 0.05 + e.x * 0.01) * 24;
         }
 
-        // Attack / dive hitbox
+        if (e.hitFlash > 0) e.hitFlash--;
+
+        // Sword attack hitbox (extended reach thanks to weapon)
         const attacking = player.attack > 0;
-        if (attacking) {
-          const hx = player.x + (player.facing > 0 ? player.w - 4 : -14);
+        if (attacking && e.hitFlash === 0) {
+          const hx = player.x + (player.facing > 0 ? player.w - 8 : -30);
           const hy = player.y + 8;
-          const hw = 18, hh = 18;
+          const hw = 42, hh = 40;
           if (hx < e.x + e.w && hx + hw > e.x && hy < e.y + e.h && hy + hh > e.y) {
-            e.alive = false; e.squashT = 30;
-            const reward = e.kind === "flyer" ? 200 : 100;
-            localScore += reward; setScore(localScore);
-            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
-            addParticles(e.x + e.w / 2, e.y + 8, 12, {
-              color: "#fff", size: 3, life: 25, speed: 4, gravity: 0.3,
-            });
-            cameraShake = 4;
-            continue;
+            const dmg = stats.str + Math.floor(Math.random() * 2);
+            e.hp -= dmg; e.hitFlash = 10;
+            floatText(e.x + e.w / 2, e.y - 4, `${dmg}`, "#ffd94a");
+            addParticles(e.x + e.w / 2, e.y + 8, 8, { color: "#fff", size: 3, life: 20, speed: 4, gravity: 0.2 });
+            cameraShake = 3;
+            if (e.hp <= 0) {
+              e.alive = false; e.squashT = 30;
+              const reward = e.kind === "flyer" ? 200 : 100;
+              localScore += reward; setScore(localScore);
+              gainXp(e.xp);
+              spawnLoot(e.x + e.w / 2, e.y + e.h / 2, e);
+              cameraShake = 5;
+              continue;
+            }
           }
         }
 
@@ -1063,20 +1070,27 @@ function Index() {
         ) {
           const stompable = e.kind === "goomba" || e.kind === "flyer" || e.kind === "jumper";
           if (stompable && player.vy > 1 && player.y + player.h - e.y < 20) {
-            e.alive = false; e.squashT = 30;
-            player.vy = jump ? -11 : -8.5; // higher bounce with jump held
+            const stompDmg = 2 + Math.floor(stats.str / 2);
+            e.hp -= stompDmg; e.hitFlash = 10;
+            player.vy = jump ? -11 : -8.5;
             player.squash = 0.7; player.stretch = 1.3;
-            const reward = e.kind === "flyer" ? 200 : 100;
-            localScore += reward; setScore(localScore);
-            floatText(e.x + e.w / 2, e.y - 4, `+${reward}`, "#ff7676");
-            addParticles(e.x + e.w / 2, e.y + 8, 10, {
-              color: e.kind === "flyer" ? "#c8ccd4" : "#8b4513",
-              size: 3, life: 25, speed: 3, gravity: 0.3,
-            });
-            cameraShake = 3;
-          } else die();
+            floatText(e.x + e.w / 2, e.y - 4, `${stompDmg}`, "#ffd94a");
+            addParticles(e.x + e.w / 2, e.y + 8, 6, { color: "#fff", size: 3, life: 20, speed: 2.5, gravity: 0.3 });
+            if (e.hp <= 0) {
+              e.alive = false; e.squashT = 30;
+              const reward = e.kind === "flyer" ? 200 : 100;
+              localScore += reward; setScore(localScore);
+              gainXp(e.xp);
+              spawnLoot(e.x + e.w / 2, e.y + e.h / 2, e);
+              cameraShake = 4;
+            }
+          } else if (player.invuln <= 0) {
+            const knock = player.x < e.x ? -1 : 1;
+            takeDamage(2 + e.power, knock);
+          }
         }
       }
+
 
       // Coins
       for (const c of world.coins) {
