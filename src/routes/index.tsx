@@ -434,17 +434,15 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     }
   });
 
-  // Each frame: drive the sword's transform from the right-hand bone's world
-  // matrix (converted into the hero group's local space) so the sword follows
-  // the hand rigidly, without inheriting the skeleton's internal bone scale
-  // (which would make the sword invisible or huge if we reparented it).
-  const tmpMat = useRef(new THREE.Matrix4()).current;
+  // Keep the sword visually locked to the right hand without re-parenting it
+  // into the animated skeleton (that caused visibility/freeze issues).
   const tmpPos = useRef(new THREE.Vector3()).current;
   const tmpQuat = useRef(new THREE.Quaternion()).current;
-  const tmpScale = useRef(new THREE.Vector3()).current;
-  const handOffsetPos = useRef(new THREE.Vector3(0, 0.05, 0)).current;
+  const tmpParentQuat = useRef(new THREE.Quaternion()).current;
+  const tmpOffset = useRef(new THREE.Vector3()).current;
+  const handOffsetPos = useRef(new THREE.Vector3(0.04, -0.03, 0.03)).current;
   const handOffsetQuat = useRef(
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, -Math.PI / 2)),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, -Math.PI / 2, Math.PI / 2)),
   ).current;
 
   useFrame(() => {
@@ -474,12 +472,16 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       b.spine1.rotation.set(base.x + s * 0.12, base.y - s * 0.3, base.z);
     }
 
-    // Snap sword to hand each frame.
+    // Snap sword to hand each frame using position/quaternion only. This avoids
+    // matrix decomposition and per-frame allocations that could hang the game.
     if (b.rightHand && swordRef.current && group.current) {
-      b.rightHand.updateWorldMatrix(true, false);
-      tmpMat.copy(group.current.matrixWorld).invert().multiply(b.rightHand.matrixWorld);
-      tmpMat.decompose(tmpPos, tmpQuat, tmpScale);
-      swordRef.current.position.copy(tmpPos).add(handOffsetPos.clone().applyQuaternion(tmpQuat));
+      b.rightHand.getWorldPosition(tmpPos);
+      b.rightHand.getWorldQuaternion(tmpQuat);
+      group.current.worldToLocal(tmpPos);
+      group.current.getWorldQuaternion(tmpParentQuat).invert();
+      tmpQuat.premultiply(tmpParentQuat);
+      tmpOffset.copy(handOffsetPos).applyQuaternion(tmpQuat);
+      swordRef.current.position.copy(tmpPos).add(tmpOffset);
       swordRef.current.quaternion.copy(tmpQuat).multiply(handOffsetQuat);
     }
   });
