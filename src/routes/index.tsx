@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Sky, Stars, Text } from "@react-three/drei";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import hero0 from "@/assets/hero_0.png.asset.json";
+import hero1 from "@/assets/hero_1.png.asset.json";
+import hero2 from "@/assets/hero_2.png.asset.json";
+import hero3 from "@/assets/hero_3.png.asset.json";
+
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -335,7 +340,7 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
   return false;
 }
 
-/* ---------------- HERO (hooded swordsman, Berserk/Witcher inspired) ---------------- */
+/* ---------------- HERO (photoreal sprite billboard from reference image) ---------------- */
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
   facingRef: React.MutableRefObject<number>;
@@ -343,376 +348,114 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   walkPhaseRef: React.MutableRefObject<number>;
 }) {
   const group = useRef<THREE.Group>(null!);
-  const swordGrip = useRef<THREE.Group>(null!);      // sword held in right hand while attacking
-  const swordSheath = useRef<THREE.Group>(null!);    // sword on back while idle
-  const capeRef = useRef<THREE.Group>(null!);
-  const capeShredsRef = useRef<THREE.Group>(null!);
-  const leftLeg = useRef<THREE.Group>(null!);
-  const rightLeg = useRef<THREE.Group>(null!);
-  const leftArm = useRef<THREE.Group>(null!);
-  const rightArm = useRef<THREE.Group>(null!);
-  const head = useRef<THREE.Group>(null!);
-  const torso = useRef<THREE.Group>(null!);
+  const plane = useRef<THREE.Mesh>(null!);
+  const shadowRef = useRef<THREE.Mesh>(null!);
+  const { camera } = useThree();
 
-  useFrame(() => {
-    if (!group.current) return;
+  // Load the 4 reference frames as textures
+  const [tex0, tex1, tex2, tex3] = useLoader(THREE.TextureLoader, [
+    hero0.url, hero1.url, hero2.url, hero3.url,
+  ]);
+  const textures = useMemo(() => {
+    const list = [tex0, tex1, tex2, tex3];
+    for (const t of list) {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.magFilter = THREE.LinearFilter;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+      t.anisotropy = 8;
+      t.needsUpdate = true;
+    }
+    return list;
+  }, [tex0, tex1, tex2, tex3]);
+
+  // Sprite dimensions: keep hero ~2.4 units tall; width follows source aspect
+  const HERO_HEIGHT = 2.4;
+  const dims = useMemo(() => textures.map((t) => {
+    const img = t.image as HTMLImageElement | undefined;
+    const ar = img && img.width ? img.width / img.height : 0.42;
+    return { w: HERO_HEIGHT * ar, h: HERO_HEIGHT };
+  }), [textures]);
+
+  const prevWalk = useRef(0);
+  const frameIdx = useRef(0);
+
+  useFrame((_state, dt) => {
+    if (!group.current || !plane.current) return;
+
+    // Anchor sprite: feet at posRef.y, so plane center at posRef.y + HERO_HEIGHT/2
+    group.current.position.set(posRef.current.x, posRef.current.y + HERO_HEIGHT / 2 - 0.05, posRef.current.z);
+
+    // Billboard: rotate plane to face camera (yaw only so feet stay on ground)
+    const dx = camera.position.x - group.current.position.x;
+    const dz = camera.position.z - group.current.position.z;
+    plane.current.rotation.y = Math.atan2(dx, dz);
+
+    // Frame selection
     const wp = walkPhaseRef.current;
-    const swing = Math.sin(wp * 10);
-    const swingB = Math.sin(wp * 10 + Math.PI);
-
-    group.current.position.copy(posRef.current);
-    group.current.rotation.y = facingRef.current;
-    group.current.position.y += Math.sin(wp * 20) * 0.035;
-
-    if (torso.current) torso.current.rotation.y = swing * 0.06;
-    if (head.current) {
-      head.current.rotation.y = -swing * 0.04;
-      head.current.rotation.x = 0.05; // slightly down, like the reference
-    }
-
-    if (leftLeg.current) leftLeg.current.rotation.x = swing * 0.75;
-    if (rightLeg.current) rightLeg.current.rotation.x = swingB * 0.75;
-    if (leftArm.current) leftArm.current.rotation.x = swingB * 0.55;
-
+    const walking = Math.abs(wp - prevWalk.current) > 0.0005;
+    prevWalk.current = wp;
     const atk = attackingRef.current;
-    if (rightArm.current) {
-      if (atk > 0) {
-        // Overhead diagonal slash
-        rightArm.current.rotation.x = -Math.sin(atk * Math.PI) * 2.4 - 0.2;
-        rightArm.current.rotation.z = -Math.cos(atk * Math.PI) * 0.6 - 0.15;
-      } else {
-        rightArm.current.rotation.x = swing * 0.55 - 0.15;
-        rightArm.current.rotation.z = -0.05;
-      }
-    }
-    // Sword visible in hand only during attack; sheathed on back otherwise
-    if (swordGrip.current) swordGrip.current.visible = atk > 0;
-    if (swordSheath.current) swordSheath.current.visible = atk <= 0;
 
-    if (capeRef.current) {
-      capeRef.current.rotation.x = Math.sin(wp * 6) * 0.15 + 0.1;
-      capeRef.current.rotation.z = Math.sin(wp * 4) * 0.04;
+    let idx: number;
+    if (atk > 0) {
+      // Alternate attack/wind-up frames for slash motion
+      idx = atk > 0.5 ? 3 : 1;
+    } else if (walking) {
+      // Cycle walk frames: 2 (running forward) ↔ 1 (mid-stride)
+      idx = Math.floor(wp * 4) % 2 === 0 ? 2 : 1;
+    } else {
+      idx = 0; // idle standing
     }
-    if (capeShredsRef.current) {
-      capeShredsRef.current.children.forEach((c, i) => {
-        (c as THREE.Object3D).rotation.x = Math.sin(wp * 7 + i * 0.4) * 0.25;
-      });
+
+    if (idx !== frameIdx.current) {
+      frameIdx.current = idx;
+      const mat = plane.current.material as THREE.MeshBasicMaterial;
+      mat.map = textures[idx];
+      mat.needsUpdate = true;
+      // Rescale plane to match this frame's aspect
+      const d = dims[idx];
+      plane.current.scale.set(d.w, d.h, 1);
+    }
+
+    // Flip sprite based on facing vs camera so hero appears to walk correctly
+    const facingVec = new THREE.Vector3(Math.sin(facingRef.current), 0, Math.cos(facingRef.current));
+    const camRight = new THREE.Vector3().subVectors(camera.position, group.current.position);
+    // rotate camRight 90deg (right-hand of camera->hero)
+    const right = new THREE.Vector3(-camRight.z, 0, camRight.x).normalize();
+    const side = facingVec.dot(right);
+    plane.current.scale.x = Math.abs(plane.current.scale.x) * (side >= 0 ? 1 : -1);
+
+    // Subtle vertical bob when moving
+    if (walking) group.current.position.y += Math.sin(wp * 20) * 0.03;
+
+    // Shadow follows on ground
+    if (shadowRef.current) {
+      shadowRef.current.position.set(posRef.current.x, posRef.current.y + 0.02, posRef.current.z);
     }
   });
 
-  // Grim palette from reference: weathered leather, dark browns, black, muddy tan
-  const leatherDark = "#1e1610";
-  const leatherMid  = "#3a2a1c";
-  const leatherWorn = "#5a4128";
-  const leatherHi   = "#7a5a38";
-  const clothDark   = "#0f0a06";
-  const skinCol     = "#c69a72";
-  const skinShadow  = "#8a6244";
-  const hairCol     = "#2a1b10";
-  const steelDark   = "#3a3a3f";
-  const steelHi     = "#8a8a92";
-  const emberCol    = "#ff8a3a";
-
-  // Reusable rag/shred piece for the cape edge
-  const Shred = ({ x, y, w, h, rot = 0 }: { x: number; y: number; w: number; h: number; rot?: number }) => (
-    <mesh position={[x, y, 0]} rotation={[0, 0, rot]}>
-      <planeGeometry args={[w, h]} />
-      <meshStandardMaterial color={clothDark} roughness={1} side={THREE.DoubleSide} />
-    </mesh>
-  );
-
+  const initial = dims[0];
   return (
     <group ref={group}>
-      {/* --- LEGS (dark trousers + tall boots) --- */}
-      <group ref={leftLeg} position={[-0.13, 0.78, 0]}>
-        <mesh position={[0, -0.3, 0]} castShadow>
-          <capsuleGeometry args={[0.11, 0.38, 4, 8]} />
-          <meshStandardMaterial color={leatherDark} roughness={0.95} />
-        </mesh>
-        {/* Boot */}
-        <mesh position={[0, -0.72, 0.03]} castShadow>
-          <boxGeometry args={[0.22, 0.22, 0.36]} />
-          <meshStandardMaterial color={leatherDark} roughness={0.7} />
-        </mesh>
-        {/* Boot cuff */}
-        <mesh position={[0, -0.6, 0]} castShadow>
-          <cylinderGeometry args={[0.14, 0.13, 0.1, 10]} />
-          <meshStandardMaterial color={leatherMid} roughness={0.9} />
-        </mesh>
-      </group>
-      <group ref={rightLeg} position={[0.13, 0.78, 0]}>
-        <mesh position={[0, -0.3, 0]} castShadow>
-          <capsuleGeometry args={[0.11, 0.38, 4, 8]} />
-          <meshStandardMaterial color={leatherDark} roughness={0.95} />
-        </mesh>
-        <mesh position={[0, -0.72, 0.03]} castShadow>
-          <boxGeometry args={[0.22, 0.22, 0.36]} />
-          <meshStandardMaterial color={leatherDark} roughness={0.7} />
-        </mesh>
-        <mesh position={[0, -0.6, 0]} castShadow>
-          <cylinderGeometry args={[0.14, 0.13, 0.1, 10]} />
-          <meshStandardMaterial color={leatherMid} roughness={0.9} />
-        </mesh>
-      </group>
-
-      {/* --- TORSO --- */}
-      <group ref={torso} position={[0, 0.78, 0]}>
-        {/* Layered tunic skirt (tattered leather) */}
-        <mesh position={[0, 0.02, 0]} castShadow>
-          <cylinderGeometry args={[0.42, 0.3, 0.7, 14, 1, false]} />
-          <meshStandardMaterial color={leatherMid} roughness={0.95} />
-        </mesh>
-        {/* Torn skirt hem strips */}
-        {[-0.35, -0.2, -0.05, 0.1, 0.25].map((ax, i) => (
-          <mesh key={i} position={[ax, -0.35, 0.24]} rotation={[0.15, 0, (i - 2) * 0.06]}>
-            <planeGeometry args={[0.14, 0.28]} />
-            <meshStandardMaterial color={leatherDark} roughness={1} side={THREE.DoubleSide} />
-          </mesh>
-        ))}
-        {[-0.35, -0.2, -0.05, 0.1, 0.25].map((ax, i) => (
-          <mesh key={`b${i}`} position={[ax, -0.35, -0.24]} rotation={[-0.15, 0, (i - 2) * 0.06]}>
-            <planeGeometry args={[0.14, 0.28]} />
-            <meshStandardMaterial color={leatherDark} roughness={1} side={THREE.DoubleSide} />
-          </mesh>
-        ))}
-
-        {/* Chestpiece (leather cuirass, wider at shoulders) */}
-        <mesh position={[0, 0.55, 0]} castShadow>
-          <capsuleGeometry args={[0.28, 0.42, 4, 12]} />
-          <meshStandardMaterial color={leatherMid} roughness={0.9} />
-        </mesh>
-        {/* Shoulder pauldrons */}
-        <mesh position={[-0.3, 0.72, 0]} castShadow>
-          <sphereGeometry args={[0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color={leatherWorn} roughness={0.9} />
-        </mesh>
-        <mesh position={[0.3, 0.72, 0]} castShadow>
-          <sphereGeometry args={[0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-          <meshStandardMaterial color={leatherWorn} roughness={0.9} />
-        </mesh>
-        {/* Diagonal sword baldric across chest */}
-        <mesh position={[0, 0.55, 0.24]} rotation={[0, 0, 0.55]}>
-          <boxGeometry args={[0.06, 0.9, 0.02]} />
-          <meshStandardMaterial color={leatherHi} roughness={0.85} />
-        </mesh>
-        {/* Belt */}
-        <mesh position={[0, 0.32, 0]} castShadow>
-          <cylinderGeometry args={[0.34, 0.34, 0.09, 16]} />
-          <meshStandardMaterial color={leatherHi} roughness={0.8} />
-        </mesh>
-        {/* Belt buckle (dull iron, not shiny gold) */}
-        <mesh position={[0, 0.32, 0.34]}>
-          <boxGeometry args={[0.11, 0.08, 0.025]} />
-          <meshStandardMaterial color={steelDark} metalness={0.7} roughness={0.5} />
-        </mesh>
-        {/* Belt pouch */}
-        <mesh position={[0.22, 0.28, 0.28]} castShadow>
-          <boxGeometry args={[0.13, 0.15, 0.08]} />
-          <meshStandardMaterial color={leatherMid} roughness={0.95} />
-        </mesh>
-        {/* Small ember/lantern on hip for visibility in dark */}
-        <mesh position={[-0.22, 0.28, 0.28]}>
-          <sphereGeometry args={[0.055, 8, 8]} />
-          <meshStandardMaterial color={emberCol} emissive={emberCol} emissiveIntensity={2.2} />
-        </mesh>
-        <pointLight position={[-0.22, 0.3, 0.35]} color={emberCol} intensity={1.2} distance={4.5} />
-
-        {/* --- CAPE (tattered, from shoulders) --- */}
-        <group ref={capeRef} position={[0, 0.65, -0.2]}>
-          {/* Main cloak body */}
-          <mesh castShadow position={[0, -0.45, 0]}>
-            <planeGeometry args={[1.1, 1.25, 3, 3]} />
-            <meshStandardMaterial color={clothDark} roughness={1} side={THREE.DoubleSide} />
-          </mesh>
-          {/* Under-cape lighter layer */}
-          <mesh position={[0, -0.45, -0.02]}>
-            <planeGeometry args={[1.0, 1.15]} />
-            <meshStandardMaterial color={leatherMid} roughness={1} side={THREE.DoubleSide} />
-          </mesh>
-          {/* Torn shreds hanging from bottom of cape */}
-          <group ref={capeShredsRef} position={[0, -1.05, 0.02]}>
-            <Shred x={-0.42} y={-0.1} w={0.14} h={0.32} rot={-0.05} />
-            <Shred x={-0.24} y={-0.05} w={0.13} h={0.4} rot={0.03} />
-            <Shred x={-0.08} y={-0.12} w={0.15} h={0.28} rot={-0.02} />
-            <Shred x={0.08}  y={-0.02} w={0.13} h={0.42} rot={0.04} />
-            <Shred x={0.24}  y={-0.1}  w={0.15} h={0.34} rot={-0.03} />
-            <Shred x={0.42}  y={-0.08} w={0.13} h={0.3}  rot={0.06} />
-          </group>
-        </group>
-
-        {/* --- ARMS --- */}
-        <group ref={leftArm} position={[-0.34, 0.7, 0]}>
-          {/* Upper arm (padded) */}
-          <mesh position={[0, -0.22, 0]} castShadow>
-            <capsuleGeometry args={[0.1, 0.28, 4, 8]} />
-            <meshStandardMaterial color={leatherMid} roughness={0.95} />
-          </mesh>
-          {/* Bracer (forearm) */}
-          <mesh position={[0, -0.52, 0]} castShadow>
-            <capsuleGeometry args={[0.085, 0.26, 4, 8]} />
-            <meshStandardMaterial color={leatherDark} roughness={0.9} />
-          </mesh>
-          {/* Bracer strap */}
-          <mesh position={[0, -0.5, 0]}>
-            <torusGeometry args={[0.095, 0.012, 6, 12]} />
-            <meshStandardMaterial color={leatherHi} roughness={0.9} />
-          </mesh>
-          {/* Fingerless glove hand */}
-          <mesh position={[0, -0.74, 0]} castShadow>
-            <sphereGeometry args={[0.08, 10, 10]} />
-            <meshStandardMaterial color={skinShadow} roughness={0.9} />
-          </mesh>
-        </group>
-
-        <group ref={rightArm} position={[0.34, 0.7, 0]}>
-          <mesh position={[0, -0.22, 0]} castShadow>
-            <capsuleGeometry args={[0.1, 0.28, 4, 8]} />
-            <meshStandardMaterial color={leatherMid} roughness={0.95} />
-          </mesh>
-          <mesh position={[0, -0.52, 0]} castShadow>
-            <capsuleGeometry args={[0.085, 0.26, 4, 8]} />
-            <meshStandardMaterial color={leatherDark} roughness={0.9} />
-          </mesh>
-          <mesh position={[0, -0.5, 0]}>
-            <torusGeometry args={[0.095, 0.012, 6, 12]} />
-            <meshStandardMaterial color={leatherHi} roughness={0.9} />
-          </mesh>
-          <mesh position={[0, -0.74, 0]} castShadow>
-            <sphereGeometry args={[0.08, 10, 10]} />
-            <meshStandardMaterial color={skinShadow} roughness={0.9} />
-          </mesh>
-
-          {/* --- BROADSWORD (visible in hand while attacking) --- */}
-          <group ref={swordGrip} position={[0, -0.78, 0.05]} visible={false}>
-            {/* Grip */}
-            <mesh position={[0, -0.05, 0]}>
-              <cylinderGeometry args={[0.028, 0.028, 0.22, 8]} />
-              <meshStandardMaterial color={leatherDark} roughness={0.9} />
-            </mesh>
-            {/* Pommel */}
-            <mesh position={[0, -0.18, 0]}>
-              <sphereGeometry args={[0.045, 10, 10]} />
-              <meshStandardMaterial color={steelDark} metalness={0.85} roughness={0.4} />
-            </mesh>
-            {/* Crossguard */}
-            <mesh position={[0, 0.09, 0]}>
-              <boxGeometry args={[0.32, 0.04, 0.05]} />
-              <meshStandardMaterial color={steelDark} metalness={0.85} roughness={0.4} />
-            </mesh>
-            {/* Blade */}
-            <mesh position={[0, 0.65, 0]} castShadow>
-              <boxGeometry args={[0.08, 1.15, 0.02]} />
-              <meshStandardMaterial color={steelHi} metalness={0.95} roughness={0.25} />
-            </mesh>
-            {/* Blade tip */}
-            <mesh position={[0, 1.25, 0]} rotation={[0, 0, Math.PI / 4]}>
-              <boxGeometry args={[0.06, 0.06, 0.02]} />
-              <meshStandardMaterial color={steelHi} metalness={0.95} roughness={0.25} />
-            </mesh>
-          </group>
-        </group>
-
-        {/* --- SWORD ON BACK (sheathed, visible while not attacking) --- */}
-        <group ref={swordSheath} position={[-0.12, 0.9, -0.28]} rotation={[0, 0, 0.5]}>
-          {/* Sheath */}
-          <mesh castShadow>
-            <boxGeometry args={[0.11, 1.05, 0.05]} />
-            <meshStandardMaterial color={leatherDark} roughness={0.95} />
-          </mesh>
-          {/* Sheath binding */}
-          <mesh position={[0, 0.25, 0.03]}>
-            <boxGeometry args={[0.13, 0.05, 0.02]} />
-            <meshStandardMaterial color={leatherHi} roughness={0.8} />
-          </mesh>
-          <mesh position={[0, -0.2, 0.03]}>
-            <boxGeometry args={[0.13, 0.05, 0.02]} />
-            <meshStandardMaterial color={leatherHi} roughness={0.8} />
-          </mesh>
-          {/* Hilt sticking out */}
-          <mesh position={[0, 0.62, 0]}>
-            <cylinderGeometry args={[0.028, 0.028, 0.22, 8]} />
-            <meshStandardMaterial color={leatherDark} roughness={0.9} />
-          </mesh>
-          <mesh position={[0, 0.75, 0]}>
-            <boxGeometry args={[0.28, 0.035, 0.045]} />
-            <meshStandardMaterial color={steelDark} metalness={0.8} roughness={0.5} />
-          </mesh>
-          <mesh position={[0, 0.5, 0]}>
-            <sphereGeometry args={[0.04, 8, 8]} />
-            <meshStandardMaterial color={steelDark} metalness={0.8} roughness={0.5} />
-          </mesh>
-        </group>
-      </group>
-
-      {/* --- HEAD --- */}
-      <group ref={head} position={[0, 1.66, 0]}>
-        {/* Face */}
-        <mesh position={[0, 0, 0.02]} castShadow>
-          <sphereGeometry args={[0.19, 16, 16]} />
-          <meshStandardMaterial color={skinCol} roughness={0.9} />
-        </mesh>
-        {/* Neck */}
-        <mesh position={[0, -0.2, 0]} castShadow>
-          <cylinderGeometry args={[0.09, 0.11, 0.14, 10]} />
-          <meshStandardMaterial color={skinShadow} roughness={0.9} />
-        </mesh>
-        {/* Messy dark hair fringe under hood */}
-        <mesh position={[0, 0.12, 0.14]} castShadow>
-          <sphereGeometry args={[0.18, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.55]} />
-          <meshStandardMaterial color={hairCol} roughness={1} />
-        </mesh>
-        {/* Side hair tufts */}
-        <mesh position={[0.16, 0.02, 0.08]}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshStandardMaterial color={hairCol} roughness={1} />
-        </mesh>
-        <mesh position={[-0.16, 0.02, 0.08]}>
-          <sphereGeometry args={[0.08, 8, 8]} />
-          <meshStandardMaterial color={hairCol} roughness={1} />
-        </mesh>
-        {/* Stubble (dark jaw) */}
-        <mesh position={[0, -0.09, 0.14]}>
-          <sphereGeometry args={[0.14, 12, 12, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
-          <meshStandardMaterial color={hairCol} roughness={1} transparent opacity={0.6} />
-        </mesh>
-        {/* Hood cowl (weathered leather, covers back and sides) */}
-        <mesh position={[0, 0.05, -0.05]} castShadow>
-          <sphereGeometry args={[0.32, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.72]} />
-          <meshStandardMaterial color={leatherDark} roughness={1} side={THREE.DoubleSide} />
-        </mesh>
-        {/* Hood brim shadowing the face */}
-        <mesh position={[0, 0.14, 0.11]} rotation={[0.35, 0, 0]}>
-          <ringGeometry args={[0.15, 0.32, 20, 1, 0, Math.PI]} />
-          <meshStandardMaterial color={clothDark} roughness={1} side={THREE.DoubleSide} />
-        </mesh>
-        {/* Eyes (subtle, not glowing — just faint highlights) */}
-        <mesh position={[0.07, 0.01, 0.19]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color="#0a0a08" />
-        </mesh>
-        <mesh position={[-0.07, 0.01, 0.19]}>
-          <sphereGeometry args={[0.022, 8, 8]} />
-          <meshStandardMaterial color="#0a0a08" />
-        </mesh>
-        {/* Tiny eye glints for readability in the dark */}
-        <mesh position={[0.075, 0.015, 0.205]}>
-          <sphereGeometry args={[0.008, 6, 6]} />
-          <meshStandardMaterial color="#e8e0c8" emissive="#e8e0c8" emissiveIntensity={0.8} />
-        </mesh>
-        <mesh position={[-0.065, 0.015, 0.205]}>
-          <sphereGeometry args={[0.008, 6, 6]} />
-          <meshStandardMaterial color="#e8e0c8" emissive="#e8e0c8" emissiveIntensity={0.8} />
-        </mesh>
-      </group>
-
-      {/* Ground shadow blob */}
-      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.45, 20]} />
-        <meshBasicMaterial color="#000" transparent opacity={0.4} />
+      <mesh ref={plane} scale={[initial.w, initial.h, 1]}>
+        <planeGeometry args={[1, 1]} />
+        <meshBasicMaterial
+          map={textures[0]}
+          transparent
+          alphaTest={0.35}
+          side={THREE.DoubleSide}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Ground shadow disc (rendered in world space, not billboarded) */}
+      <mesh ref={shadowRef} rotation={[-Math.PI / 2, 0, 0]} renderOrder={-1}>
+        <circleGeometry args={[0.55, 24]} />
+        <meshBasicMaterial color="#000" transparent opacity={0.45} depthWrite={false} />
       </mesh>
     </group>
   );
 }
+
 
 /* ---------------- ENEMY ---------------- */
 function EnemyMesh({ e }: { e: Enemy }) {
