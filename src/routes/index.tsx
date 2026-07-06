@@ -2079,13 +2079,20 @@ function Index() {
           <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-2xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▶</button>
           <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▼</button>
         </div>
-        <div className="flex gap-2 items-end pointer-events-auto">
-          <button {...holdKey("KeyZ")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-yellow-400 text-black rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">PUÑO</button>
-          <button {...holdKey("KeyX")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none leading-tight">POUND</button>
-          <button {...holdKey("ShiftLeft")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">RUN</button>
-          <button {...holdKey("Space")} className="w-18 h-18 min-w-[72px] min-h-[72px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">JUMP</button>
+        <div className="flex flex-col gap-2 items-end pointer-events-auto">
+          <div className="flex gap-2 items-center">
+            <button {...holdKey("KeyQ")} className="w-11 h-11 bg-green-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">🧪</button>
+            <button {...holdKey("KeyE")} className="w-11 h-11 bg-cyan-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">🔮</button>
+          </div>
+          <div className="flex gap-2 items-end">
+            <button {...holdKey("KeyZ")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-yellow-400 text-black rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">ESPADA</button>
+            <button {...holdKey("KeyX")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none leading-tight">POUND</button>
+            <button {...holdKey("ShiftLeft")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">RUN</button>
+            <button {...holdKey("Space")} className="w-18 h-18 min-w-[72px] min-h-[72px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">JUMP</button>
+          </div>
         </div>
       </div>
+
 
       {/* Modals */}
       {status === "stageClear" && (
