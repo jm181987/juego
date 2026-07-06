@@ -497,58 +497,165 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
 /* ---------------- ENEMY ---------------- */
+/* ---------------- ENEMY ---------------- */
+// Realistic enemies reuse the same rigged human GLB as the hero, with
+// per-kind tinting, scale, and a weapon prop. This gives real skeletal
+// animation instead of primitive limbs.
 function EnemyMesh({ e }: { e: Enemy }) {
   const ref = useRef<THREE.Group>(null!);
-  const leftArm = useRef<THREE.Group>(null!);
-  const rightArm = useRef<THREE.Group>(null!);
-  const leftLeg = useRef<THREE.Group>(null!);
-  const rightLeg = useRef<THREE.Group>(null!);
-  const head = useRef<THREE.Group>(null!);
-  const bodyRef = useRef<THREE.Group>(null!);
-  const walk = useRef(0);
-  const lastPos = useRef(new THREE.Vector3());
-  useFrame((state, dt) => {
+  const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
+
+  const gltf = useGLTF(soldierAsset.url) as unknown as {
+    scene: THREE.Group;
+    animations: THREE.AnimationClip[];
+  };
+  const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
+  const baseColors = useRef(new Map<THREE.Material, THREE.Color>());
+
+  // Per-kind visual identity
+  const tint = useMemo(() => {
+    if (e.kind === "brute") return new THREE.Color("#8a6a4a"); // heavy warrior — warm bronze/leather
+    if (e.kind === "wraith") return new THREE.Color("#b0a0d8"); // pale sorceress — cool violet
+    return new THREE.Color("#6a5a44"); // bandit — muted brown
+  }, [e.kind]);
+  const scale = e.kind === "brute" ? 1.25 : e.kind === "wraith" ? 1.05 : 0.95;
+
+  useEffect(() => {
+    cloned.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+        const mat = m.material as THREE.MeshStandardMaterial | undefined;
+        if (mat && "color" in mat && mat.color) {
+          // clone material so per-instance tint / hit-flash don't leak across enemies
+          const cloneMat = mat.clone();
+          baseColors.current.set(cloneMat, cloneMat.color.clone().multiply(tint));
+          cloneMat.color.copy(baseColors.current.get(cloneMat)!);
+          m.material = cloneMat;
+        }
+      }
+    });
+  }, [cloned, tint]);
+
+  const { actions } = useAnimations(gltf.animations, cloned);
+  const currentAction = useRef<string>("");
+  const switchTo = (name: string, fade = 0.25, timeScale = 1) => {
+    const next = actions[name];
+    if (!next) return;
+    if (currentAction.current === name) {
+      next.setEffectiveTimeScale(timeScale);
+      return;
+    }
+    const prev = actions[currentAction.current];
+    next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).fadeIn(fade).play();
+    if (prev) prev.fadeOut(fade);
+    currentAction.current = name;
+  };
+  useEffect(() => {
+    switchTo("Idle", 0);
+    return () => { Object.values(actions).forEach((a) => a?.stop()); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actions]);
+
+  useFrame((_state, dt) => {
     if (!ref.current) return;
     ref.current.position.copy(e.pos);
     ref.current.visible = e.alive;
+
     const dx = e.pos.x - lastPos.current.x;
     const dz = e.pos.z - lastPos.current.z;
-    const moved = Math.hypot(dx, dz, e.pos.y - lastPos.current.y);
+    const speed = Math.hypot(dx, dz) / Math.max(dt, 0.0001);
     if (Math.abs(dx) + Math.abs(dz) > 0.0005) {
-      ref.current.rotation.y = Math.atan2(dx, dz);
+      // Model faces +Z by default; +PI so it looks toward its travel direction.
+      ref.current.rotation.y = Math.atan2(dx, dz) + Math.PI;
     }
-    lastPos.current.copy(e.pos);
-    const speed = Math.min(moved / Math.max(dt, 0.0001), 8);
-    walk.current += dt * (2 + speed * 1.5);
-    const sw = Math.sin(walk.current) * Math.min(0.6, 0.15 + speed * 0.15);
-    if (leftLeg.current) leftLeg.current.rotation.x = sw;
-    if (rightLeg.current) rightLeg.current.rotation.x = -sw;
-    if (leftArm.current) leftArm.current.rotation.x = -sw * 0.9;
-    if (rightArm.current) rightArm.current.rotation.x = sw * 0.9;
-    if (bodyRef.current) bodyRef.current.position.y = Math.abs(Math.sin(walk.current)) * 0.05;
-    if (head.current) {
-      head.current.rotation.z = Math.sin(state.clock.elapsedTime * 1.7 + e.id) * 0.05;
-      head.current.rotation.x = Math.sin(state.clock.elapsedTime * 0.9 + e.id) * 0.04;
+    lastPos.current.set(e.pos.x, e.pos.y, e.pos.z);
+
+    if (speed > 0.6) switchTo("Run", 0.18, e.kind === "wraith" ? 1.1 : e.kind === "brute" ? 0.9 : 1.2);
+    else switchTo("Idle", 0.25, 1);
+
+    // Hit flash — brighten cached base colors briefly.
+    const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
+    if (flash > 0) {
+      baseColors.current.forEach((base, mat) => {
+        const m = mat as THREE.MeshStandardMaterial;
+        m.color.copy(base).lerp(new THREE.Color(1, 0.4, 0.4), flash);
+      });
+    } else {
+      baseColors.current.forEach((base, mat) => {
+        const m = mat as THREE.MeshStandardMaterial;
+        if (!m.color.equals(base)) m.color.copy(base);
+      });
     }
-    const flash = e.hitFlash > 0;
-    ref.current.traverse((c: any) => {
-      if (c.material && c.material.emissive) {
-        c.material.emissiveIntensity = flash ? 2 : (c.userData.baseEmissive ?? 0);
-      }
-    });
   });
 
-  const s = e.kind === "brute" ? 1.35 : e.kind === "wraith" ? 1.15 : 0.9;
+  const weapon = e.kind === "brute" ? "greatsword" : e.kind === "wraith" ? "staff" : "sword";
 
   return (
-    <group ref={ref}>
-      <group ref={bodyRef}>
-        {e.kind === "goblin" && <GoblinBody s={s} leftArm={leftArm} rightArm={rightArm} leftLeg={leftLeg} rightLeg={rightLeg} head={head} />}
-        {e.kind === "wraith" && <WraithBody s={s} leftArm={leftArm} rightArm={rightArm} leftLeg={leftLeg} rightLeg={rightLeg} head={head} id={e.id} />}
-        {e.kind === "brute" && <BruteBody s={s} leftArm={leftArm} rightArm={rightArm} leftLeg={leftLeg} rightLeg={rightLeg} head={head} />}
-      </group>
+    <group ref={ref} scale={scale}>
+      <primitive object={cloned} />
+
+      {/* Weapon prop bolted to the right side of the hero group. */}
+      {weapon === "sword" && (
+        <group position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
+          <mesh position={[0, -0.15, 0]} castShadow>
+            <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
+            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.02, 0]} castShadow>
+            <boxGeometry args={[0.38, 0.055, 0.07]} />
+            <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.7, 0]} castShadow>
+            <boxGeometry args={[0.08, 1.25, 0.02]} />
+            <meshStandardMaterial color="#b8bcc4" metalness={0.85} roughness={0.3} />
+          </mesh>
+        </group>
+      )}
+
+      {weapon === "greatsword" && (
+        <group position={[0.6, 1.05, 0.15]} rotation={[0, 0, -0.55]}>
+          <mesh position={[0, -0.2, 0]} castShadow>
+            <cylinderGeometry args={[0.05, 0.05, 0.4, 10]} />
+            <meshStandardMaterial color="#1a0f08" roughness={0.9} />
+          </mesh>
+          <mesh position={[0, 0.02, 0]} castShadow>
+            <boxGeometry args={[0.5, 0.07, 0.08]} />
+            <meshStandardMaterial color="#a8862a" metalness={0.75} roughness={0.35} />
+          </mesh>
+          <mesh position={[0, 1.0, 0]} castShadow>
+            <boxGeometry args={[0.11, 1.85, 0.025]} />
+            <meshStandardMaterial color="#d0d4dc" metalness={0.9} roughness={0.2} />
+          </mesh>
+          <mesh position={[0, 1.95, 0]} castShadow>
+            <coneGeometry args={[0.055, 0.22, 4]} />
+            <meshStandardMaterial color="#d0d4dc" metalness={0.9} roughness={0.2} />
+          </mesh>
+        </group>
+      )}
+
+      {weapon === "staff" && (
+        <group position={[0.5, 1.1, 0.15]} rotation={[0, 0, -0.5]}>
+          <mesh castShadow>
+            <cylinderGeometry args={[0.03, 0.035, 1.9, 8]} />
+            <meshStandardMaterial color="#3a2410" roughness={0.85} />
+          </mesh>
+          <mesh position={[0, 0.98, 0]} castShadow>
+            <torusGeometry args={[0.09, 0.022, 6, 14]} />
+            <meshStandardMaterial color="#3a2410" roughness={0.85} />
+          </mesh>
+          <mesh position={[0, 1.06, 0]}>
+            <sphereGeometry args={[0.08, 12, 12]} />
+            <meshStandardMaterial color="#a060ff" emissive="#a060ff" emissiveIntensity={1.1} roughness={0.2} />
+          </mesh>
+          <pointLight color="#a060ff" intensity={0.8} distance={3.5} position={[0, 1.06, 0]} />
+        </group>
+      )}
+
+      {/* Health bar */}
       {e.alive && e.hp < e.maxHp && (
-        <group position={[0, s * 2.4, 0]}>
+        <group position={[0, 2.4, 0]}>
           <mesh>
             <planeGeometry args={[1, 0.12]} />
             <meshBasicMaterial color="#200" />
