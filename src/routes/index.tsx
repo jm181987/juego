@@ -1147,7 +1147,7 @@ function Index() {
       const speed = Math.abs(player.vx);
       const walking = player.onGround && speed > 0.3;
       const walkPhase = player.anim * 0.55;
-      const walkFrame = Math.floor(player.anim) % 4;
+      const walkFrame = Math.floor(player.anim) % 4; void walkFrame;
       const airborne = !player.onGround;
       const crouched = player.crouching;
       const attacking = player.attack > 0;
