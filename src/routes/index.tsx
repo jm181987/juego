@@ -614,10 +614,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           position={[0, -0.22, 0]}
           angle={0.55}
           penumbra={0.7}
-          intensity={16}
+          intensity={lightIntensity}
           distance={20}
           decay={1.2}
           color="#fff2c8"
+          castShadow={false}
+        />
+
           castShadow={false}
         />
         {/* target lejano en el eje -Y local (dirección del cabezal) */}
