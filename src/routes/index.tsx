@@ -675,9 +675,10 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
   return (
     <group ref={group} scale={[scaleX, scaleY, scaleZ]}>
-      <group rotation={[0, appearanceGender === "female" ? Math.PI : 0, 0]}>
+      <group rotation={[0, 0, 0]}>
         <primitive object={cloned} />
       </group>
+
       {/* Linterna sujeta por la mano izquierda: cuerpo + haz de luz hacia adelante */}
       <group ref={flashlightRef} visible={lightActive}>
 
