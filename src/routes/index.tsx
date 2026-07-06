@@ -667,67 +667,17 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 function EnemyMesh({ e }: { e: Enemy }) {
   const ref = useRef<THREE.Group>(null!);
   const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
-
-  const gltf = useGLTF(soldierAsset.url) as unknown as {
-    scene: THREE.Group;
-    animations: THREE.AnimationClip[];
-  };
-  const cloned = useMemo(() => SkeletonUtils.clone(gltf.scene) as THREE.Group, [gltf.scene]);
-  const baseColors = useRef(new Map<THREE.Material, THREE.Color>());
-
-  // Per-kind visual identity — darker, more menacing palette
-  const tint = useMemo(() => {
-    if (e.kind === "brute") return new THREE.Color("#2a1a12"); // blackened blood-iron
-    if (e.kind === "wraith") return new THREE.Color("#3a2f4a"); // decayed violet shroud
-    return new THREE.Color("#1a1410"); // bandit — charred leather
-  }, [e.kind]);
-  const scale = e.kind === "brute" ? 1.25 : e.kind === "wraith" ? 1.05 : 0.95;
-
-
-  useEffect(() => {
-    cloned.traverse((o) => {
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.castShadow = true;
-        m.receiveShadow = true;
-        const mat = m.material as THREE.MeshStandardMaterial | undefined;
-        if (mat && "color" in mat && mat.color) {
-          // clone material so per-instance tint / hit-flash don't leak across enemies
-          const cloneMat = mat.clone();
-          baseColors.current.set(cloneMat, cloneMat.color.clone().multiply(tint));
-          cloneMat.color.copy(baseColors.current.get(cloneMat)!);
-          cloneMat.roughness = 1;
-          cloneMat.metalness = 0.05;
-          // subtle sickly emissive glow so enemies read as "wrong" even in shadow
-          cloneMat.emissive = e.kind === "wraith"
-            ? new THREE.Color("#20102a")
-            : new THREE.Color("#100804");
-          cloneMat.emissiveIntensity = 0.35;
-          m.material = cloneMat;
-        }
-      }
-    });
-  }, [cloned, tint]);
-
-  const { actions } = useAnimations(gltf.animations, cloned);
-  const currentAction = useRef<string>("");
-  const switchTo = (name: string, fade = 0.25, timeScale = 1) => {
-    const next = actions[name];
-    if (!next) return;
-    if (currentAction.current === name) {
-      next.setEffectiveTimeScale(timeScale);
-      return;
+  const bodyMatRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const accentMatRef = useRef<THREE.MeshStandardMaterial>(null!);
+  const cfg = useMemo(() => {
+    if (e.kind === "brute") {
+      return { scale: 1.25, body: "#2a1a12", accent: "#ff3018", weapon: "greatsword" as const };
     }
-    const prev = actions[currentAction.current];
-    next.reset().setEffectiveTimeScale(timeScale).setEffectiveWeight(1).fadeIn(fade).play();
-    if (prev) prev.fadeOut(fade);
-    currentAction.current = name;
-  };
-  useEffect(() => {
-    switchTo("Idle", 0);
-    return () => { Object.values(actions).forEach((a) => a?.stop()); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [actions]);
+    if (e.kind === "wraith") {
+      return { scale: 1.05, body: "#24142f", accent: "#7cf9ff", weapon: "staff" as const };
+    }
+    return { scale: 0.95, body: "#1a1410", accent: "#ff6a22", weapon: "sword" as const };
+  }, [e.kind]);
 
   useFrame((_state, dt) => {
     if (!ref.current) return;
@@ -743,144 +693,39 @@ function EnemyMesh({ e }: { e: Enemy }) {
     }
     lastPos.current.set(e.pos.x, e.pos.y, e.pos.z);
 
-    if (speed > 0.6) switchTo("Run", 0.18, e.kind === "wraith" ? 1.1 : e.kind === "brute" ? 0.9 : 1.2);
-    else switchTo("Idle", 0.25, 1);
-
-    // Hit flash — brighten cached base colors briefly.
     const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
-    if (flash > 0) {
-      baseColors.current.forEach((base, mat) => {
-        const m = mat as THREE.MeshStandardMaterial;
-        m.color.copy(base).lerp(new THREE.Color(1, 0.4, 0.4), flash);
-      });
-    } else {
-      baseColors.current.forEach((base, mat) => {
-        const m = mat as THREE.MeshStandardMaterial;
-        if (!m.color.equals(base)) m.color.copy(base);
-      });
+    if (bodyMatRef.current) {
+      bodyMatRef.current.emissiveIntensity = 0.2 + flash * 1.5;
+    }
+    if (accentMatRef.current) {
+      accentMatRef.current.emissiveIntensity = 0.6 + flash * 2.2 + Math.sin(performance.now() * 0.006 + e.id) * 0.12;
     }
   });
 
-  const weapon = e.kind === "brute" ? "greatsword" : e.kind === "wraith" ? "staff" : "sword";
-
   return (
-    <group ref={ref} scale={scale}>
-      <primitive object={cloned} />
+    <group ref={ref} scale={cfg.scale}>
+      <mesh position={[0, 0.9, 0]} castShadow>
+        <capsuleGeometry args={[0.32, 0.85, 4, 10]} />
+        <meshStandardMaterial ref={bodyMatRef} color={cfg.body} emissive={cfg.body} emissiveIntensity={0.2} roughness={0.95} />
+      </mesh>
+      <mesh position={[0, 1.62, 0]} castShadow>
+        <sphereGeometry args={[0.23, 14, 12]} />
+        <meshStandardMaterial color={cfg.body} emissive={cfg.body} emissiveIntensity={0.22} roughness={1} />
+      </mesh>
+      <mesh position={[-0.07, 1.64, 0.2]}>
+        <sphereGeometry args={[0.028, 8, 8]} />
+        <meshStandardMaterial ref={accentMatRef} color={cfg.accent} emissive={cfg.accent} emissiveIntensity={0.8} />
+      </mesh>
+      <mesh position={[0.07, 1.64, 0.2]}>
+        <sphereGeometry args={[0.028, 8, 8]} />
+        <meshStandardMaterial color={cfg.accent} emissive={cfg.accent} emissiveIntensity={0.8} />
+      </mesh>
+      <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.7, 20]} />
+        <meshBasicMaterial color={cfg.accent} transparent opacity={0.16} depthWrite={false} />
+      </mesh>
 
-      {/* Scary head accents: glowing eyes + hooded shadow / skull mask */}
-      {(() => {
-        const eyeColor = e.kind === "wraith" ? "#7cf9ff" : "#ff2a1a";
-        const eyeY = 1.72;
-        const eyeZ = 0.18;
-        const pulse = 0.9 + Math.sin(e.id * 1.3) * 0.1;
-        return (
-          <group>
-            <mesh position={[-0.07, eyeY, eyeZ]}>
-              <sphereGeometry args={[0.028, 8, 8]} />
-              <meshBasicMaterial color={eyeColor} />
-            </mesh>
-            <mesh position={[0.07, eyeY, eyeZ]}>
-              <sphereGeometry args={[0.028, 8, 8]} />
-              <meshBasicMaterial color={eyeColor} />
-            </mesh>
-            <pointLight color={eyeColor} intensity={0.6 * pulse} distance={1.4} position={[0, eyeY, eyeZ + 0.05]} />
-
-            {/* Hood / cowl casting a dark shadow over the face */}
-            {e.kind !== "brute" && (
-              <mesh position={[0, 1.78, -0.02]} rotation={[0.25, 0, 0]} castShadow>
-                <coneGeometry args={[0.28, 0.42, 12, 1, true]} />
-                <meshStandardMaterial
-                  color={e.kind === "wraith" ? "#0a0612" : "#0d0906"}
-                  roughness={1}
-                  side={THREE.DoubleSide}
-                />
-              </mesh>
-            )}
-
-            {/* Wraith (female): long flowing hair, feminine silhouette, robed skirt */}
-            {e.kind === "wraith" && (
-              <group>
-                {/* Long dark hair cascade behind the head */}
-                <mesh position={[0, 1.62, -0.13]} castShadow>
-                  <sphereGeometry args={[0.22, 14, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
-                  <meshStandardMaterial color="#0a0510" roughness={1} />
-                </mesh>
-                <mesh position={[0, 1.35, -0.16]} rotation={[0.15, 0, 0]} castShadow>
-                  <cylinderGeometry args={[0.19, 0.11, 0.55, 14, 1, true]} />
-                  <meshStandardMaterial color="#0a0510" roughness={1} side={THREE.DoubleSide} />
-                </mesh>
-                <mesh position={[0, 1.02, -0.18]} rotation={[0.25, 0, 0]} castShadow>
-                  <cylinderGeometry args={[0.11, 0.05, 0.35, 12, 1, true]} />
-                  <meshStandardMaterial color="#0a0510" roughness={1} side={THREE.DoubleSide} />
-                </mesh>
-                {/* Loose side locks framing the face */}
-                <mesh position={[-0.14, 1.55, 0.02]} rotation={[0.1, 0, 0.15]} castShadow>
-                  <cylinderGeometry args={[0.04, 0.02, 0.32, 8]} />
-                  <meshStandardMaterial color="#0a0510" roughness={1} />
-                </mesh>
-                <mesh position={[0.14, 1.55, 0.02]} rotation={[0.1, 0, -0.15]} castShadow>
-                  <cylinderGeometry args={[0.04, 0.02, 0.32, 8]} />
-                  <meshStandardMaterial color="#0a0510" roughness={1} />
-                </mesh>
-                {/* Subtle bust to signal feminine silhouette */}
-                <mesh position={[-0.09, 1.28, 0.13]} castShadow>
-                  <sphereGeometry args={[0.09, 10, 10]} />
-                  <meshStandardMaterial color="#3a2f4a" roughness={1} emissive="#180a24" emissiveIntensity={0.25} />
-                </mesh>
-                <mesh position={[0.09, 1.28, 0.13]} castShadow>
-                  <sphereGeometry args={[0.09, 10, 10]} />
-                  <meshStandardMaterial color="#3a2f4a" roughness={1} emissive="#180a24" emissiveIntensity={0.25} />
-                </mesh>
-                {/* Flared robe / skirt at the hips */}
-                <mesh position={[0, 0.55, 0]} castShadow>
-                  <coneGeometry args={[0.45, 1.0, 18, 1, true]} />
-                  <meshStandardMaterial
-                    color="#1a1024"
-                    roughness={1}
-                    side={THREE.DoubleSide}
-                    emissive="#2a1440"
-                    emissiveIntensity={0.15}
-                  />
-                </mesh>
-              </group>
-            )}
-
-            {/* Brute: horned iron helm */}
-            {e.kind === "brute" && (
-              <group position={[0, 1.78, 0]}>
-                <mesh castShadow>
-                  <sphereGeometry args={[0.19, 12, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-                  <meshStandardMaterial color="#141014" metalness={0.7} roughness={0.55} />
-                </mesh>
-                <mesh position={[-0.16, 0.04, 0]} rotation={[0, 0, 0.9]} castShadow>
-                  <coneGeometry args={[0.04, 0.28, 8]} />
-                  <meshStandardMaterial color="#0a0a0a" metalness={0.8} roughness={0.4} />
-                </mesh>
-                <mesh position={[0.16, 0.04, 0]} rotation={[0, 0, -0.9]} castShadow>
-                  <coneGeometry args={[0.04, 0.28, 8]} />
-                  <meshStandardMaterial color="#0a0a0a" metalness={0.8} roughness={0.4} />
-                </mesh>
-              </group>
-            )}
-
-            {/* Ground aura — sickly fog disk */}
-            <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-              <circleGeometry args={[0.7, 20]} />
-              <meshBasicMaterial
-                color={e.kind === "wraith" ? "#4020a0" : "#600810"}
-                transparent
-                opacity={0.22}
-                depthWrite={false}
-              />
-            </mesh>
-          </group>
-        );
-      })()}
-
-
-
-      {/* Weapon prop bolted to the right side of the hero group. */}
-      {weapon === "sword" && (
+      {cfg.weapon === "sword" && (
         <group position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
           <mesh position={[0, -0.15, 0]} castShadow>
             <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
@@ -897,7 +742,7 @@ function EnemyMesh({ e }: { e: Enemy }) {
         </group>
       )}
 
-      {weapon === "greatsword" && (
+      {cfg.weapon === "greatsword" && (
         <group position={[0.6, 1.05, 0.15]} rotation={[0, 0, -0.55]}>
           <mesh position={[0, -0.2, 0]} castShadow>
             <cylinderGeometry args={[0.05, 0.05, 0.4, 10]} />
@@ -918,7 +763,7 @@ function EnemyMesh({ e }: { e: Enemy }) {
         </group>
       )}
 
-      {weapon === "staff" && (
+      {cfg.weapon === "staff" && (
         <group position={[0.5, 1.1, 0.15]} rotation={[0, 0, -0.5]}>
           <mesh castShadow>
             <cylinderGeometry args={[0.03, 0.035, 1.9, 8]} />
@@ -932,7 +777,6 @@ function EnemyMesh({ e }: { e: Enemy }) {
             <sphereGeometry args={[0.08, 12, 12]} />
             <meshStandardMaterial color="#a060ff" emissive="#a060ff" emissiveIntensity={1.1} roughness={0.2} />
           </mesh>
-          <pointLight color="#a060ff" intensity={0.8} distance={3.5} position={[0, 1.06, 0]} />
         </group>
       )}
 
