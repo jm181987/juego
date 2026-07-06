@@ -833,16 +833,18 @@ function Scene({
 
   return (
     <>
-      <fog attach="fog" args={[world.fog, 15, 55]} />
+      <fog attach="fog" args={[world.fog, world.fogNear, world.fogFar]} />
       <color attach="background" args={[world.fog]} />
       <ambientLight intensity={world.ambient} />
       <directionalLight
         position={[10, 20, 5]}
         intensity={0.6}
-        color={world.theme === "cave" ? "#ff8060" : world.theme === "sky" ? "#a090ff" : "#e0e0ff"}
+        color={world.theme === "cave" ? "#ff8060" : world.theme === "sky" ? "#a090ff" : world.theme === "ice" ? "#a0d0ff" : world.theme === "abyss" ? "#ff2020" : "#e0e0ff"}
         castShadow
       />
       {world.theme === "sky" && <Stars radius={80} depth={40} count={2000} factor={4} fade />}
+      {world.theme === "void" && <Stars radius={60} depth={60} count={3000} factor={2} fade speed={0.3} />}
+      <ScareFX scare={world.scare} playerRef={pos} />
       {/* Platforms */}
       {world.platforms.map((p, i) => (
         <mesh key={i} position={p.pos} castShadow receiveShadow>
