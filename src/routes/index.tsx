@@ -1649,12 +1649,22 @@ function Scene({
     });
     floats.current = floats.current.filter((f) => f.life > 0);
 
-    // Camera follow (third person, orbits with mouse yaw)
-    const yaw = yawRef.current;
-    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * 8, 4, Math.cos(yaw) * 8));
+    // Camera follow (third person). Hold Alt to orbit freely (yaw offset + pitch + wheel zoom).
+    if (!keysRef.current.camFree) {
+      // Ease the free-look offset back to zero so aim re-syncs with view
+      camYawOffsetRef.current *= Math.pow(0.001, dt);
+      pitchRef.current += (0.35 - pitchRef.current) * (1 - Math.pow(0.01, dt));
+    }
+    const yaw = yawRef.current + camYawOffsetRef.current;
+    const pitch = pitchRef.current;
+    const dist = camDistRef.current;
+    const horiz = Math.cos(pitch) * dist;
+    const vert = Math.sin(pitch) * dist + 2.5;
+    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
     camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
+
 
     // Only rerender React tree when the floats list actually changes,
     // otherwise mesh refs update the scene each frame without React work.
