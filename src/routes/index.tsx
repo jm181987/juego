@@ -550,7 +550,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     if (!group.current) return;
 
     group.current.position.set(posRef.current.x, posRef.current.y, posRef.current.z);
-    group.current.rotation.y = facingRef.current + Math.PI + (appearanceGender === "female" ? Math.PI : 0);
+    group.current.rotation.y = facingRef.current + Math.PI;
 
     const wp = walkPhaseRef.current;
     const walking = Math.abs(wp - prevWalkPhase.current) > 0.0005;
