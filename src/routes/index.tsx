@@ -436,7 +436,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   return (
     <>
       <group ref={group} scale={1.05}>
-        <primitive object={scene} />
+        <primitive object={cloned} />
         {/* Heroic sword bolted to the hero group (right-hand side) */}
         <group ref={swordRef} position={[0.55, 1.0, 0.2]} rotation={[0, 0, -0.6]}>
           {/* Grip */}
