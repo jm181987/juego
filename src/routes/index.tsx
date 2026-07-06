@@ -958,9 +958,15 @@ function Index() {
             const dx = (e.x + e.w/2) - (player.x + player.w/2);
             const dy = (e.y + e.h/2) - (player.y + player.h/2);
             if (Math.abs(dx) < 60 && Math.abs(dy) < 40) {
-              e.alive = false; e.squashT = 30;
-              localScore += 100; setScore(localScore);
-              floatText(e.x + e.w/2, e.y - 4, "+100", "#ff7676");
+              const dmg = stats.str * 2;
+              e.hp -= dmg; e.hitFlash = 10;
+              floatText(e.x + e.w/2, e.y - 4, `${dmg}`, "#ffd94a");
+              if (e.hp <= 0) {
+                e.alive = false; e.squashT = 30;
+                localScore += 100; setScore(localScore);
+                gainXp(e.xp);
+                spawnLoot(e.x + e.w / 2, e.y + e.h / 2, e);
+              }
             }
           }
           player.comboTimer = 20; // reset combo
