@@ -1509,75 +1509,83 @@ function Index() {
   });
 
   return (
-    <main className="min-h-screen w-full bg-gradient-to-b from-indigo-900 via-sky-700 to-sky-400 flex flex-col items-center justify-center p-3 gap-3 select-none">
-      <h1 className="text-2xl md:text-4xl font-black text-white drop-shadow-[3px_3px_0_#000] tracking-tight font-mono">
-        SUPER PLUMBER ADVENTURE
-      </h1>
+    <main className="fixed inset-0 w-screen h-screen overflow-hidden bg-black select-none">
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full block"
+      />
 
-      <div className="flex flex-wrap justify-center gap-3 md:gap-5 text-white font-mono font-bold text-xs md:text-base drop-shadow-[2px_2px_0_#000]">
-        <span>SCORE {score.toString().padStart(6, "0")}</span>
-        <span className="text-yellow-300">◉ x{coinsCount.toString().padStart(2, "0")}</span>
-        <span className="text-red-300">♥ x{lives}</span>
-        <span className={timeLeft <= 20 ? "text-red-400 animate-pulse" : ""}>⏱ {timeLeft.toString().padStart(3, "0")}</span>
-        <span className="text-cyan-300">WORLD {STAGES[stageIdx].name.split(" ")[0]}</span>
-      </div>
-
-      <div className="relative rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] ring-4 ring-yellow-400 bg-sky-400 max-w-full">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={520}
-          className="block w-full h-auto"
-          style={{ imageRendering: "pixelated", maxWidth: "min(100vw - 24px, 800px)" }}
-        />
-        {status === "stageClear" && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
-            <p className="text-lg">Puntuación: {score}</p>
-            <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
-              SIGUIENTE MUNDO →
-            </button>
+      {/* HUD overlay */}
+      <div className="pointer-events-none absolute top-0 left-0 right-0 p-3 md:p-5 flex justify-between items-start z-10">
+        <div className="flex flex-col gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <div className="bg-black/40 backdrop-blur-sm rounded-xl px-3 md:px-4 py-1.5 md:py-2 border border-white/20">
+            <span className="text-yellow-300">★ {score.toString().padStart(6, "0")}</span>
           </div>
-        )}
-        {status === "win" && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
-            <p className="text-xl">Puntuación final: {score}</p>
-            <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
-            <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
-              JUGAR DE NUEVO
-            </button>
+          <div className="flex gap-2 text-xs md:text-base">
+            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-yellow-300">◉ ×{coinsCount.toString().padStart(2, "0")}</span>
+            <span className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-red-300">♥ ×{lives}</span>
           </div>
-        )}
-        {status === "dead" && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
-            <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
-            <p className="text-xl">Puntuación: {score}</p>
-            <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
-              JUGAR DE NUEVO
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-between items-end w-full max-w-[800px] gap-2 md:hidden">
-        <div className="flex gap-2">
-          <button {...holdKey("ArrowLeft")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">◀</button>
-          <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/90 rounded-full text-2xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▶</button>
-          <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/90 rounded-full text-xl font-black shadow-[0_4px_0_#000] active:translate-y-1">▼</button>
         </div>
-        <div className="flex gap-2 items-end">
-          <button {...holdKey("KeyZ")} className="w-14 h-14 bg-yellow-400 text-black rounded-full text-sm font-black shadow-[0_4px_0_#000] active:translate-y-1">PUÑO</button>
-          <button {...holdKey("KeyX")} className="w-14 h-14 bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_#000] active:translate-y-1 leading-tight">POUND</button>
-          <button {...holdKey("ShiftLeft")} className="w-14 h-14 bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_#000] active:translate-y-1">RUN</button>
-          <button {...holdKey("Space")} className="w-18 h-18 min-w-[68px] min-h-[68px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_#000] active:translate-y-1">SALTAR</button>
+        <div className="flex flex-col items-end gap-1 text-white font-black text-sm md:text-xl drop-shadow-[2px_2px_0_#000]" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <div className={`bg-black/40 backdrop-blur-sm rounded-xl px-3 md:px-4 py-1.5 md:py-2 border border-white/20 ${timeLeft <= 20 ? "text-red-400 animate-pulse" : ""}`}>
+            ⏱ {timeLeft.toString().padStart(3, "0")}
+          </div>
+          <div className="bg-black/40 backdrop-blur-sm rounded-lg px-2 py-1 border border-white/20 text-xs md:text-base text-cyan-300">
+            {STAGES[stageIdx].name}
+          </div>
         </div>
       </div>
 
-      <p className="text-white/90 text-[11px] md:text-sm font-mono text-center drop-shadow-[1px_1px_0_#000] max-w-[800px]">
-        ← → moverse · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
-        Combos: doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
-      </p>
+      {/* Desktop hint */}
+      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-10 hidden md:block text-white/80 font-mono text-xs text-center drop-shadow-[1px_1px_0_#000]">
+        ← → mover · SHIFT correr · ESPACIO saltar · ↓ agacharse · Z puño/dive · X ground pound<br />
+        doble/triple salto · corriendo+↓+salto = <b>salto largo</b> · quieto+↓+salto = <b>backflip</b> · pared+salto = <b>wall jump</b>
+      </div>
+
+      {/* Mobile controls */}
+      <div className="absolute bottom-0 left-0 right-0 p-3 flex justify-between items-end z-20 md:hidden pointer-events-none">
+        <div className="flex gap-2 pointer-events-auto">
+          <button {...holdKey("ArrowLeft")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-2xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">◀</button>
+          <button {...holdKey("ArrowRight")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-2xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▶</button>
+          <button {...holdKey("ArrowDown")} className="w-14 h-14 bg-white/80 backdrop-blur rounded-full text-xl font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">▼</button>
+        </div>
+        <div className="flex gap-2 items-end pointer-events-auto">
+          <button {...holdKey("KeyZ")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-yellow-400 text-black rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">PUÑO</button>
+          <button {...holdKey("KeyX")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-purple-500 text-white rounded-full text-[10px] font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none leading-tight">POUND</button>
+          <button {...holdKey("ShiftLeft")} className="w-13 h-13 min-w-[52px] min-h-[52px] bg-blue-500 text-white rounded-full text-xs font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">RUN</button>
+          <button {...holdKey("Space")} className="w-18 h-18 min-w-[72px] min-h-[72px] bg-red-500 text-white rounded-full text-base font-black shadow-[0_4px_0_rgba(0,0,0,0.5)] active:translate-y-1 active:shadow-none">JUMP</button>
+        </div>
+      </div>
+
+      {/* Modals */}
+      {status === "stageClear" && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white z-30" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
+          <p className="text-lg">Puntuación: {score}</p>
+          <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+            SIGUIENTE MUNDO →
+          </button>
+        </div>
+      )}
+      {status === "win" && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white z-30" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
+          <p className="text-xl">Puntuación final: {score}</p>
+          <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
+          <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+            JUGAR DE NUEVO
+          </button>
+        </div>
+      )}
+      {status === "dead" && (
+        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white z-30" style={{ fontFamily: "system-ui, sans-serif" }}>
+          <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
+          <p className="text-xl">Puntuación: {score}</p>
+          <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
+            JUGAR DE NUEVO
+          </button>
+        </div>
+      )}
     </main>
   );
 }
