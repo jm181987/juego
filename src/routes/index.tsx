@@ -434,32 +434,43 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     }
   });
 
+  // Parent the sword to the right hand bone so it follows the hand rigidly —
+  // no more "sword floating on its own" while the arm swings elsewhere.
+  const swordAttached = useRef(false);
   useFrame(() => {
     const b = bonesRef.current;
+    if (!swordAttached.current && b.rightHand && swordRef.current) {
+      b.rightHand.add(swordRef.current);
+      // Local transform inside the hand: grip at origin, blade extending along
+      // the fingers. Mixamo right hand's +X runs down the fingers.
+      swordRef.current.position.set(0.02, 0.02, 0);
+      swordRef.current.rotation.set(0, Math.PI / 2, -Math.PI / 2);
+      swordAttached.current = true;
+    }
+
     if (b.rightArm && !b.base.rightArm) b.base.rightArm = b.rightArm.rotation.clone();
     if (b.rightForeArm && !b.base.rightForeArm) b.base.rightForeArm = b.rightForeArm.rotation.clone();
     if (b.spine1 && !b.base.spine1) b.base.spine1 = b.spine1.rotation.clone();
 
     const atk = Math.max(0, Math.min(1, attackingRef.current));
-    const s = atk > 0 ? Math.sin((1 - atk) * Math.PI) : 0;
+    // Two-phase swing: wind-up then chop (smoother, less mechanical).
+    const t = 1 - atk;
+    const windup = Math.max(0, Math.min(1, (0.35 - Math.abs(t - 0.2)) / 0.35));
+    const chop = Math.max(0, Math.min(1, (0.5 - Math.abs(t - 0.65)) / 0.5));
+    const s = chop - windup * 0.35;
 
     if (b.rightArm && b.base.rightArm) {
       const base = b.base.rightArm;
-      b.rightArm.rotation.set(base.x - s * 1.6, base.y, base.z + s * 0.4);
+      b.rightArm.rotation.set(base.x - s * 1.5, base.y - s * 0.2, base.z + s * 0.35);
     }
     if (b.rightForeArm && b.base.rightForeArm) {
       const base = b.base.rightForeArm;
-      b.rightForeArm.rotation.set(base.x, base.y - s * 1.2, base.z);
+      // Bend the elbow with the chop so the sword swings THROUGH, not floats.
+      b.rightForeArm.rotation.set(base.x - s * 0.6, base.y - s * 1.0, base.z);
     }
     if (b.spine1 && b.base.spine1) {
       const base = b.base.spine1;
-      b.spine1.rotation.set(base.x + s * 0.15, base.y - s * 0.35, base.z);
-    }
-
-    // Sword swings alongside the arm — static offset from the hero group.
-    if (swordRef.current) {
-      swordRef.current.rotation.z = -0.6 - s * 1.6;
-      swordRef.current.rotation.x = s * 1.2;
+      b.spine1.rotation.set(base.x + s * 0.12, base.y - s * 0.3, base.z);
     }
   });
 
@@ -467,8 +478,9 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   return (
     <group ref={group} scale={1.05}>
       <primitive object={cloned} />
-      {/* Heroic sword bolted to the hero group (right side). */}
-      <group ref={swordRef} position={[0.55, 1.05, 0.15]} rotation={[0, 0, -0.6]}>
+      {/* Sword — mounted at the hero group initially, then reparented into the
+          right hand bone on first frame so it swings with the hand naturally. */}
+      <group ref={swordRef}>
         <mesh position={[0, -0.15, 0]} castShadow>
           <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
           <meshStandardMaterial color="#1a0f08" roughness={0.9} />
