@@ -1181,7 +1181,7 @@ function Index() {
           style={{ imageRendering: "pixelated", maxWidth: "min(100vw - 24px, 800px)" }}
         />
         {status === "stageClear" && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
             <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
             <p className="text-lg">Puntuación: {score}</p>
             <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
@@ -1190,7 +1190,7 @@ function Index() {
           </div>
         )}
         {status === "win" && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
             <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
             <p className="text-xl">Puntuación final: {score}</p>
             <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
@@ -1200,7 +1200,7 @@ function Index() {
           </div>
         )}
         {status === "dead" && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
             <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
             <p className="text-xl">Puntuación: {score}</p>
             <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
