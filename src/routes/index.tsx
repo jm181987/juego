@@ -986,7 +986,7 @@ function Index() {
           player.x < e.x + e.w && player.x + player.w > e.x &&
           player.y < e.y + e.h && player.y + player.h > e.y
         ) {
-          const stompable = e.kind === "goomba" || e.kind === "flyer";
+          const stompable = e.kind === "goomba" || e.kind === "flyer" || e.kind === "jumper";
           if (stompable && player.vy > 1 && player.y + player.h - e.y < 20) {
             e.alive = false; e.squashT = 30;
             player.vy = jump ? -11 : -8.5; // higher bounce with jump held
