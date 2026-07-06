@@ -1100,13 +1100,7 @@ function Index() {
       drawParticles();
       drawFloatTexts();
 
-      const vg = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.4,
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.85
-      );
-      vg.addColorStop(0, "rgba(0,0,0,0)");
-      vg.addColorStop(1, stage.theme === "cave" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)");
-      ctx.fillStyle = vg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(vignette.c, 0, 0);
 
       ctx.restore();
 
