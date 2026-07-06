@@ -523,9 +523,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   const tmpQuat = useRef(new THREE.Quaternion()).current;
   const tmpParentQuat = useRef(new THREE.Quaternion()).current;
   const tmpOffset = useRef(new THREE.Vector3()).current;
-  const handOffsetPos = useRef(new THREE.Vector3(0.04, -0.03, 0.03)).current;
+  // Palm sits ~15cm past the wrist along the fingers (+Y in Mixamo hand
+  // local space). Rotating the sword -90° around Z aligns its +Y (blade) with
+  // the hand's +X (grip axis when the fingers curl around the hilt), so the
+  // hilt sits inside the palm and the blade extends forward.
+  const handOffsetPos = useRef(new THREE.Vector3(0, 0.14, 0)).current;
   const handOffsetQuat = useRef(
-    new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, -Math.PI / 2, Math.PI / 2)),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -Math.PI / 2)),
   ).current;
 
   useFrame(() => {
