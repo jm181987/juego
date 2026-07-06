@@ -219,6 +219,258 @@ function Index() {
       }
     }
 
+    // ---------- Sprite / background caches ----------
+    function makeCanvas(w: number, h: number) {
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const cx = c.getContext("2d")!;
+      cx.imageSmoothingEnabled = false;
+      return { c, cx };
+    }
+
+    // Pre-render every tile type ONCE into an offscreen canvas.
+    const S = TILE;
+    const sprites: Record<string, HTMLCanvasElement> = {};
+
+    (function buildTileSprites() {
+      // ground
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, 0, S);
+        g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#5c2f0d");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        cx.fillStyle = "#6b3410";
+        cx.fillRect(4, 6, 4, 4); cx.fillRect(20, 14, 4, 4); cx.fillRect(12, 22, 4, 4);
+        cx.fillStyle = "rgba(0,0,0,0.35)"; cx.fillRect(0, S - 3, S, 3);
+        cx.fillStyle = "rgba(255,255,255,0.15)"; cx.fillRect(0, 0, S, 2);
+        sprites.ground = c;
+      }
+      // grass
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, 0, S);
+        g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#6b3410");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        const gg = cx.createLinearGradient(0, 0, 0, 12);
+        gg.addColorStop(0, "#5cd464"); gg.addColorStop(1, "#2ea63a");
+        cx.fillStyle = gg; cx.fillRect(0, 0, S, 12);
+        cx.fillStyle = "#7ee085";
+        cx.fillRect(3, 0, 2, 2); cx.fillRect(11, 0, 2, 2); cx.fillRect(22, 0, 2, 2);
+        sprites.grass = c;
+      }
+      // brick
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, 0, S);
+        g.addColorStop(0, "#e05a2a"); g.addColorStop(1, "#8b3110");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        cx.strokeStyle = "#2a0e04"; cx.lineWidth = 2;
+        cx.beginPath();
+        cx.moveTo(0, 16); cx.lineTo(S, 16);
+        cx.moveTo(16, 0); cx.lineTo(16, 16);
+        cx.moveTo(8, 16); cx.lineTo(8, S);
+        cx.moveTo(24, 16); cx.lineTo(24, S);
+        cx.stroke();
+        cx.strokeRect(1, 1, S - 2, S - 2);
+        cx.fillStyle = "rgba(255,255,255,0.2)"; cx.fillRect(2, 2, S - 4, 1);
+        sprites.brick = c;
+      }
+      // question (unused, static; pulse drawn on top)
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, 0, S);
+        g.addColorStop(0, "#ffcf3f"); g.addColorStop(1, "#c86e00");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        cx.fillStyle = "#7a4600";
+        cx.fillRect(0, 0, S, 3); cx.fillRect(0, S - 3, S, 3);
+        cx.fillRect(0, 0, 3, S); cx.fillRect(S - 3, 0, 3, S);
+        cx.fillStyle = "#ffe680";
+        cx.fillRect(3, 3, 3, 3); cx.fillRect(S - 6, 3, 3, 3);
+        cx.fillRect(3, S - 6, 3, 3); cx.fillRect(S - 6, S - 6, 3, 3);
+        cx.fillStyle = "rgba(0,0,0,0.4)"; cx.font = "bold 20px monospace";
+        cx.fillText("?", 11, 24);
+        cx.fillStyle = "#fff"; cx.fillText("?", 10, 23);
+        sprites.question = c;
+      }
+      // question used
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, 0, S);
+        g.addColorStop(0, "#8b5a2b"); g.addColorStop(1, "#4a2f14");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        cx.strokeStyle = "#2a1808"; cx.lineWidth = 2;
+        cx.strokeRect(1, 1, S - 2, S - 2);
+        sprites.questionUsed = c;
+      }
+      // pipe body
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, S, 0);
+        g.addColorStop(0, "#0f5a19"); g.addColorStop(0.15, "#7ee085");
+        g.addColorStop(0.5, "#3ec54a"); g.addColorStop(0.85, "#1a6b22"); g.addColorStop(1, "#0a3d10");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        sprites.pipe = c;
+      }
+      // pipe top (rim overlay, wider)
+      {
+        const rimW = S + 4;
+        const { c, cx } = makeCanvas(rimW, 8);
+        cx.fillStyle = "#1a6b22"; cx.fillRect(0, 0, rimW, 8);
+        const rg = cx.createLinearGradient(0, 0, rimW, 0);
+        rg.addColorStop(0, "#0f5a19"); rg.addColorStop(0.2, "#8ff090");
+        rg.addColorStop(0.5, "#4ad058"); rg.addColorStop(0.8, "#1a6b22"); rg.addColorStop(1, "#0a3d10");
+        cx.fillStyle = rg; cx.fillRect(0, 2, rimW, 4);
+        cx.fillStyle = "rgba(255,255,255,0.3)"; cx.fillRect(4, 4, 8, 1);
+        sprites.pipeTop = c;
+      }
+      // stone (theme-aware)
+      {
+        const { c, cx } = makeCanvas(S, S);
+        const g = cx.createLinearGradient(0, 0, 0, S);
+        if (stage.theme === "cave") {
+          g.addColorStop(0, "#b56a3a"); g.addColorStop(1, "#5a2810");
+        } else {
+          g.addColorStop(0, "#c8ccd4"); g.addColorStop(1, "#5c6270");
+        }
+        cx.fillStyle = g; cx.fillRect(0, 0, S, S);
+        cx.fillStyle = "rgba(0,0,0,0.25)";
+        cx.fillRect(6, 8, 4, 2); cx.fillRect(18, 18, 4, 2);
+        cx.fillStyle = "rgba(255,255,255,0.2)"; cx.fillRect(0, 0, S, 2);
+        sprites.stone = c;
+      }
+      // platform (14px tall)
+      {
+        const { c, cx } = makeCanvas(S, 14);
+        const g = cx.createLinearGradient(0, 0, 0, 14);
+        g.addColorStop(0, "#c07500"); g.addColorStop(1, "#7a4600");
+        cx.fillStyle = g; cx.fillRect(0, 0, S, 14);
+        cx.fillStyle = "rgba(255,255,255,0.35)"; cx.fillRect(0, 0, S, 2);
+        cx.fillStyle = "rgba(0,0,0,0.35)"; cx.fillRect(0, 12, S, 2);
+        sprites.platform = c;
+      }
+      // cloud platform
+      {
+        const { c, cx } = makeCanvas(S, 14);
+        cx.fillStyle = "rgba(255,255,255,0.9)";
+        cx.beginPath();
+        cx.arc(6, 8, 8, 0, Math.PI * 2);
+        cx.arc(16, 5, 10, 0, Math.PI * 2);
+        cx.arc(26, 8, 8, 0, Math.PI * 2);
+        cx.fill();
+        cx.fillStyle = "#ffffff"; cx.fillRect(0, 4, S, 8);
+        cx.fillStyle = "rgba(180,200,240,0.5)"; cx.fillRect(0, 10, S, 2);
+        sprites.cloud = c;
+      }
+    })();
+
+    // Pre-render static background (sky gradient + sun/moon + stars + far mountains)
+    // Wide strip so parallax can scroll; we tile horizontally.
+    const BG_W = canvas.width * 2;
+    const bgFar = makeCanvas(BG_W, canvas.height);
+    const bgMid = makeCanvas(BG_W, canvas.height);
+    (function buildBackgrounds() {
+      const { cx } = bgFar;
+      if (stage.theme === "grass") {
+        const g = cx.createLinearGradient(0, 0, 0, canvas.height);
+        g.addColorStop(0, "#4a86f7"); g.addColorStop(0.6, "#7cb4ff"); g.addColorStop(1, "#c5e2ff");
+        cx.fillStyle = g; cx.fillRect(0, 0, BG_W, canvas.height);
+        // Sun
+        const sunX = canvas.width - 90, sunY = 80;
+        const sg = cx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 80);
+        sg.addColorStop(0, "rgba(255,240,180,1)");
+        sg.addColorStop(0.4, "rgba(255,220,140,0.5)");
+        sg.addColorStop(1, "rgba(255,220,140,0)");
+        cx.fillStyle = sg; cx.fillRect(sunX - 90, sunY - 90, 180, 180);
+        cx.fillStyle = "#fff5c8";
+        cx.beginPath(); cx.arc(sunX, sunY, 26, 0, Math.PI * 2); cx.fill();
+      } else if (stage.theme === "cave") {
+        const g = cx.createLinearGradient(0, 0, 0, canvas.height);
+        g.addColorStop(0, "#1a0f22"); g.addColorStop(0.6, "#3a1a10"); g.addColorStop(1, "#5a2010");
+        cx.fillStyle = g; cx.fillRect(0, 0, BG_W, canvas.height);
+        // Stalactites
+        cx.fillStyle = "#2a1a12";
+        for (let i = 0; i < 40; i++) {
+          const sx = i * 90 + ((i * 7) % 30);
+          const h = 24 + ((i * 17) % 30);
+          cx.beginPath();
+          cx.moveTo(sx, 32); cx.lineTo(sx + 12, 32); cx.lineTo(sx + 6, 32 + h);
+          cx.closePath(); cx.fill();
+        }
+      } else {
+        const g = cx.createLinearGradient(0, 0, 0, canvas.height);
+        g.addColorStop(0, "#0a0a2e"); g.addColorStop(0.5, "#1a1a5a"); g.addColorStop(1, "#3a1a5a");
+        cx.fillStyle = g; cx.fillRect(0, 0, BG_W, canvas.height);
+        // Stars baked in
+        for (const st of stars) {
+          cx.fillStyle = "rgba(255,255,255,0.9)";
+          cx.fillRect(st.x % BG_W, st.y, st.s, st.s);
+        }
+        // Moon
+        const mx = canvas.width - 100, my = 90;
+        cx.fillStyle = "rgba(255,240,200,0.2)";
+        cx.beginPath(); cx.arc(mx, my, 60, 0, Math.PI * 2); cx.fill();
+        cx.fillStyle = "#f8f4d0";
+        cx.beginPath(); cx.arc(mx, my, 32, 0, Math.PI * 2); cx.fill();
+        cx.fillStyle = "#d8d0a8";
+        cx.beginPath(); cx.arc(mx - 8, my - 4, 4, 0, Math.PI * 2); cx.fill();
+        cx.beginPath(); cx.arc(mx + 10, my + 6, 6, 0, Math.PI * 2); cx.fill();
+      }
+
+      // Mid layer (mountains / hills / distant rocks / cloud islands)
+      const { cx: mx } = bgMid;
+      mx.clearRect(0, 0, BG_W, canvas.height);
+      if (stage.theme === "grass") {
+        mx.fillStyle = "#6b8fbf";
+        for (let i = 0; i < 8; i++) {
+          const px = i * 320;
+          mx.beginPath();
+          mx.moveTo(px - 20, canvas.height - 100);
+          mx.lineTo(px + 120, canvas.height - 240);
+          mx.lineTo(px + 260, canvas.height - 100);
+          mx.closePath(); mx.fill();
+        }
+        for (let i = 0; i < 8; i++) {
+          const hx = i * 260;
+          const grad = mx.createLinearGradient(0, canvas.height - 160, 0, canvas.height);
+          grad.addColorStop(0, "#4aa64a"); grad.addColorStop(1, "#2f7a2f");
+          mx.fillStyle = grad;
+          mx.beginPath(); mx.arc(hx, canvas.height - 90, 100, Math.PI, 0); mx.fill();
+        }
+      } else if (stage.theme === "cave") {
+        mx.fillStyle = "#2a1810";
+        for (let i = 0; i < 6; i++) {
+          const rx = i * 260;
+          mx.beginPath();
+          mx.moveTo(rx, canvas.height - 60);
+          mx.lineTo(rx + 80, canvas.height - 180);
+          mx.lineTo(rx + 160, canvas.height - 60);
+          mx.closePath(); mx.fill();
+        }
+      } else {
+        for (let i = 0; i < 8; i++) {
+          const cx2 = i * 260;
+          const cy = 260 + ((i * 41) % 80);
+          mx.fillStyle = "rgba(120,100,180,0.5)";
+          mx.beginPath();
+          mx.ellipse(cx2, cy, 90, 20, 0, 0, Math.PI * 2);
+          mx.fill();
+        }
+      }
+    })();
+
+    // Vignette cached
+    const vignette = makeCanvas(canvas.width, canvas.height);
+    {
+      const { cx } = vignette;
+      const vg = cx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, canvas.height * 0.4,
+        canvas.width / 2, canvas.height / 2, canvas.height * 0.85
+      );
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, stage.theme === "cave" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)");
+      cx.fillStyle = vg; cx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
     const player = {
       x: world.spawn.x, y: world.spawn.y, w: 22, h: 30,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
@@ -521,144 +773,33 @@ function Index() {
     }
 
     // ------- Drawing -------
-    function drawSkyGrass() {
-      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#4a86f7"); g.addColorStop(0.6, "#7cb4ff"); g.addColorStop(1, "#c5e2ff");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      const sunX = canvas.width - 90 - cameraX * 0.02;
-      const sunY = 80;
-      const sunGrad = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 80);
-      sunGrad.addColorStop(0, "rgba(255,240,180,1)");
-      sunGrad.addColorStop(0.4, "rgba(255,220,140,0.5)");
-      sunGrad.addColorStop(1, "rgba(255,220,140,0)");
-      ctx.fillStyle = sunGrad; ctx.fillRect(sunX - 90, sunY - 90, 180, 180);
-      ctx.fillStyle = "#fff5c8";
-      ctx.beginPath(); ctx.arc(sunX, sunY, 26, 0, Math.PI * 2); ctx.fill();
-
-      ctx.fillStyle = "#6b8fbf";
-      for (let i = 0; i < 8; i++) {
-        const mx = i * 320 - (cameraX * 0.15) % 320;
-        ctx.beginPath();
-        ctx.moveTo(mx - 20, canvas.height - 100);
-        ctx.lineTo(mx + 120, canvas.height - 240);
-        ctx.lineTo(mx + 260, canvas.height - 100);
-        ctx.closePath(); ctx.fill();
-      }
-      for (let i = 0; i < 8; i++) {
-        const hx = i * 260 - (cameraX * 0.3) % 260;
-        const grad = ctx.createLinearGradient(0, canvas.height - 160, 0, canvas.height);
-        grad.addColorStop(0, "#4aa64a"); grad.addColorStop(1, "#2f7a2f");
-        ctx.fillStyle = grad;
-        ctx.beginPath(); ctx.arc(hx, canvas.height - 90, 100, Math.PI, 0); ctx.fill();
-      }
-      for (let i = 0; i < 10; i++) {
-        const cx = i * 220 - (cameraX * 0.25) % 220;
-        const cy = 50 + ((i * 53) % 60);
-        cloud(cx, cy, 0.9 + (i % 3) * 0.15);
-      }
-    }
-
-    function drawSkyCave() {
-      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#1a0f22"); g.addColorStop(0.6, "#3a1a10"); g.addColorStop(1, "#5a2010");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Torch glows
-      for (let i = 0; i < 6; i++) {
-        const tx = i * 180 - (cameraX * 0.5) % 180 + 90;
-        const ty = 120;
-        const flick = Math.sin(time * 0.3 + i) * 6 + 60;
-        const g2 = ctx.createRadialGradient(tx, ty, 5, tx, ty, flick);
-        g2.addColorStop(0, "rgba(255,180,80,0.6)");
-        g2.addColorStop(1, "rgba(255,180,80,0)");
-        ctx.fillStyle = g2; ctx.fillRect(tx - flick, ty - flick, flick * 2, flick * 2);
-      }
-
-      // Stalactites (ceiling)
-      ctx.fillStyle = "#2a1a12";
-      for (let i = 0; i < 20; i++) {
-        const sx = i * 90 - (cameraX * 0.6) % 90;
-        const h = 24 + ((i * 17) % 30);
-        ctx.beginPath();
-        ctx.moveTo(sx, 32); ctx.lineTo(sx + 12, 32); ctx.lineTo(sx + 6, 32 + h);
-        ctx.closePath(); ctx.fill();
-      }
-      // Distant rock silhouettes
-      ctx.fillStyle = "#2a1810";
-      for (let i = 0; i < 6; i++) {
-        const rx = i * 260 - (cameraX * 0.2) % 260;
-        ctx.beginPath();
-        ctx.moveTo(rx, canvas.height - 60);
-        ctx.lineTo(rx + 80, canvas.height - 180);
-        ctx.lineTo(rx + 160, canvas.height - 60);
-        ctx.closePath(); ctx.fill();
-      }
-    }
-
-    function drawSkyNight() {
-      const g = ctx.createLinearGradient(0, 0, 0, canvas.height);
-      g.addColorStop(0, "#0a0a2e"); g.addColorStop(0.5, "#1a1a5a"); g.addColorStop(1, "#3a1a5a");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Stars
-      for (const st of stars) {
-        const tw = 0.6 + Math.abs(Math.sin(time * 0.03 + st.tw)) * 0.4;
-        ctx.fillStyle = `rgba(255,255,255,${tw})`;
-        const sx = ((st.x - cameraX * 0.1) % LEVEL_W + LEVEL_W) % LEVEL_W;
-        ctx.fillRect(sx, st.y, st.s, st.s);
-      }
-      // Moon
-      const mx = canvas.width - 100 - cameraX * 0.03;
-      const my = 90;
-      ctx.fillStyle = "rgba(255,240,200,0.2)";
-      ctx.beginPath(); ctx.arc(mx, my, 60, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#f8f4d0";
-      ctx.beginPath(); ctx.arc(mx, my, 32, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#d8d0a8";
-      ctx.beginPath(); ctx.arc(mx - 8, my - 4, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(mx + 10, my + 6, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(mx + 4, my - 12, 3, 0, Math.PI * 2); ctx.fill();
-
-      // Distant cloud islands
-      for (let i = 0; i < 8; i++) {
-        const cx = i * 260 - (cameraX * 0.3) % 260;
-        const cy = 260 + ((i * 41) % 80);
-        ctx.fillStyle = "rgba(120,100,180,0.5)";
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, 90, 20, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Foreground drifting clouds
-      for (let i = 0; i < 8; i++) {
-        const cx = i * 240 - (cameraX * 0.5) % 240;
-        const cy = 80 + ((i * 47) % 100);
-        ctx.globalAlpha = 0.7;
-        cloud(cx, cy, 1);
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    function drawSky() {
-      if (stage.theme === "grass") drawSkyGrass();
-      else if (stage.theme === "cave") drawSkyCave();
-      else drawSkyNight();
-    }
-
     function cloud(x: number, y: number, s = 1) {
-      ctx.fillStyle = "rgba(230,240,255,0.9)";
-      ctx.beginPath();
-      ctx.arc(x, y + 2, 16 * s, 0, Math.PI * 2);
-      ctx.arc(x + 18 * s, y - 4, 22 * s, 0, Math.PI * 2);
-      ctx.arc(x + 40 * s, y + 2, 16 * s, 0, Math.PI * 2);
-      ctx.arc(x + 22 * s, y + 10, 18 * s, 0, Math.PI * 2);
-      ctx.fill();
       ctx.fillStyle = "#ffffff";
       ctx.beginPath();
       ctx.arc(x, y - 1, 14 * s, 0, Math.PI * 2);
       ctx.arc(x + 18 * s, y - 7, 20 * s, 0, Math.PI * 2);
       ctx.arc(x + 40 * s, y - 1, 14 * s, 0, Math.PI * 2);
+      ctx.arc(x + 22 * s, y + 7, 16 * s, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    function drawSky() {
+      // Base sky + baked sun/moon/stars/stalactites — tiled parallax
+      const offFar = -((cameraX * 0.15) % BG_W);
+      ctx.drawImage(bgFar.c, offFar, 0);
+      ctx.drawImage(bgFar.c, offFar + BG_W, 0);
+      const offMid = -((cameraX * 0.3) % BG_W);
+      ctx.drawImage(bgMid.c, offMid, 0);
+      ctx.drawImage(bgMid.c, offMid + BG_W, 0);
+
+      // A few animated clouds for grass/sky themes (cheap)
+      if (stage.theme !== "cave") {
+        for (let i = 0; i < 5; i++) {
+          const cx2 = i * 260 - (cameraX * 0.4) % 260;
+          const cy = 50 + ((i * 53) % 60);
+          cloud(cx2, cy, 0.9 + (i % 3) * 0.15);
+        }
+      }
     }
 
     function drawBlock(b: Block) {
@@ -666,124 +807,26 @@ function Index() {
       const y = Math.round(b.y - (b.bump || 0) - cameraY);
       if (x + b.w < -20 || x > canvas.width + 20) return;
       switch (b.type) {
-        case "ground": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#5c2f0d");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "#6b3410";
-          ctx.fillRect(x + 4, y + 6, 4, 4);
-          ctx.fillRect(x + 20, y + 14, 4, 4);
-          ctx.fillRect(x + 12, y + 22, 4, 4);
-          ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + b.h - 3, b.w, 3);
-          ctx.fillStyle = "rgba(255,255,255,0.15)"; ctx.fillRect(x, y, b.w, 2);
+        case "ground": ctx.drawImage(sprites.ground, x, y); break;
+        case "grass": ctx.drawImage(sprites.grass, x, y); break;
+        case "brick": ctx.drawImage(sprites.brick, x, y); break;
+        case "question":
+          ctx.drawImage(b.used ? sprites.questionUsed : sprites.question, x, y);
           break;
-        }
-        case "grass": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#a0522d"); g.addColorStop(1, "#6b3410");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          const gg = ctx.createLinearGradient(0, y, 0, y + 12);
-          gg.addColorStop(0, "#5cd464"); gg.addColorStop(1, "#2ea63a");
-          ctx.fillStyle = gg; ctx.fillRect(x, y, b.w, 12);
-          ctx.fillStyle = "#7ee085";
-          ctx.fillRect(x + 3, y - 2, 2, 4);
-          ctx.fillRect(x + 11, y - 3, 2, 5);
-          ctx.fillRect(x + 22, y - 2, 2, 4);
-          break;
-        }
-        case "brick": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#e05a2a"); g.addColorStop(1, "#8b3110");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.strokeStyle = "#2a0e04"; ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.moveTo(x, y + 16); ctx.lineTo(x + b.w, y + 16);
-          ctx.moveTo(x + 16, y); ctx.lineTo(x + 16, y + 16);
-          ctx.moveTo(x + 8, y + 16); ctx.lineTo(x + 8, y + b.h);
-          ctx.moveTo(x + 24, y + 16); ctx.lineTo(x + 24, y + b.h);
-          ctx.stroke();
-          ctx.strokeRect(x + 1, y + 1, b.w - 2, b.h - 2);
-          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(x + 2, y + 2, b.w - 4, 1);
-          break;
-        }
-        case "question": {
-          if (b.used) {
-            const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-            g.addColorStop(0, "#8b5a2b"); g.addColorStop(1, "#4a2f14");
-            ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-            ctx.strokeStyle = "#2a1808"; ctx.lineWidth = 2;
-            ctx.strokeRect(x + 1, y + 1, b.w - 2, b.h - 2);
-          } else {
-            const pulse = Math.sin(time * 0.08) * 0.15 + 0.85;
-            const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-            g.addColorStop(0, "#ffcf3f"); g.addColorStop(1, "rgba(200,110,0,1)");
-            ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-            ctx.fillStyle = "#7a4600";
-            ctx.fillRect(x, y, b.w, 3); ctx.fillRect(x, y + b.h - 3, b.w, 3);
-            ctx.fillRect(x, y, 3, b.h); ctx.fillRect(x + b.w - 3, y, 3, b.h);
-            ctx.fillStyle = "#ffe680";
-            ctx.fillRect(x + 3, y + 3, 3, 3); ctx.fillRect(x + b.w - 6, y + 3, 3, 3);
-            ctx.fillRect(x + 3, y + b.h - 6, 3, 3); ctx.fillRect(x + b.w - 6, y + b.h - 6, 3, 3);
-            ctx.fillStyle = "rgba(0,0,0,0.4)"; ctx.font = "bold 20px monospace";
-            ctx.fillText("?", x + 11, y + 24);
-            ctx.fillStyle = `rgba(255,255,255,${pulse})`;
-            ctx.fillText("?", x + 10, y + 23);
-          }
-          break;
-        }
-        case "pipe": {
-          const g = ctx.createLinearGradient(x, 0, x + b.w, 0);
-          g.addColorStop(0, "#0f5a19"); g.addColorStop(0.15, "#7ee085");
-          g.addColorStop(0.5, "#3ec54a"); g.addColorStop(0.85, "#1a6b22"); g.addColorStop(1, "#0a3d10");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
+        case "pipe":
+          ctx.drawImage(sprites.pipe, x, y);
           if (b.pipeTop) {
             const rimX = b.pipeLeft ? x - 4 : x;
-            const rimW = b.w + 4;
-            ctx.fillStyle = "#1a6b22"; ctx.fillRect(rimX, y - 6, rimW, 8);
-            const rg = ctx.createLinearGradient(rimX, 0, rimX + rimW, 0);
-            rg.addColorStop(0, "#0f5a19"); rg.addColorStop(0.2, "#8ff090");
-            rg.addColorStop(0.5, "#4ad058"); rg.addColorStop(0.8, "#1a6b22"); rg.addColorStop(1, "#0a3d10");
-            ctx.fillStyle = rg; ctx.fillRect(rimX, y - 4, rimW, 4);
-            ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillRect(rimX + 4, y - 2, 8, 1);
+            ctx.drawImage(sprites.pipeTop, rimX, y - 6);
           }
           break;
-        }
-        case "stone": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          if (stage.theme === "cave") {
-            g.addColorStop(0, "#b56a3a"); g.addColorStop(1, "#5a2810");
-          } else {
-            g.addColorStop(0, "#c8ccd4"); g.addColorStop(1, "#5c6270");
-          }
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "rgba(0,0,0,0.25)";
-          ctx.fillRect(x + 6, y + 8, 4, 2);
-          ctx.fillRect(x + 18, y + 18, 4, 2);
-          ctx.fillStyle = "rgba(255,255,255,0.2)"; ctx.fillRect(x, y, b.w, 2);
-          break;
-        }
-        case "platform": {
-          const g = ctx.createLinearGradient(0, y, 0, y + b.h);
-          g.addColorStop(0, "#c07500"); g.addColorStop(1, "#7a4600");
-          ctx.fillStyle = g; ctx.fillRect(x, y, b.w, b.h);
-          ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(x, y, b.w, 2);
-          ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.fillRect(x, y + b.h - 2, b.w, 2);
-          break;
-        }
-        case "cloud": {
-          // Cloud platform (sky theme)
-          ctx.fillStyle = "rgba(255,255,255,0.9)";
-          ctx.beginPath();
-          ctx.arc(x + 6, y + 8, 8, 0, Math.PI * 2);
-          ctx.arc(x + 16, y + 5, 10, 0, Math.PI * 2);
-          ctx.arc(x + 26, y + 8, 8, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = "#ffffff"; ctx.fillRect(x, y + 4, b.w, 8);
-          ctx.fillStyle = "rgba(180,200,240,0.5)"; ctx.fillRect(x, y + 10, b.w, 2);
-          break;
-        }
+        case "stone": ctx.drawImage(sprites.stone, x, y); break;
+        case "platform": ctx.drawImage(sprites.platform, x, y); break;
+        case "cloud": ctx.drawImage(sprites.cloud, x, y); break;
       }
     }
+
+
 
     function drawHazard(h: Hazard) {
       const x = Math.round(h.x - cameraX);
@@ -1057,13 +1100,7 @@ function Index() {
       drawParticles();
       drawFloatTexts();
 
-      const vg = ctx.createRadialGradient(
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.4,
-        canvas.width / 2, canvas.height / 2, canvas.height * 0.85
-      );
-      vg.addColorStop(0, "rgba(0,0,0,0)");
-      vg.addColorStop(1, stage.theme === "cave" ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)");
-      ctx.fillStyle = vg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(vignette.c, 0, 0);
 
       ctx.restore();
 
@@ -1144,7 +1181,7 @@ function Index() {
           style={{ imageRendering: "pixelated", maxWidth: "min(100vw - 24px, 800px)" }}
         />
         {status === "stageClear" && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
             <h2 className="text-3xl md:text-5xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">¡ETAPA COMPLETADA!</h2>
             <p className="text-lg">Puntuación: {score}</p>
             <button onClick={nextStage} className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
@@ -1153,7 +1190,7 @@ function Index() {
           </div>
         )}
         {status === "win" && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
             <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in text-yellow-300">¡AVENTURA COMPLETA!</h2>
             <p className="text-xl">Puntuación final: {score}</p>
             <p className="text-lg text-yellow-300">Monedas: {coinsCount}</p>
@@ -1163,7 +1200,7 @@ function Index() {
           </div>
         )}
         {status === "dead" && (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-white font-mono">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white font-mono">
             <h2 className="text-4xl md:text-6xl font-black drop-shadow-[3px_3px_0_#000] animate-scale-in">GAME OVER</h2>
             <p className="text-xl">Puntuación: {score}</p>
             <button onClick={restart} className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-md font-bold text-lg shadow-[0_4px_0_#000] active:translate-y-1 active:shadow-[0_0_0_#000] transition">
