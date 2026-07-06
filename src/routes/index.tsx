@@ -924,6 +924,7 @@ function Scene({
     if (gd < 1.5) { onWin(); return; }
 
     // Floating texts life
+    const beforeLen = floats.current.length;
     floats.current.forEach((f) => {
       f.life -= dt;
       f.pos.y += dt * 1.5;
@@ -937,7 +938,9 @@ function Scene({
     camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
 
-    rerender();
+    // Only rerender React tree when the floats list actually changes,
+    // otherwise mesh refs update the scene each frame without React work.
+    if (floats.current.length !== beforeLen) rerender();
   });
 
   return (
