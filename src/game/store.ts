@@ -209,8 +209,8 @@ const seedQuests = (): Quest[] => [
 
 const MAX_SAVE_SCREENSHOT_CHARS = 180_000;
 
-const sanitizePersistedState = (persisted: unknown) => {
-  if (!persisted || typeof persisted !== "object") return persisted;
+const sanitizePersistedState = (persisted: unknown): Partial<Store> => {
+  if (!persisted || typeof persisted !== "object") return {};
   const state = persisted as Partial<Store>;
   const settings = { ...DEFAULT_SETTINGS, ...(state.settings ?? {}) };
   const safeSettings: Settings = {
