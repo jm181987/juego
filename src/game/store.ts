@@ -63,9 +63,9 @@ export const DEFAULT_SETTINGS: Settings = {
   sfxVol: 0.85,
   brightness: 1.0,
   fov: 60,
-  quality: "high",
-  shadows: true,
-  postFx: true,
+  quality: "medium",
+  shadows: false,
+  postFx: false,
   hudVisible: true,
 };
 
@@ -160,6 +160,7 @@ type Store = {
 
   saveToSlot: (slotId: number, data: unknown, meta: { world: string; level: number; screenshot?: string }) => void;
   deleteSlot: (slotId: number) => void;
+  optimizeForStartup: () => void;
 };
 
 const seedBestiary = (): Record<string, BestiaryEntry> => ({
@@ -206,6 +207,36 @@ const seedQuests = (): Quest[] => [
     reward: "Poción HP ×2",
   },
 ];
+
+export const MAX_SAVE_SCREENSHOT_CHARS = 180_000;
+
+const startupSafeSettings = (settings?: Partial<Settings>): Settings => {
+  const next = { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
+  return {
+    ...next,
+    // Heavy effects were causing startup hangs on weaker/mobile previews.
+    quality: next.quality === "low" ? "low" : "medium",
+    shadows: false,
+    postFx: false,
+  };
+};
+
+const compactSaves = (saves: unknown): SaveSlot[] =>
+  Array.isArray(saves)
+    ? saves.slice(0, 6).map((slot) => ({
+        ...slot,
+        screenshot:
+          typeof slot.screenshot === "string" && slot.screenshot.length <= MAX_SAVE_SCREENSHOT_CHARS
+            ? slot.screenshot
+            : undefined,
+      }))
+    : [];
+
+const sanitizePersistedState = (persisted: unknown): Partial<Store> => {
+  if (!persisted || typeof persisted !== "object") return {};
+  const state = persisted as Partial<Store>;
+  return { ...state, settings: startupSafeSettings(state.settings), saves: compactSaves(state.saves) };
+};
 
 export const useGame = create<Store>()(
   persist(
@@ -293,6 +324,10 @@ export const useGame = create<Store>()(
 
       saveToSlot: (slotId, data, meta) =>
         set((s) => {
+          const screenshot =
+            meta.screenshot && meta.screenshot.length <= MAX_SAVE_SCREENSHOT_CHARS
+              ? meta.screenshot
+              : undefined;
           const slot: SaveSlot = {
             id: slotId,
             name: `Slot ${slotId}`,
@@ -300,16 +335,19 @@ export const useGame = create<Store>()(
             world: meta.world,
             level: meta.level,
             playtime: s.playtime,
-            screenshot: meta.screenshot,
+            screenshot,
             data,
           };
           const others = s.saves.filter((x) => x.id !== slotId);
           return { saves: [...others, slot].sort((a, b) => a.id - b.id) };
         }),
       deleteSlot: (slotId) => set((s) => ({ saves: s.saves.filter((x) => x.id !== slotId) })),
+      optimizeForStartup: () => set((s) => ({ settings: startupSafeSettings(s.settings), saves: compactSaves(s.saves) })),
     }),
     {
       name: "arcane-realms-store",
+      version: 2,
+      migrate: sanitizePersistedState,
       partialize: (s) => ({
         appearance: s.appearance,
         settings: s.settings,
