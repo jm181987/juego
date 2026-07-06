@@ -162,10 +162,10 @@ function buildWorld(stageIdx: number) {
       else if (ch === "L") hazards.push({ x, y: y + 8, w: TILE, h: TILE - 8, kind: "lava" });
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
       else if (ch === "G") enemies.push({
-        x, y: y + 4, w: 28, h: 28, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+        x, y: y - 10, w: 38, h: 38, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
       });
       else if (ch === "K") enemies.push({
-        x, y, w: 28, h: 24, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+        x, y, w: 38, h: 32, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
       });
       else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
     }
