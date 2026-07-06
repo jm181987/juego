@@ -1406,16 +1406,6 @@ function Index() {
       }
 
 
-      ctx.restore();
-
-      // Attack sfx swipe
-      if (player.attack > 6) {
-        ctx.strokeStyle = `rgba(255,255,255,${player.attack / 14})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(px + player.w / 2 + f * 14, py + 16, 10, -0.6, 0.6);
-        ctx.stroke();
-      }
 
       if (player.landPulse > 0) {
         ctx.strokeStyle = `rgba(255,255,255,${(player.landPulse / 14) * 0.7})`;
