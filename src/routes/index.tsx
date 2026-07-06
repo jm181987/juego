@@ -381,20 +381,14 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
           mat.color.multiplyScalar(0.85);
         }
       }
-      const name = o.name;
-      if (name === "mixamorigRightArm" || name === "mixamorig:RightArm") bonesRef.current.rightArm = o;
-      else if (name === "mixamorigRightForeArm" || name === "mixamorig:RightForeArm") bonesRef.current.rightForeArm = o;
-      else if (name === "mixamorigSpine1" || name === "mixamorig:Spine1") bonesRef.current.spine1 = o;
-      else if (name === "mixamorigRightHand" || name === "mixamorig:RightHand") bonesRef.current.rightHand = o;
+      const name = (o.name || "").replace(/[:_]/g, "");
+      if (name === "mixamorigRightArm") bonesRef.current.rightArm = o;
+      else if (name === "mixamorigRightForeArm") bonesRef.current.rightForeArm = o;
+      else if (name === "mixamorigSpine1") bonesRef.current.spine1 = o;
+      else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
     });
-    // Attach sword to the right hand bone so it follows the arm swing.
-    if (bonesRef.current.rightHand && swordRef.current) {
-      bonesRef.current.rightHand.add(swordRef.current);
-      swordRef.current.position.set(0, 0.05, 0.08);
-      swordRef.current.rotation.set(Math.PI / 2, 0, 0);
-      swordRef.current.scale.setScalar(1);
-    }
   }, [cloned]);
+
 
   const { actions } = useAnimations(gltf.animations, cloned);
   const currentAction = useRef<string>("");
