@@ -162,10 +162,10 @@ function buildWorld(stageIdx: number) {
       else if (ch === "L") hazards.push({ x, y: y + 8, w: TILE, h: TILE - 8, kind: "lava" });
       else if (ch === "C") coins.push({ x: x + 8, y: y + 8, taken: false, t: Math.random() * 6, pop: 0 });
       else if (ch === "G") enemies.push({
-        x, y: y - 10, w: 38, h: 38, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
+        x, y: y - 22, w: 50, h: 50, vx: -0.7, vy: 0, alive: true, squashT: 0, anim: 0, kind: "goomba",
       });
       else if (ch === "K") enemies.push({
-        x, y, w: 38, h: 32, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
+        x, y, w: 50, h: 42, vx: 0, vy: 0, alive: true, squashT: 0, anim: 0, kind: "flyer", baseY: y,
       });
       else if (ch === ">" || ch === "F") flag = { x: x + 12, y };
     }
@@ -549,7 +549,7 @@ function Index() {
 
 
     const player = {
-      x: world.spawn.x, y: world.spawn.y, w: 33, h: 45,
+      x: world.spawn.x, y: world.spawn.y, w: 44, h: 60,
       vx: 0, vy: 0, onGround: false, facing: 1, anim: 0, invuln: 0,
       squash: 1, stretch: 1, coyote: 0, jumpBuffer: 0, landPulse: 0,
       crouching: false, groundPound: 0, gpCharge: 0,
@@ -905,7 +905,11 @@ function Index() {
       // Camera
       const target = player.x - 260;
       cameraX += (target - cameraX) * 0.12;
-      const targetY = Math.max(0, Math.min(LEVEL_H - canvas.height, player.y - canvas.height * 0.6));
+      // If the level is shorter than the screen, pin the ground to the bottom (negative cameraY).
+      // Otherwise, follow the player vertically.
+      const groundPinY = LEVEL_H - canvas.height; // negative when level shorter than screen
+      const followY = Math.max(groundPinY, Math.min(LEVEL_H - canvas.height, player.y - canvas.height * 0.65));
+      const targetY = LEVEL_H < canvas.height ? groundPinY : followY;
       cameraY += (targetY - cameraY) * 0.08;
       if (cameraX < 0) cameraX = 0;
       if (cameraX > LEVEL_W - canvas.width) cameraX = LEVEL_W - canvas.width;
@@ -1123,7 +1127,7 @@ function Index() {
 
       // Base sprite is drawn in a 22x30 virtual space, then scaled up.
       const BW = 22, BH = 30;
-      const CHAR_SCALE = 1.5;
+      const CHAR_SCALE = 2;
 
       ctx.save();
       ctx.translate(px + player.w / 2, py + player.h);
