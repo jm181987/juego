@@ -1915,9 +1915,11 @@ function Index() {
       drawCheckpoints();
       drawFlag();
       for (const c of world.coins) drawCoin(c);
+      drawLoot();
       for (const e of world.enemies) {
         if (e.kind === "goomba" || e.kind === "jumper") drawGoomba(e);
         else drawFlyer(e);
+        drawEnemyHpBar(e);
       }
       drawPlayer();
       drawParticles();
