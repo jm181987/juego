@@ -1442,6 +1442,7 @@ function Scene({
     if (k.attack && attackCd.current <= 0) {
       attackCd.current = ATTACK_COOLDOWN;
       attackTimer.current = 1;
+      playSwing();
       const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
       for (const e of enemies.current) {
         if (!e.alive) continue;
