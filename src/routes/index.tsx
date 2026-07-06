@@ -1647,6 +1647,9 @@ function Scene({
   onHudUpdate,
   keysRef,
   checkpointRef,
+  sharedPosRef,
+  sharedFacingRef,
+  sharedEnemiesRef,
 }: {
   world: WorldDef;
   statsRef: React.MutableRefObject<Stats>;
@@ -1655,7 +1658,11 @@ function Scene({
   onHudUpdate: () => void;
   keysRef: React.MutableRefObject<Keys>;
   checkpointRef: React.MutableRefObject<Vec3>;
+  sharedPosRef: React.MutableRefObject<{ x: number; y: number; z: number }>;
+  sharedFacingRef: React.MutableRefObject<number>;
+  sharedEnemiesRef: React.MutableRefObject<Enemy[]>;
 }) {
+
   const pos = useRef(new THREE.Vector3(...checkpointRef.current));
   const vel = useRef(new THREE.Vector3());
   const facing = useRef(0);
