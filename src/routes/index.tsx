@@ -1855,7 +1855,7 @@ function Index() {
       ctx.fillRect(x + 1, y + 1, (w - 2) * pct, 2);
     }
 
-
+    function drawFlag() {
       if (!world.flag.x) return;
       const x = Math.round(world.flag.x - cameraX);
       const y = world.flag.y - cameraY;
