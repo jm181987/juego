@@ -383,6 +383,7 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
 }
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
 useGLTF.preload(soldierAsset.url);
+useGLTF.preload(michelleAsset.url);
 
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
