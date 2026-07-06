@@ -1919,6 +1919,12 @@ function Index() {
       for (const e of world.enemies) {
         if (e.kind === "goomba" || e.kind === "jumper") drawGoomba(e);
         else drawFlyer(e);
+        if (e.alive && e.hitFlash > 0) {
+          ctx.globalAlpha = e.hitFlash / 10 * 0.6;
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(Math.round(e.x - cameraX), Math.round(e.y - cameraY), e.w, e.h);
+          ctx.globalAlpha = 1;
+        }
         drawEnemyHpBar(e);
       }
       drawPlayer();
