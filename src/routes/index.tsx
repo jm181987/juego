@@ -416,6 +416,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   // Priority 1: run AFTER the animation mixer so our bone offsets aren't
   // overwritten by the clip evaluator.
   useFrame(() => {
+
     if (!group.current) return;
 
     group.current.position.set(posRef.current.x, posRef.current.y, posRef.current.z);
