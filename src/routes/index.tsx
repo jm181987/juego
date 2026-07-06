@@ -357,12 +357,14 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     rightForeArm?: THREE.Object3D;
     spine1?: THREE.Object3D;
     rightHand?: THREE.Object3D;
+    leftHand?: THREE.Object3D;
     base: {
       rightArm?: THREE.Euler;
       rightForeArm?: THREE.Euler;
       spine1?: THREE.Euler;
     };
   }>({ base: {} });
+
 
   const gltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
@@ -387,7 +389,9 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       else if (name === "mixamorigRightForeArm") bonesRef.current.rightForeArm = o;
       else if (name === "mixamorigSpine1") bonesRef.current.spine1 = o;
       else if (name === "mixamorigRightHand") bonesRef.current.rightHand = o;
+      else if (name === "mixamorigLeftHand") bonesRef.current.leftHand = o;
     });
+
   }, [cloned]);
 
 
@@ -484,11 +488,28 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
       swordRef.current.position.copy(tmpPos).add(tmpOffset);
       swordRef.current.quaternion.copy(tmpQuat).multiply(handOffsetQuat);
     }
+
+    // Same treatment for the flashlight held in the left hand.
+    if (b.leftHand && flashlightRef.current && group.current) {
+      b.leftHand.getWorldPosition(tmpPos);
+      b.leftHand.getWorldQuaternion(tmpQuat);
+      group.current.worldToLocal(tmpPos);
+      group.current.getWorldQuaternion(tmpParentQuat).invert();
+      tmpQuat.premultiply(tmpParentQuat);
+      tmpOffset.copy(flashOffsetPos).applyQuaternion(tmpQuat);
+      flashlightRef.current.position.copy(tmpPos).add(tmpOffset);
+      flashlightRef.current.quaternion.copy(tmpQuat).multiply(flashOffsetQuat);
+    }
   });
 
 
   const spotRef = useRef<THREE.SpotLight>(null!);
   const spotTargetRef = useRef<THREE.Object3D>(null!);
+  const flashlightRef = useRef<THREE.Group>(null!);
+  const flashOffsetPos = useRef(new THREE.Vector3(0.04, -0.02, 0.05)).current;
+  const flashOffsetQuat = useRef(
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI, -Math.PI / 2, Math.PI / 2)),
+  ).current;
   useEffect(() => {
     if (spotRef.current && spotTargetRef.current) {
       spotRef.current.target = spotTargetRef.current;
@@ -498,20 +519,40 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   return (
     <group ref={group} scale={1.05}>
       <primitive object={cloned} />
-      {/* Linterna: haz de luz proyectado desde el pecho hacia adelante */}
-      <spotLight
-        ref={spotRef}
-        position={[0, 1.35, -0.15]}
-        angle={0.55}
-        penumbra={0.65}
-        intensity={14}
-        distance={18}
-        decay={1.2}
-        color="#fff2c8"
-      />
-      <object3D ref={spotTargetRef} position={[0, 0.6, -10]} />
-      {/* halo cálido cerca del personaje para revelar el entorno inmediato */}
-      <pointLight position={[0, 1.2, -0.2]} color="#ffd89a" intensity={1.2} distance={3.5} decay={2} />
+      {/* Linterna sujeta por la mano izquierda: cuerpo + haz de luz hacia adelante */}
+      <group ref={flashlightRef}>
+        {/* mango */}
+        <mesh castShadow position={[0, 0, 0]}>
+          <cylinderGeometry args={[0.035, 0.04, 0.22, 14]} />
+          <meshStandardMaterial color="#141416" metalness={0.7} roughness={0.35} />
+        </mesh>
+        {/* cabezal */}
+        <mesh castShadow position={[0, 0.16, 0]}>
+          <cylinderGeometry args={[0.06, 0.045, 0.1, 16]} />
+          <meshStandardMaterial color="#2a2a2e" metalness={0.85} roughness={0.25} />
+        </mesh>
+        {/* lente brillante */}
+        <mesh position={[0, 0.215, 0]}>
+          <cylinderGeometry args={[0.055, 0.055, 0.01, 20]} />
+          <meshStandardMaterial color="#fff2c8" emissive="#fff2c8" emissiveIntensity={2.2} roughness={0.15} />
+        </mesh>
+        {/* haz principal */}
+        <spotLight
+          ref={spotRef}
+          position={[0, 0.22, 0]}
+          angle={0.55}
+          penumbra={0.7}
+          intensity={16}
+          distance={20}
+          decay={1.2}
+          color="#fff2c8"
+          castShadow={false}
+        />
+        {/* target lejano en el eje +Y local de la linterna (dirección del cabezal) */}
+        <object3D ref={spotTargetRef} position={[0, 12, 0]} />
+        {/* halo cercano para no dejar el cuerpo a oscuras */}
+        <pointLight position={[0, 0.24, 0]} color="#ffd89a" intensity={0.9} distance={2.2} decay={2} />
+      </group>
       {/* Sword — its transform is driven each frame from the right-hand bone. */}
       <group ref={swordRef}>
         <mesh position={[0, -0.15, 0]} castShadow>
@@ -534,6 +575,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     </group>
   );
 }
+
 
 
 
