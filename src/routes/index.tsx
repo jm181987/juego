@@ -927,16 +927,17 @@ function Index() {
         if (!e.alive) { if (e.squashT > 0) e.squashT--; continue; }
         e.anim += 0.12 + Math.abs(e.vx) * 0.15;
 
-        if (e.kind === "goomba") {
+        if (e.kind === "goomba" || e.kind === "jumper") {
           e.x += e.vx;
           e.vy += 0.5;
           e.y += e.vy;
+          let onGroundE = false;
           for (const b of collideBlocks(e)) {
             if (b.type === "platform" || b.type === "cloud") {
-              if (e.vy > 0 && e.y + e.h - e.vy <= b.y + 1) { e.y = b.y - e.h; e.vy = 0; }
+              if (e.vy > 0 && e.y + e.h - e.vy <= b.y + 1) { e.y = b.y - e.h; e.vy = 0; onGroundE = true; }
               continue;
             }
-            if (e.vy > 0) { e.y = b.y - e.h; e.vy = 0; }
+            if (e.vy > 0) { e.y = b.y - e.h; e.vy = 0; onGroundE = true; }
             else if (e.vx !== 0) {
               if (e.vx > 0) e.x = b.x - e.w; else e.x = b.x + b.w;
               e.vx *= -1;
@@ -944,6 +945,15 @@ function Index() {
           }
           const foot = { x: e.x + (e.vx > 0 ? e.w + 2 : -2), y: e.y + e.h + 2, w: 2, h: 2 };
           if (collideBlocks(foot).length === 0) e.vx *= -1;
+          // Jumper: chase and hop toward the player when close
+          if (e.kind === "jumper") {
+            const dx = player.x - e.x;
+            if (Math.abs(dx) < 220) e.vx = Math.sign(dx) * 1.1;
+            e.jumpCd = (e.jumpCd ?? 60) - 1;
+            if (onGroundE && (e.jumpCd ?? 0) <= 0) {
+              e.vy = -8.5; e.jumpCd = 70 + Math.floor(Math.random() * 40);
+            }
+          }
         } else if (e.kind === "flyer") {
           // Hovering sine wave, chases horizontally
           const dx = player.x - e.x;
