@@ -489,6 +489,209 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     }
   }, [appearance, cloned]);
 
+  // Female body swap: hide the male soldier meshes and attach primitive
+  // female body parts as CHILDREN of the Mixamo bones. Because they are
+  // parented to the skeleton, they inherit every bone transform for free
+  // (idle sway, run, sword swing) without per-frame snapping code.
+  useEffect(() => {
+    const b = bonesRef.current;
+    const isFemale = appearance.gender === "female";
+
+    // Toggle original soldier meshes.
+    cloned.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) m.visible = !isFemale;
+    });
+
+    if (!isFemale) return;
+
+    const skinMat = new THREE.MeshStandardMaterial({ color: appearance.skinTint, roughness: 0.72 });
+    const clothMat = new THREE.MeshStandardMaterial({ color: appearance.clothTint, roughness: 0.9 });
+    const hairMat = new THREE.MeshStandardMaterial({ color: appearance.hairTint, roughness: 1 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: appearance.accentTint, metalness: 0.5, roughness: 0.4 });
+    const lipMat = new THREE.MeshStandardMaterial({ color: "#8a2030", roughness: 0.5 });
+    const eyeWhite = new THREE.MeshStandardMaterial({ color: "#f4ede0" });
+    const eyePupil = new THREE.MeshStandardMaterial({ color: "#2a1a3a" });
+
+    const attached: { parent: THREE.Object3D; child: THREE.Object3D }[] = [];
+    const attach = (parent: THREE.Object3D | undefined, child: THREE.Object3D) => {
+      if (!parent) return;
+      parent.add(child);
+      attached.push({ parent, child });
+    };
+
+    // Bone length inference: distance from bone to its first child bone.
+    const boneLen = (bone?: THREE.Object3D, fallback = 20) => {
+      if (!bone || bone.children.length === 0) return fallback;
+      const child = bone.children[0];
+      const len = child.position.length();
+      return len > 0.01 ? len : fallback;
+    };
+
+    // All Mixamo bone geometry is expressed in centimeter-ish units for the
+    // stock soldier rig (the whole model is ~180 units tall). We build
+    // meshes at that same scale so they align with the bones.
+    const mkCap = (r: number, len: number, mat: THREE.Material, offset = len / 2) => {
+      const g = new THREE.CapsuleGeometry(r, Math.max(0.001, len - r * 2), 4, 10);
+      const m = new THREE.Mesh(g, mat);
+      m.position.y = offset;
+      m.castShadow = true;
+      return m;
+    };
+    const mkSphere = (r: number, mat: THREE.Material, pos: [number, number, number]) => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat);
+      m.position.set(...pos);
+      m.castShadow = true;
+      return m;
+    };
+    const mkBox = (w: number, h: number, d: number, mat: THREE.Material, pos: [number, number, number], rot?: [number, number, number]) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+      m.position.set(...pos);
+      if (rot) m.rotation.set(...rot);
+      m.castShadow = true;
+      return m;
+    };
+
+    // --- Legs (upper leg bones point along +Y; halfLen ≈ 44) ---
+    const upLegLen = boneLen(b.leftUpLeg, 44);
+    const legLen = boneLen(b.leftLeg, 40);
+    for (const [upLeg, leg, foot] of [
+      [b.leftUpLeg, b.leftLeg, b.leftFoot],
+      [b.rightUpLeg, b.rightLeg, b.rightFoot],
+    ] as const) {
+      attach(upLeg, mkCap(7, upLegLen, skinMat));
+      attach(leg, mkCap(6, legLen, skinMat));
+      // Boot
+      if (foot) {
+        const boot = new THREE.Mesh(new THREE.BoxGeometry(9, 6, 22), clothMat);
+        boot.position.set(0, 3, 8);
+        boot.castShadow = true;
+        attach(foot, boot);
+      }
+    }
+
+    // --- Hips: pelvis + long skirt (skirt hangs downward, i.e. -Y in hips local space is upward for Mixamo hips — actually hips +Y goes up spine, so legs go -Y. Skirt should extend along -Y.) ---
+    const pelvis = new THREE.Mesh(new THREE.SphereGeometry(14, 16, 12), clothMat);
+    pelvis.scale.set(1, 0.65, 0.85);
+    pelvis.castShadow = true;
+    attach(b.hips, pelvis);
+    const skirt = new THREE.Mesh(new THREE.ConeGeometry(24, 40, 20, 1, true), clothMat);
+    skirt.material = new THREE.MeshStandardMaterial({ color: appearance.clothTint, roughness: 0.95, side: THREE.DoubleSide });
+    skirt.position.y = -18;
+    skirt.rotation.x = Math.PI;
+    skirt.castShadow = true;
+    attach(b.hips, skirt);
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(15, 1.8, 6, 20), accentMat);
+    belt.rotation.x = Math.PI / 2;
+    belt.position.y = 2;
+    attach(b.hips, belt);
+
+    // --- Torso: narrow waist + bust on spine1/spine2 ---
+    const waist = new THREE.Mesh(new THREE.CapsuleGeometry(9, 12, 4, 12), clothMat);
+    waist.position.y = boneLen(b.spine1, 10) / 2;
+    waist.castShadow = true;
+    attach(b.spine1, waist);
+
+    if (b.spine2) {
+      const chest = new THREE.Mesh(new THREE.SphereGeometry(13, 16, 12), clothMat);
+      chest.scale.set(1.1, 0.7, 0.9);
+      chest.position.y = 4;
+      chest.castShadow = true;
+      attach(b.spine2, chest);
+      const bustL = mkSphere(6, clothMat, [-6, 8, 10]);
+      const bustR = mkSphere(6, clothMat, [6, 8, 10]);
+      attach(b.spine2, bustL);
+      attach(b.spine2, bustR);
+      // Corset lace accent
+      const lace = mkBox(1.5, 20, 0.2, accentMat, [0, 6, 12]);
+      attach(b.spine2, lace);
+    }
+
+    // --- Shoulders + arms (arm bones point along +Y down the limb; length ~28) ---
+    const armLen = boneLen(b.leftArm, 28);
+    const foreArmLen = boneLen(b.leftForeArm, 26);
+    for (const [shoulder, arm, forearm, hand] of [
+      [b.leftShoulder, b.leftArm, b.leftForeArm, b.leftHand],
+      [b.rightShoulder, b.rightArm, b.rightForeArm, b.rightHand],
+    ] as const) {
+      if (shoulder) {
+        const pad = new THREE.Mesh(new THREE.SphereGeometry(6, 12, 10), clothMat);
+        pad.position.y = 6;
+        attach(shoulder, pad);
+      }
+      // Upper arm — slim sleeve
+      attach(arm, mkCap(4.2, armLen, clothMat));
+      // Forearm — bare skin
+      attach(forearm, mkCap(3.6, foreArmLen, skinMat));
+      // Hand
+      if (hand) {
+        const h = new THREE.Mesh(new THREE.SphereGeometry(3.5, 10, 8), skinMat);
+        h.position.y = 4;
+        h.scale.set(0.9, 1.2, 0.7);
+        h.castShadow = true;
+        attach(hand, h);
+      }
+    }
+
+    // --- Neck ---
+    if (b.neck) {
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(4, 5, boneLen(b.neck, 8), 10), skinMat);
+      neck.position.y = boneLen(b.neck, 8) / 2;
+      attach(b.neck, neck);
+    }
+
+    // --- Head: feminine face + long hair with ponytail ---
+    if (b.head) {
+      const face = new THREE.Mesh(new THREE.SphereGeometry(11, 20, 16), skinMat);
+      face.position.y = 8;
+      face.castShadow = true;
+      attach(b.head, face);
+      // Back hair mass (envelops the head from behind)
+      const backHair = new THREE.Mesh(
+        new THREE.SphereGeometry(13, 20, 16, 0, Math.PI * 2, 0, Math.PI * 0.75),
+        hairMat,
+      );
+      backHair.position.set(0, 8, -1.5);
+      backHair.castShadow = true;
+      attach(b.head, backHair);
+      // Bangs
+      attach(b.head, mkBox(18, 5, 4, hairMat, [0, 15, 9]));
+      // Side locks framing the face
+      attach(b.head, mkBox(4, 18, 6, hairMat, [-9.5, 4, 3]));
+      attach(b.head, mkBox(4, 18, 6, hairMat, [9.5, 4, 3]));
+      // Long ponytail down the back
+      const pony = new THREE.Mesh(new THREE.CapsuleGeometry(3.5, 26, 4, 8), hairMat);
+      pony.position.set(0, -8, -10);
+      pony.rotation.x = 0.35;
+      pony.castShadow = true;
+      attach(b.head, pony);
+      // Eyes
+      attach(b.head, mkSphere(1.5, eyeWhite, [-4, 9, 9]));
+      attach(b.head, mkSphere(1.5, eyeWhite, [4, 9, 9]));
+      attach(b.head, mkSphere(0.7, eyePupil, [-4, 9, 10.3]));
+      attach(b.head, mkSphere(0.7, eyePupil, [4, 9, 10.3]));
+      // Lips
+      attach(b.head, mkBox(4, 1.1, 1.3, lipMat, [0, 3, 10.6]));
+      // Small nose
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(1, 3, 6), skinMat);
+      nose.position.set(0, 6, 10.5);
+      nose.rotation.x = Math.PI / 2;
+      attach(b.head, nose);
+    }
+
+    return () => {
+      for (const { parent, child } of attached) {
+        parent.remove(child);
+        const m = child as THREE.Mesh;
+        if (m.geometry) m.geometry.dispose();
+      }
+      skinMat.dispose(); clothMat.dispose(); hairMat.dispose();
+      accentMat.dispose(); lipMat.dispose(); eyeWhite.dispose(); eyePupil.dispose();
+    };
+  }, [appearance.gender, appearance.skinTint, appearance.hairTint, appearance.clothTint, appearance.accentTint, cloned]);
+
+
+
 
 
 
