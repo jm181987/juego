@@ -2414,7 +2414,7 @@ function Index() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", overflow: "hidden", fontFamily: "system-ui" }}>
-      {mounted && status !== "menu" && (
+      {mounted && status !== "menu" && status !== "dead" && status !== "victory" && (
         <Canvas
           key={sceneKey}
           shadows={settings.shadows && settings.quality === "high"}
