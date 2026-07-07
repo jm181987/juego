@@ -751,6 +751,25 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 const MageMemo = React.memo(Mage);
 
+/* ---------------- PROJECTILE ---------------- */
+function ProjectileMesh({ pr }: { pr: Projectile }) {
+  const ref = useRef<THREE.Group>(null!);
+  useFrame(() => {
+    if (!ref.current) return;
+    ref.current.position.copy(pr.pos);
+    ref.current.visible = pr.life > 0;
+  });
+  return (
+    <group ref={ref}>
+      <mesh castShadow>
+        <sphereGeometry args={[0.18, 12, 10]} />
+        <meshStandardMaterial color="#a8e6ff" emissive="#4ac6ff" emissiveIntensity={2.4} roughness={0.2} />
+      </mesh>
+      <pointLight color="#7ad6ff" intensity={1.6} distance={4} decay={2} />
+    </group>
+  );
+}
+
 
 
 
