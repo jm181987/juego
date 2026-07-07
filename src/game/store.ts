@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 /* ============ TYPES ============ */
 
 export type Appearance = {
-  gender: "male" | "female";
+  gender: "male" | "female" | "jorge";
   skinTint: string;      // hex — recolor tint applied to body materials
   hairTint: string;
   clothTint: string;
