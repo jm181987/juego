@@ -37,6 +37,28 @@ export function playSwing() {
   src.stop(a.currentTime + dur + 0.02);
 }
 
+/** Magic bolt: quick zappy pew. */
+export function playShoot() {
+  const a = ac();
+  if (!a) return;
+  const t0 = a.currentTime;
+  const dur = 0.18;
+  const osc = a.createOscillator();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(1400, t0);
+  osc.frequency.exponentialRampToValueAtTime(220, t0 + dur);
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.28, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  const bp = a.createBiquadFilter();
+  bp.type = "lowpass";
+  bp.frequency.value = 2600;
+  osc.connect(bp).connect(g).connect(a.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.02);
+}
+
 /** Enemy death vocalization by gender. */
 export function playDeath(gender: "male" | "female") {
   const a = ac();

@@ -8,7 +8,7 @@ import soldierAsset from "@/assets/soldier.glb.asset.json";
 import michelleAsset from "@/assets/michelle.glb.asset.json";
 
 
-import { playSwing, playDeath, genderFor } from "@/lib/sfx";
+import { playSwing, playShoot, playDeath, genderFor } from "@/lib/sfx";
 import { useGame, type SaveSlot } from "@/game/store";
 import { StatBar, BatteryPill } from "@/components/hud/Bars";
 import { Minimap, type MiniBlip } from "@/components/hud/Minimap";
@@ -67,6 +67,7 @@ type Pickup = {
   taken: boolean;
 };
 type FloatText = { id: number; pos: THREE.Vector3; text: string; color: string; life: number };
+type Projectile = { id: number; pos: THREE.Vector3; vel: THREE.Vector3; life: number };
 
 type WorldDef = {
   name: string;
@@ -277,7 +278,10 @@ const AIR_CONTROL = 1.0;
 const COYOTE_TIME = 0.12;
 const JUMP_BUFFER = 0.12;
 const ATTACK_RANGE = 2.6;
-const ATTACK_COOLDOWN = 0.4;
+const ATTACK_COOLDOWN = 0.28;
+const PROJECTILE_SPEED = 32;
+const PROJECTILE_LIFE = 1.2;
+const PROJECTILE_RADIUS = 0.35;
 
 /* ---------------- INPUT ---------------- */
 type Keys = {
@@ -746,6 +750,25 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 }
 
 const MageMemo = React.memo(Mage);
+
+/* ---------------- PROJECTILE ---------------- */
+function ProjectileMesh({ pr }: { pr: Projectile }) {
+  const ref = useRef<THREE.Group>(null!);
+  useFrame(() => {
+    if (!ref.current) return;
+    ref.current.position.copy(pr.pos);
+    ref.current.visible = pr.life > 0;
+  });
+  return (
+    <group ref={ref}>
+      <mesh castShadow>
+        <sphereGeometry args={[0.18, 12, 10]} />
+        <meshStandardMaterial color="#a8e6ff" emissive="#4ac6ff" emissiveIntensity={2.4} roughness={0.2} />
+      </mesh>
+      <pointLight color="#7ad6ff" intensity={1.6} distance={4} decay={2} />
+    </group>
+  );
+}
 
 
 
@@ -1583,6 +1606,8 @@ function Scene({
   );
   const floats = useRef<FloatText[]>([]);
   const nextFtId = useRef(0);
+  const projectiles = useRef<Projectile[]>([]);
+  const nextProjId = useRef(0);
   const spawnFloat = (p: THREE.Vector3, text: string, color: string) => {
     floats.current.push({ id: nextFtId.current++, pos: p.clone().add(new THREE.Vector3(0, 1.5, 0)), text, color, life: 1 });
   };
@@ -1787,61 +1812,88 @@ function Scene({
       }
     }
 
-    // Attack
+    // Attack — fire a projectile in the facing direction.
     if (attackCd.current > 0) attackCd.current -= dt;
     if (attackTimer.current > 0) attackTimer.current -= dt * 4;
-    if (k.attack && attackCd.current <= 0 && gs.stamina >= 12) {
+    if (k.attack && attackCd.current <= 0 && gs.stamina >= 6) {
       attackCd.current = ATTACK_COOLDOWN;
       attackTimer.current = 1;
-      gs.setStamina(gs.stamina - 12);
-      playSwing();
+      gs.setStamina(gs.stamina - 6);
+      playShoot();
       const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
+      // Spawn slightly in front of the mage and roughly at hand height.
+      const spawn = pos.current.clone().add(new THREE.Vector3(fx * 0.6, 1.1, fz * 0.6));
+      projectiles.current.push({
+        id: nextProjId.current++,
+        pos: spawn,
+        vel: new THREE.Vector3(fx * PROJECTILE_SPEED, 0, fz * PROJECTILE_SPEED),
+        life: PROJECTILE_LIFE,
+      });
+    }
+
+    // Projectiles: move, expire, and damage enemies on hit.
+    for (const pr of projectiles.current) {
+      if (pr.life <= 0) continue;
+      pr.life -= dt;
+      pr.pos.x += pr.vel.x * dt;
+      pr.pos.y += pr.vel.y * dt;
+      pr.pos.z += pr.vel.z * dt;
+      // Block on world geometry.
+      if (blocked(pr.pos.x, pr.pos.y, pr.pos.z, 0.1, 0.1, world.platforms)) {
+        pr.life = 0;
+        continue;
+      }
       for (const e of enemies.current) {
         if (!e.alive) continue;
-        const d = e.pos.clone().sub(pos.current);
-        const dist = d.length();
-        if (dist < ATTACK_RANGE) {
-          // dot with facing
-          const dn = d.clone().normalize();
-          if (dn.x * fx + dn.z * fz > 0.3) {
-            const dmg = 15 + st.str + Math.floor(Math.random() * 8);
-            e.hp -= dmg;
-            e.hitFlash = 0.15;
-            e.vel.x += fx * 6; e.vel.z += fz * 6; e.vel.y = 4;
-            spawnFloat(e.pos, `-${dmg}`, "#ffe040");
-            if (e.hp <= 0) {
-              e.alive = false;
-              playDeath(genderFor(e.kind));
-              gs.recordKill(e.kind);
+        const dx = e.pos.x - pr.pos.x;
+        const dy = (e.pos.y + 0.9) - pr.pos.y;
+        const dz = e.pos.z - pr.pos.z;
+        if (dx * dx + dy * dy + dz * dz < (PROJECTILE_RADIUS + 0.5) * (PROJECTILE_RADIUS + 0.5)) {
+          const dmg = 18 + st.str + Math.floor(Math.random() * 8);
+          e.hp -= dmg;
+          e.hitFlash = 0.15;
+          const kbx = pr.vel.x, kbz = pr.vel.z;
+          const len = Math.hypot(kbx, kbz) || 1;
+          e.vel.x += (kbx / len) * 5; e.vel.z += (kbz / len) * 5; e.vel.y = 3;
+          spawnFloat(e.pos, `-${dmg}`, "#80d8ff");
+          pr.life = 0;
+          if (e.hp <= 0) {
+            e.alive = false;
+            playDeath(genderFor(e.kind));
+            gs.recordKill(e.kind);
 
-              const xp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 40 : 25;
-              const gold = e.kind === "brute" ? 20 : e.kind === "wraith" ? 12 : 6;
-              st.xp += xp; st.gold += gold;
-              spawnFloat(e.pos, `+${xp} XP  +${gold}g`, "#a0ff40");
-              while (st.xp >= st.xpNext) {
-                st.xp -= st.xpNext;
-                st.level++;
-                st.xpNext = Math.floor(st.xpNext * 1.4);
-                st.maxHp += 20; st.hp = st.maxHp;
-                st.maxMp += 10; st.mp = st.maxMp;
-                st.str += 3; st.def += 1;
-                spawnFloat(pos.current, `LEVEL ${st.level}!`, "#ff80ff");
-              }
-              // Random drop
-              if (Math.random() < 0.4) {
-                pickups.current.push({
-                  id: 9000 + pickups.current.length,
-                  pos: e.pos.clone(),
-                  kind: Math.random() < 0.5 ? "hp" : "mp",
-                  taken: false,
-                });
-              }
-              onHudUpdate();
+            const xp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 40 : 25;
+            const gold = e.kind === "brute" ? 20 : e.kind === "wraith" ? 12 : 6;
+            st.xp += xp; st.gold += gold;
+            spawnFloat(e.pos, `+${xp} XP  +${gold}g`, "#a0ff40");
+            while (st.xp >= st.xpNext) {
+              st.xp -= st.xpNext;
+              st.level++;
+              st.xpNext = Math.floor(st.xpNext * 1.4);
+              st.maxHp += 20; st.hp = st.maxHp;
+              st.maxMp += 10; st.mp = st.maxMp;
+              st.str += 3; st.def += 1;
+              spawnFloat(pos.current, `LEVEL ${st.level}!`, "#ff80ff");
             }
+            // Random drop
+            if (Math.random() < 0.4) {
+              pickups.current.push({
+                id: 9000 + pickups.current.length,
+                pos: e.pos.clone(),
+                kind: Math.random() < 0.5 ? "hp" : "mp",
+                taken: false,
+              });
+            }
+            onHudUpdate();
           }
+          break;
         }
       }
     }
+    const beforeProj = projectiles.current.length;
+    projectiles.current = projectiles.current.filter((p) => p.life > 0);
+    const projChanged = projectiles.current.length !== beforeProj;
+
 
     // Potions
     if (k.pot1 && !potPrev.current.q && st.potHp > 0 && st.hp < st.maxHp) {
@@ -1963,7 +2015,7 @@ function Scene({
 
     // Only rerender React tree when the floats list actually changes,
     // otherwise mesh refs update the scene each frame without React work.
-    if (floats.current.length !== beforeLen) rerender();
+    if (floats.current.length !== beforeLen || projChanged) rerender();
   });
 
   return (
@@ -2003,6 +2055,10 @@ function Scene({
       <Goal pos={world.goal} />
       {/* Mage */}
       <MageMemo posRef={pos} facingRef={facing} attackingRef={attackTimer} walkPhaseRef={walkPhase} />
+      {/* Projectiles */}
+      {projectiles.current.map((pr) => (
+        <ProjectileMesh key={pr.id} pr={pr} />
+      ))}
       {/* Floating texts */}
       {floats.current.map((f) => (
         <FloatingText key={f.id} ft={f} />
