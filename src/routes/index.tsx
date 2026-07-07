@@ -56,9 +56,16 @@ type Enemy = {
   hp: number;
   maxHp: number;
   vel: THREE.Vector3;
-  kind: "goblin" | "wraith" | "brute";
+  kind: "goblin" | "wraith" | "brute" | "archer" | "hopper" | "sentinel" | "dasher";
   alive: boolean;
   hitFlash: number;
+  // AI state
+  shootTimer?: number;
+  jumpTimer?: number;
+  dashTimer?: number;
+  dashActive?: number;
+  patrolCenter?: THREE.Vector3;
+  patrolDir?: number;
 };
 type Pickup = {
   id: number;
@@ -68,6 +75,7 @@ type Pickup = {
 };
 type FloatText = { id: number; pos: THREE.Vector3; text: string; color: string; life: number };
 type Projectile = { id: number; pos: THREE.Vector3; vel: THREE.Vector3; life: number };
+type EnemyProjectile = { id: number; pos: THREE.Vector3; vel: THREE.Vector3; life: number; dmg: number };
 
 type WorldDef = {
   name: string;
