@@ -1,5 +1,0 @@
-{
-  "buildCommand": "vite build",
-  "outputDirectory": ".vercel/output",
-  "framework": null
-}
