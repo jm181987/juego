@@ -111,11 +111,17 @@ function genPath(count: number, startX: number, startY: number, jumpX: number, j
       const midZ = -z * 0.6 + Math.cos(i * 1.7) * (zSwing + 1.5);
       plats.push({ pos: [midX, midY, midZ], size: [width * 0.55, 0.6, width * 0.55], color });
     }
-    // Tall pillar side-platform every few steps
+    // Tall pillar side-platform every few steps (both sides for lateral variety)
     if (i % 2 === 1) {
       const sideZ = z + (i % 4 === 1 ? 1 : -1) * (zSwing + 2.5);
       const sideY = y + 2.4;
       plats.push({ pos: [x, sideY, sideZ], size: [width * 0.6, 0.5, width * 0.6], color });
+      plats.push({ pos: [x, sideY + 1.2, -sideZ], size: [width * 0.5, 0.5, width * 0.5], color });
+    }
+    // Extra low lateral catwalks so there are always side routes
+    if (i % 3 === 0) {
+      plats.push({ pos: [x + jumpX * 0.25, y - 0.8, z + zSwing + 4], size: [width * 0.7, 0.5, width * 0.4], color });
+      plats.push({ pos: [x + jumpX * 0.25, y - 0.8, z - zSwing - 4], size: [width * 0.7, 0.5, width * 0.4], color });
     }
   }
   return plats;
@@ -132,7 +138,7 @@ function branches(
   jumpY: number,
   width: number,
   color: string,
-  offsets: number[] = [-13, -8, 8, 13],
+  offsets: number[] = [-20, -14, -8, 8, 14, 20],
 ): Platform[] {
   const out: Platform[] = [];
   offsets.forEach((zBase, bi) => {
@@ -1682,12 +1688,75 @@ function PlatformField({ platforms }: { platforms: Platform[] }) {
   );
 }
 
+const _rockTexCache: { color?: THREE.Texture; normal?: THREE.Texture; rough?: THREE.Texture } = {};
+function getRockTextures() {
+  if (_rockTexCache.color) return _rockTexCache as Required<typeof _rockTexCache>;
+  const size = 256;
+  const make = (draw: (ctx: CanvasRenderingContext2D) => void) => {
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const ctx = c.getContext("2d")!;
+    draw(ctx);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, 2);
+    t.anisotropy = 4;
+    return t;
+  };
+  // Color: noisy grayscale with cracks
+  _rockTexCache.color = make((ctx) => {
+    const img = ctx.createImageData(size, size);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = 160 + Math.floor(Math.random() * 70) - 35;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = n;
+      img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 22; k++) {
+      ctx.beginPath();
+      ctx.moveTo(Math.random() * size, Math.random() * size);
+      for (let s = 0; s < 6; s++) ctx.lineTo(Math.random() * size, Math.random() * size);
+      ctx.stroke();
+    }
+  });
+  // Normal map (bluish, perturbed)
+  _rockTexCache.normal = make((ctx) => {
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const i = (y * size + x) * 4;
+        const nx = Math.floor(128 + (Math.random() - 0.5) * 90);
+        const ny = Math.floor(128 + (Math.random() - 0.5) * 90);
+        img.data[i] = nx;
+        img.data[i + 1] = ny;
+        img.data[i + 2] = 255;
+        img.data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  });
+  // Roughness map
+  _rockTexCache.rough = make((ctx) => {
+    const img = ctx.createImageData(size, size);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = 180 + Math.floor(Math.random() * 60);
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = n;
+      img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  });
+  return _rockTexCache as Required<typeof _rockTexCache>;
+}
+
 function PlatformInstances({ color, platforms }: { color: string; platforms: Platform[] }) {
   const ref = useRef<THREE.InstancedMesh>(null!);
   const matrix = useMemo(() => new THREE.Matrix4(), []);
   const position = useMemo(() => new THREE.Vector3(), []);
   const quaternion = useMemo(() => new THREE.Quaternion(), []);
   const scale = useMemo(() => new THREE.Vector3(), []);
+  const tex = useMemo(() => getRockTextures(), []);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -1702,9 +1771,17 @@ function PlatformInstances({ color, platforms }: { color: string; platforms: Pla
   }, [matrix, platforms, position, quaternion, scale]);
 
   return (
-    <instancedMesh ref={ref} args={[undefined, undefined, platforms.length]} receiveShadow>
+    <instancedMesh ref={ref} args={[undefined, undefined, platforms.length]} receiveShadow castShadow>
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color={color} roughness={0.85} />
+      <meshStandardMaterial
+        color={color}
+        map={tex.color}
+        normalMap={tex.normal}
+        roughnessMap={tex.rough}
+        normalScale={new THREE.Vector2(0.8, 0.8)}
+        roughness={0.95}
+        metalness={0.05}
+      />
     </instancedMesh>
   );
 }
