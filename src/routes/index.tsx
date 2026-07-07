@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
+import { Sky, Stars, Text, useAnimations, useFBX, useGLTF } from "@react-three/drei";
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
 import michelleAsset from "@/assets/michelle.glb.asset.json";
+import vampireAsset from "@/assets/vampire.fbx.asset.json";
+import medeaAsset from "@/assets/medea.fbx.asset.json";
+import skeletonzombieAsset from "@/assets/skeletonzombie.fbx.asset.json";
 
 
 import { playSwing, playShoot, playDeath, genderFor } from "@/lib/sfx";
