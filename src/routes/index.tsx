@@ -277,7 +277,10 @@ const AIR_CONTROL = 1.0;
 const COYOTE_TIME = 0.12;
 const JUMP_BUFFER = 0.12;
 const ATTACK_RANGE = 2.6;
-const ATTACK_COOLDOWN = 0.4;
+const ATTACK_COOLDOWN = 0.28;
+const PROJECTILE_SPEED = 32;
+const PROJECTILE_LIFE = 1.2;
+const PROJECTILE_RADIUS = 0.35;
 
 /* ---------------- INPUT ---------------- */
 type Keys = {
