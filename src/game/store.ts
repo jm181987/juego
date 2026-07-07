@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 /* ============ TYPES ============ */
 
 export type Appearance = {
-  gender: "male" | "female" | "jorge";
+  gender: "male" | "female";
   skinTint: string;      // hex — recolor tint applied to body materials
   hairTint: string;
   clothTint: string;
@@ -235,7 +235,10 @@ const compactSaves = (saves: unknown): SaveSlot[] =>
 const sanitizePersistedState = (persisted: unknown): Partial<Store> => {
   if (!persisted || typeof persisted !== "object") return {};
   const state = persisted as Partial<Store>;
-  return { ...state, settings: startupSafeSettings(state.settings), saves: compactSaves(state.saves) };
+  const appearance = state.appearance
+    ? { ...state.appearance, gender: state.appearance.gender === "female" ? "female" as const : "male" as const }
+    : undefined;
+  return { ...state, appearance, settings: startupSafeSettings(state.settings), saves: compactSaves(state.saves) };
 };
 
 export const useGame = create<Store>()(

@@ -59,13 +59,13 @@ export function CharacterCreator() {
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, color: "#aaa", letterSpacing: 2, textTransform: "uppercase", marginBottom: 6, fontFamily: "monospace" }}>Género</div>
           <div style={{ display: "flex", gap: 6 }}>
-            {(["male", "female", "jorge"] as const).map((g) => (
+            {(["male", "female"] as const).map((g) => (
               <button key={g} onClick={() => set({ gender: g })} style={{
                 flex: 1, padding: 10, cursor: "pointer",
                 background: a.gender === g ? "linear-gradient(180deg, #3a1a5a, #1a0838)" : "#0a0418",
                 border: a.gender === g ? "1px solid #7ee6ff" : "1px solid #444",
                 color: "#fff", textTransform: "uppercase", fontSize: 12, letterSpacing: 2, fontWeight: 600,
-              }}>{g === "male" ? "Masculino" : g === "female" ? "Femenino" : "Jorge"}</button>
+              }}>{g === "male" ? "Masculino" : "Femenino"}</button>
             ))}
           </div>
         </div>
