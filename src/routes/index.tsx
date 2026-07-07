@@ -1994,28 +1994,111 @@ function Scene({
     for (const e of enemies.current) {
       if (!e.alive) continue;
       if (e.hitFlash > 0) e.hitFlash -= dt;
-      // Simple chase
+
       const toP = pos.current.clone().sub(e.pos);
       const dist = toP.length();
-      if (dist < 12) {
-        const baseSpeed = e.kind === "wraith" ? 4 : e.kind === "brute" ? 2.5 : 3.5;
-        const speed = baseSpeed * (0.9 + diff * 0.15);
-        const dir = toP.normalize();
-        if (e.kind === "wraith") {
-          // Wraiths float toward player
+      const dir = dist > 0.001 ? toP.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      const diffMul = 0.9 + diff * 0.15;
+
+      if (e.kind === "wraith") {
+        if (dist < 14) {
+          const speed = 4 * diffMul;
           e.vel.x = dir.x * speed;
           e.vel.z = dir.z * speed;
           e.vel.y = dir.y * speed * 0.5;
         } else {
+          e.vel.multiplyScalar(0.9);
+        }
+      } else if (e.kind === "archer") {
+        // Kite: keep 6-9 units away, orbit, shoot fireballs.
+        const desiredDist = 7.5;
+        const speed = 3.4 * diffMul;
+        if (dist < 14) {
+          const radial = (dist - desiredDist);
+          const strafe = new THREE.Vector3(-dir.z, 0, dir.x);
+          const move = dir.clone().multiplyScalar(radial * 0.6).add(strafe.multiplyScalar(1.2));
+          if (move.length() > 0) move.normalize();
+          e.vel.x = move.x * speed;
+          e.vel.z = move.z * speed;
+        } else {
+          e.vel.x *= 0.9; e.vel.z *= 0.9;
+        }
+        e.vel.y += GRAVITY * dt;
+        e.shootTimer = (e.shootTimer ?? 1) - dt;
+        if (dist > 3 && dist < 16 && (e.shootTimer ?? 0) <= 0) {
+          e.shootTimer = 1.4 + Math.random() * 0.6;
+          const from = e.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
+          const target = pos.current.clone().add(new THREE.Vector3(0, 0.8, 0));
+          const shootDir = target.sub(from).normalize();
+          enemyProjectiles.current.push({
+            id: nextEnemyProjId.current++,
+            pos: from,
+            vel: shootDir.multiplyScalar(16),
+            life: 1.6,
+            dmg: Math.max(2, Math.round(8 * diff - st.def * 0.4)),
+          });
+        }
+      } else if (e.kind === "hopper") {
+        const speed = 4.5 * diffMul;
+        if (dist < 16) {
+          e.vel.x = dir.x * speed;
+          e.vel.z = dir.z * speed;
+        } else { e.vel.x *= 0.9; e.vel.z *= 0.9; }
+        e.vel.y += GRAVITY * dt;
+        e.jumpTimer = (e.jumpTimer ?? 0) - dt;
+        // Simple ground check for the enemy
+        const gy = aabb(e.pos.x, e.pos.y - 0.05, e.pos.z, 0.35, 1.4, world.platforms);
+        if (gy !== null && (e.jumpTimer ?? 0) <= 0 && dist < 18) {
+          e.vel.y = 13;
+          e.jumpTimer = 0.5 + Math.random() * 0.4;
+        }
+      } else if (e.kind === "sentinel") {
+        // Patrol left/right around patrolCenter; if player close, charge.
+        const center = e.patrolCenter ?? e.pos;
+        const speed = 2.4 * diffMul;
+        if (dist < 5) {
+          e.vel.x = dir.x * speed * 1.6;
+          e.vel.z = dir.z * speed * 1.6;
+        } else {
+          const offset = e.pos.x - center.x;
+          if (offset > 5) e.patrolDir = -1;
+          else if (offset < -5) e.patrolDir = 1;
+          e.vel.x = (e.patrolDir ?? 1) * speed;
+          e.vel.z = 0;
+        }
+        e.vel.y += GRAVITY * dt;
+      } else if (e.kind === "dasher") {
+        const speed = 3 * diffMul;
+        if (dist < 16) {
+          e.vel.x = dir.x * speed;
+          e.vel.z = dir.z * speed;
+        } else { e.vel.x *= 0.9; e.vel.z *= 0.9; }
+        e.dashTimer = (e.dashTimer ?? 2) - dt;
+        e.dashActive = (e.dashActive ?? 0) - dt;
+        if ((e.dashTimer ?? 0) <= 0 && dist < 14) {
+          e.dashActive = 0.28;
+          e.dashTimer = 1.8 + Math.random() * 0.8;
+        }
+        if ((e.dashActive ?? 0) > 0) {
+          e.vel.x = dir.x * 16;
+          e.vel.z = dir.z * 16;
+        }
+        e.vel.y += GRAVITY * dt;
+      } else {
+        // brute / goblin default chase
+        if (dist < 12) {
+          const baseSpeed = e.kind === "brute" ? 2.5 : 3.5;
+          const speed = baseSpeed * diffMul;
           e.vel.x = dir.x * speed;
           e.vel.z = dir.z * speed;
           e.vel.y += GRAVITY * dt;
           if (grounded.current && Math.random() < 0.005) e.vel.y = 8;
+        } else {
+          e.vel.x *= 0.9; e.vel.z *= 0.9;
+          e.vel.y += GRAVITY * dt;
         }
-      } else {
-        e.vel.x *= 0.9; e.vel.z *= 0.9;
-        if (e.kind !== "wraith") e.vel.y += GRAVITY * dt;
       }
+
       // Integrate
       const enx = e.pos.x + e.vel.x * dt;
       if (!blocked(enx, e.pos.y, e.pos.z, 0.35, 1.4, world.platforms)) e.pos.x = enx;
