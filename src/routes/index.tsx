@@ -388,6 +388,9 @@ const PROJECTILE_SPEED = 32;
 const PROJECTILE_LIFE = 1.2;
 const PROJECTILE_RADIUS = 0.35;
 const ENEMY_RENDER_DISTANCE_SQ = 32 * 32;
+const ENEMY_ACTIVE_DISTANCE_SQ = 28 * 28;
+const MAX_PLAYER_PROJECTILES = 8;
+const MAX_ENEMY_PROJECTILES = 14;
 
 /* ---------------- INPUT ---------------- */
 type Keys = {
@@ -827,8 +830,6 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
         {/* target lejano en el eje -Y local (dirección del cabezal) */}
         <object3D ref={spotTargetRef} position={[0, -12, 0]} />
-        {/* halo cercano para no dejar el cuerpo a oscuras */}
-        <pointLight position={[0, -0.24, 0]} color="#ffd89a" intensity={0.9} distance={2.2} decay={2} />
       </group>
 
       {/* Gun — its transform is driven each frame from the right-hand bone.
@@ -913,8 +914,6 @@ function ProjectileMesh({ pr }: { pr: Projectile }) {
           roughness={0.6}
         />
       </mesh>
-      {/* Fire glow */}
-      <pointLight color="#ff8a3a" intensity={2.6} distance={5} decay={2} />
     </group>
   );
 }
@@ -942,7 +941,6 @@ function EnemyProjectileMesh({ pr }: { pr: EnemyProjectile }) {
         <sphereGeometry args={[0.22, 12, 10]} />
         <meshStandardMaterial color="#ff4020" emissive="#ff2000" emissiveIntensity={2.2} transparent opacity={0.7} roughness={0.6} />
       </mesh>
-      <pointLight color="#ff6030" intensity={1.6} distance={3.5} decay={2} />
     </group>
   );
 }
@@ -1617,7 +1615,6 @@ function LavaPool({ pos, size }: { pos: Vec3; size: [number, number] }) {
         <planeGeometry args={size} />
         <meshStandardMaterial color="#ff5010" emissive="#ff2000" emissiveIntensity={1.5} />
       </mesh>
-      <pointLight position={[pos[0], pos[1] + 1, pos[2]]} color="#ff5010" intensity={2} distance={8} />
     </>
   );
 }
@@ -1730,23 +1727,9 @@ function FloatingText({ ft }: { ft: FloatText }) {
 
 /* ---------------- SCARE FX ---------------- */
 function ScareFX({ scare, playerRef }: { scare?: WorldDef["scare"]; playerRef: React.MutableRefObject<THREE.Vector3> }) {
-  const flickerRef = useRef<THREE.PointLight>(null!);
-  const redRef = useRef<THREE.PointLight>(null!);
   const whisperRef = useRef<THREE.Group>(null!);
-  const nextFlickerAt = useRef(0);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    if (scare?.flicker && flickerRef.current) {
-      if (t > nextFlickerAt.current) {
-        flickerRef.current.intensity = Math.random() < 0.5 ? 0 : 3 + Math.random() * 4;
-        nextFlickerAt.current = t + 0.05 + Math.random() * 0.35;
-      }
-      flickerRef.current.position.set(playerRef.current.x + Math.sin(t * 0.7) * 6, playerRef.current.y + 4, playerRef.current.z + Math.cos(t * 0.5) * 6);
-    }
-    if (scare?.redLight && redRef.current) {
-      redRef.current.intensity = 1.5 + Math.sin(t * 4) * 1 + Math.random() * 0.5;
-      redRef.current.position.set(playerRef.current.x, playerRef.current.y + 3, playerRef.current.z);
-    }
     if (scare?.whispers && whisperRef.current) {
       whisperRef.current.position.set(playerRef.current.x + Math.sin(t * 0.3) * 8, playerRef.current.y + 2 + Math.sin(t * 0.9) * 1.5, playerRef.current.z + Math.cos(t * 0.4) * 8);
       whisperRef.current.rotation.y = -Math.atan2(whisperRef.current.position.x - playerRef.current.x, whisperRef.current.position.z - playerRef.current.z);
@@ -1756,8 +1739,6 @@ function ScareFX({ scare, playerRef }: { scare?: WorldDef["scare"]; playerRef: R
   });
   return (
     <>
-      {scare?.flicker && <pointLight ref={flickerRef} color="#e0d0ff" intensity={0} distance={20} />}
-      {scare?.redLight && <pointLight ref={redRef} color="#ff1010" intensity={1.5} distance={18} />}
       {scare?.whispers && (
         <group ref={whisperRef}>
           <mesh>
@@ -1869,6 +1850,13 @@ function Scene({
   const nextProjId = useRef(0);
   const enemyProjectiles = useRef<EnemyProjectile[]>([]);
   const nextEnemyProjId = useRef(0);
+  const toPlayerVec = useRef(new THREE.Vector3()).current;
+  const dirVec = useRef(new THREE.Vector3()).current;
+  const strafeVec = useRef(new THREE.Vector3()).current;
+  const moveVec = useRef(new THREE.Vector3()).current;
+  const targetVec = useRef(new THREE.Vector3()).current;
+  const cameraDesiredVec = useRef(new THREE.Vector3()).current;
+  const cameraTargetVec = useRef(new THREE.Vector3()).current;
   const spawnFloat = (p: THREE.Vector3, text: string, color: string) => {
     floats.current.push({ id: nextFtId.current++, pos: p.clone().add(new THREE.Vector3(0, 1.5, 0)), text, color, life: 1 });
   };
@@ -2090,6 +2078,7 @@ function Scene({
         vel: new THREE.Vector3(fx * PROJECTILE_SPEED, 0, fz * PROJECTILE_SPEED),
         life: PROJECTILE_LIFE,
       });
+      if (projectiles.current.length > MAX_PLAYER_PROJECTILES) projectiles.current.shift();
     }
 
     // Projectiles: move, expire, and damage enemies on hit.
@@ -2176,10 +2165,16 @@ function Scene({
       if (!e.alive) continue;
       if (e.hitFlash > 0) e.hitFlash -= dt;
 
-      const toP = pos.current.clone().sub(e.pos);
-      const dist = toP.length();
-      const dir = dist > 0.001 ? toP.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      toPlayerVec.subVectors(pos.current, e.pos);
+      const distSq = toPlayerVec.lengthSq();
+      const dist = Math.sqrt(distSq);
+      const dir = dist > 0.001 ? dirVec.copy(toPlayerVec).multiplyScalar(1 / dist) : dirVec.set(1, 0, 0);
       const diffMul = 0.9 + diff * 0.15;
+
+      if (distSq > ENEMY_ACTIVE_DISTANCE_SQ) {
+        e.vel.multiplyScalar(0.88);
+        continue;
+      }
 
       if (e.kind === "wraith") {
         if (dist < 14) {
@@ -2196,8 +2191,8 @@ function Scene({
         const speed = 3.4 * diffMul;
         if (dist < 14) {
           const radial = (dist - desiredDist);
-          const strafe = new THREE.Vector3(-dir.z, 0, dir.x);
-          const move = dir.clone().multiplyScalar(radial * 0.6).add(strafe.multiplyScalar(1.2));
+          const strafe = strafeVec.set(-dir.z, 0, dir.x);
+          const move = moveVec.copy(dir).multiplyScalar(radial * 0.6).add(strafe.multiplyScalar(1.2));
           if (move.length() > 0) move.normalize();
           e.vel.x = move.x * speed;
           e.vel.z = move.z * speed;
@@ -2209,8 +2204,7 @@ function Scene({
         if (dist > 3 && dist < 16 && (e.shootTimer ?? 0) <= 0) {
           e.shootTimer = 1.4 + Math.random() * 0.6;
           const from = e.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
-          const target = pos.current.clone().add(new THREE.Vector3(0, 0.8, 0));
-          const shootDir = target.sub(from).normalize();
+          const shootDir = targetVec.copy(pos.current).add(new THREE.Vector3(0, 0.8, 0)).sub(from).normalize();
           enemyProjectiles.current.push({
             id: nextEnemyProjId.current++,
             pos: from,
@@ -2218,6 +2212,7 @@ function Scene({
             life: 1.6,
             dmg: Math.max(2, Math.round(8 * diff - st.def * 0.4)),
           });
+          if (enemyProjectiles.current.length > MAX_ENEMY_PROJECTILES) enemyProjectiles.current.shift();
         }
       } else if (e.kind === "hopper") {
         const speed = 4.5 * diffMul;
@@ -2302,7 +2297,7 @@ function Scene({
         invuln.current = 0.8;
         spawnFloat(pos.current, `-${dmg}`, "#ff4040");
         // Knockback
-        const kb = pos.current.clone().sub(e.pos).normalize();
+        const kb = targetVec.subVectors(pos.current, e.pos).normalize();
         vel.current.x += kb.x * 8;
         vel.current.z += kb.z * 8;
         vel.current.y = 6;
@@ -2321,7 +2316,7 @@ function Scene({
         ep.pos.z += ep.vel.z * dt;
         ep.life -= dt;
         if (blocked(ep.pos.x, ep.pos.y, ep.pos.z, 0.1, 0.1, world.platforms)) { ep.life = 0; continue; }
-        const d2 = ep.pos.distanceTo(pos.current.clone().add(new THREE.Vector3(0, 0.8, 0)));
+        const d2 = ep.pos.distanceTo(targetVec.copy(pos.current).add(new THREE.Vector3(0, 0.8, 0)));
         if (d2 < 0.7 && invuln.current <= 0) {
           st.hp -= ep.dmg;
           invuln.current = 0.6;
@@ -2375,9 +2370,9 @@ function Scene({
     const dist = camDistRef.current;
     const horiz = Math.cos(pitch) * dist;
     const vert = Math.sin(pitch) * dist + 2.5;
-    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
+    const desired = cameraDesiredVec.copy(pos.current).add(targetVec.set(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
-    camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
+    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
 
 
