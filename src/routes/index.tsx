@@ -67,6 +67,7 @@ type Pickup = {
   taken: boolean;
 };
 type FloatText = { id: number; pos: THREE.Vector3; text: string; color: string; life: number };
+type Projectile = { id: number; pos: THREE.Vector3; vel: THREE.Vector3; life: number };
 
 type WorldDef = {
   name: string;
