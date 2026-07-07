@@ -2325,9 +2325,7 @@ function Index() {
       setStatus("dead");
     } else {
       st.hp = st.maxHp;
-      setHudTick((v) => v + 1);
       setStatus("play");
-      setWorldIdx((i) => i);
       setHudTick((v) => v + 1);
     }
   };
