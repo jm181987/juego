@@ -990,9 +990,12 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
     leftArm?: THREE.Object3D; rightArm?: THREE.Object3D;
     leftLeg?: THREE.Object3D; rightLeg?: THREE.Object3D;
     leftForeArm?: THREE.Object3D; rightForeArm?: THREE.Object3D;
-    spine?: THREE.Object3D; head?: THREE.Object3D;
+    leftLowerLeg?: THREE.Object3D; rightLowerLeg?: THREE.Object3D;
+    spine?: THREE.Object3D; head?: THREE.Object3D; hips?: THREE.Object3D;
     base: Record<string, THREE.Euler>;
+    baseHipY?: number;
   }>({ base: {} });
+
 
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(fbx) as THREE.Group;
@@ -1032,10 +1035,15 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
       else if (raw === "rightforearm" || raw === "rforearm" || raw === "rlowerarm") set("rightForeArm");
       else if (raw === "leftupleg" || raw === "lupleg" || raw === "leftthigh" || raw === "lthigh") set("leftLeg");
       else if (raw === "rightupleg" || raw === "rupleg" || raw === "rightthigh" || raw === "rthigh") set("rightLeg");
-      else if (raw === "spine" || raw === "spine1") set("spine");
+      else if (raw === "leftleg" || raw === "lshin" || raw === "leftshin" || raw === "lcalf") set("leftLowerLeg");
+      else if (raw === "rightleg" || raw === "rshin" || raw === "rightshin" || raw === "rcalf") set("rightLowerLeg");
+      else if (raw === "spine" || raw === "spine1" || raw === "spine2") set("spine");
       else if (raw === "head") set("head");
+      else if (raw === "hips" || raw === "pelvis" || raw === "root") set("hips");
     });
+    if (bonesRef.current.hips) bonesRef.current.baseHipY = (bonesRef.current.hips as any).position.y;
     return c;
+
   }, [fbx, skin.tint]);
 
   // Attempt to play any embedded animation clip; procedural swing runs regardless.
@@ -1066,27 +1074,54 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
 
     if (mixer) mixer.update(dt);
 
-    // Procedural walk/idle: swing arms and legs around their bind rotation.
-    const stride = Math.min(1, speed / 3);
-    phase.current += dt * (2.2 + stride * 5);
-    const swing = Math.sin(phase.current) * (0.15 + stride * 0.9);
+    // Natural walk/idle: smoothed stride, proper opposite arm/leg swing,
+    // bent elbows, knee lift on forward stride, subtle hip bob and torso lean.
+    const targetStride = Math.min(1, speed / 3);
+    (phase as any).stride = THREE.MathUtils.lerp((phase as any).stride ?? 0, targetStride, Math.min(1, dt * 6));
+    const stride = (phase as any).stride as number;
+    const freq = 2.0 + stride * 4.5;
+    phase.current += dt * freq;
+    const s = Math.sin(phase.current);
+    const c2 = Math.cos(phase.current);
+    const amp = 0.12 + stride * 0.85;
+    const idle = (1 - stride) * 0.04 * Math.sin(phase.current * 0.6);
+
     const b = bonesRef.current;
-    const apply = (bone: THREE.Object3D | undefined, key: string, x: number) => {
+    const apply = (bone: THREE.Object3D | undefined, key: string, x: number, y = 0, z = 0) => {
       if (!bone) return;
       const base = b.base[key];
       if (!base) return;
-      (bone as any).rotation.set(base.x + x, base.y, base.z);
+      (bone as any).rotation.set(base.x + x, base.y + y, base.z + z);
     };
-    apply(b.leftArm, "leftArm", swing);
-    apply(b.rightArm, "rightArm", -swing);
-    apply(b.leftForeArm, "leftForeArm", Math.abs(swing) * 0.4);
-    apply(b.rightForeArm, "rightForeArm", Math.abs(swing) * 0.4);
-    apply(b.leftLeg, "leftLeg", -swing * 0.9);
-    apply(b.rightLeg, "rightLeg", swing * 0.9);
+    // Arms swing opposite to legs; slight inward tuck at shoulder.
+    apply(b.leftArm,  "leftArm",  -s * amp + idle, 0, -stride * 0.05);
+    apply(b.rightArm, "rightArm",  s * amp + idle, 0,  stride * 0.05);
+    // Elbows bend more on the backswing (when arm is forward).
+    const leftFore  = Math.max(0, -s) * amp * 1.2 + 0.15 * stride;
+    const rightFore = Math.max(0,  s) * amp * 1.2 + 0.15 * stride;
+    apply(b.leftForeArm,  "leftForeArm",  leftFore);
+    apply(b.rightForeArm, "rightForeArm", rightFore);
+    // Legs: upper leg swings, knee bends on forward stride.
+    apply(b.leftLeg,  "leftLeg",   s * amp);
+    apply(b.rightLeg, "rightLeg", -s * amp);
+    apply(b.leftLowerLeg,  "leftLowerLeg",  Math.max(0, -s) * amp * 1.4);
+    apply(b.rightLowerLeg, "rightLowerLeg", Math.max(0,  s) * amp * 1.4);
+    // Torso: forward lean when moving, gentle counter-rotation.
+    apply(b.spine, "spine", stride * 0.12, -s * amp * 0.15, c2 * amp * 0.05);
+    // Head: subtle look-around, counters torso yaw slightly.
     if (b.head && b.base.head) {
       const base = b.base.head;
-      (b.head as any).rotation.set(base.x, base.y + Math.sin(phase.current * 0.5) * 0.08, base.z);
+      (b.head as any).rotation.set(
+        base.x - stride * 0.05,
+        base.y + s * amp * 0.08 + Math.sin(phase.current * 0.3) * 0.05,
+        base.z,
+      );
     }
+    // Hip bob (vertical) tied to double-step frequency.
+    if (b.hips && b.baseHipY !== undefined) {
+      (b.hips as any).position.y = b.baseHipY + Math.abs(c2) * stride * 1.2;
+    }
+
 
     const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
     ref.current.scale.setScalar(skin.scale * (1 + flash * 0.08));
@@ -3106,14 +3141,15 @@ function Index() {
                 zIndex: 60,
               }}
             >
-              <svg width="56" height="56" viewBox="0 0 56 56" style={{ filter: "drop-shadow(0 0 4px #ff4040cc)" }}>
-                <circle cx="28" cy="28" r="14" fill="none" stroke="#ff5555" strokeWidth="1.5" opacity="0.9" />
-                <circle cx="28" cy="28" r="1.8" fill="#ff5555" />
-                <line x1="28" y1="4"  x2="28" y2="18" stroke="#ff5555" strokeWidth="1.5" />
-                <line x1="28" y1="38" x2="28" y2="52" stroke="#ff5555" strokeWidth="1.5" />
-                <line x1="4"  y1="28" x2="18" y2="28" stroke="#ff5555" strokeWidth="1.5" />
-                <line x1="38" y1="28" x2="52" y2="28" stroke="#ff5555" strokeWidth="1.5" />
+              <svg width="40" height="40" viewBox="0 0 40 40" style={{ filter: "drop-shadow(0 0 3px #ff3030dd)" }}>
+                <circle cx="20" cy="20" r="9" fill="none" stroke="#ff4444" strokeWidth="1" opacity="0.55" />
+                <circle cx="20" cy="20" r="1.2" fill="#ff5555" />
+                <line x1="20" y1="4"  x2="20" y2="12" stroke="#ff5555" strokeWidth="1.2" />
+                <line x1="20" y1="28" x2="20" y2="36" stroke="#ff5555" strokeWidth="1.2" />
+                <line x1="4"  y1="20" x2="12" y2="20" stroke="#ff5555" strokeWidth="1.2" />
+                <line x1="28" y1="20" x2="36" y2="20" stroke="#ff5555" strokeWidth="1.2" />
               </svg>
+
             </div>
           )}
 
