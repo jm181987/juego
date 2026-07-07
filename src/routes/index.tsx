@@ -1980,6 +1980,7 @@ function Scene({
           pitchRef.current = Math.max(-0.4, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
         } else {
           yawRef.current -= (dx / rect.width) * 0.08;
+          pitchRef.current = Math.max(-0.6, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
         }
       }
     };
