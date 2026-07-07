@@ -2997,6 +2997,27 @@ function Index() {
       {/* HUD */}
       {status === "play" && hudVisible && (
         <>
+          {/* Aim crosshair (right-click to aim) */}
+          {aiming && (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                zIndex: 60,
+              }}
+            >
+              <svg width="56" height="56" viewBox="0 0 56 56" style={{ filter: "drop-shadow(0 0 4px #ff4040cc)" }}>
+                <circle cx="28" cy="28" r="14" fill="none" stroke="#ff5555" strokeWidth="1.5" opacity="0.9" />
+                <circle cx="28" cy="28" r="1.8" fill="#ff5555" />
+                <line x1="28" y1="4"  x2="28" y2="18" stroke="#ff5555" strokeWidth="1.5" />
+                <line x1="28" y1="38" x2="28" y2="52" stroke="#ff5555" strokeWidth="1.5" />
+                <line x1="4"  y1="28" x2="18" y2="28" stroke="#ff5555" strokeWidth="1.5" />
+                <line x1="38" y1="28" x2="52" y2="28" stroke="#ff5555" strokeWidth="1.5" />
+              </svg>
+            </div>
+          )}
+
           {/* Top-left: stats panel */}
           <div style={{
             position: "absolute", top: 12, left: 12, padding: 12,
