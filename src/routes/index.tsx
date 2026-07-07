@@ -1686,6 +1686,8 @@ function Scene({
   const nextFtId = useRef(0);
   const projectiles = useRef<Projectile[]>([]);
   const nextProjId = useRef(0);
+  const enemyProjectiles = useRef<EnemyProjectile[]>([]);
+  const nextEnemyProjId = useRef(0);
   const spawnFloat = (p: THREE.Vector3, text: string, color: string) => {
     floats.current.push({ id: nextFtId.current++, pos: p.clone().add(new THREE.Vector3(0, 1.5, 0)), text, color, life: 1 });
   };
