@@ -671,16 +671,12 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
   // Michelle.glb is authored facing the opposite way from the soldier rig;
   // rotate only the visible model, not the movement/facing controller.
-  const isJorge = appearanceGender === "jorge";
   const modelYawOffset = appearanceGender === "female" ? Math.PI : 0;
 
-  // Jorge is a Tripo-generated mesh (~1m tall, no skeleton), so scale him up
-  // and lift so his feet touch the ground.
-  const jorgeBoost = isJorge ? 1.85 : 1;
-  const scaleX = 1.05 * appearance.build * jorgeBoost;
-  const scaleY = 1.05 * appearance.height * jorgeBoost;
-  const scaleZ = 1.05 * appearance.build * jorgeBoost;
-  const modelYOffset = isJorge ? 0.5 : 0;
+  const scaleX = 1.05 * appearance.build;
+  const scaleY = 1.05 * appearance.height;
+  const scaleZ = 1.05 * appearance.build;
+  const modelYOffset = 0;
 
   return (
     <group ref={group} scale={[scaleX, scaleY, scaleZ]}>
