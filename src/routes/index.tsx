@@ -2320,11 +2320,13 @@ function Index() {
 
   const onDeath = () => {
     const st = statsRef.current;
+    // Always restore hp so useFrame doesn't retrigger onDeath every frame.
+    st.hp = st.maxHp;
     st.lives--;
     if (st.lives <= 0) {
+      st.lives = 0;
       setStatus("dead");
     } else {
-      st.hp = st.maxHp;
       setStatus("play");
       setHudTick((v) => v + 1);
     }
@@ -2412,7 +2414,7 @@ function Index() {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", overflow: "hidden", fontFamily: "system-ui" }}>
-      {mounted && status !== "menu" && (
+      {mounted && status !== "menu" && status !== "dead" && status !== "victory" && (
         <Canvas
           key={sceneKey}
           shadows={settings.shadows && settings.quality === "high"}
