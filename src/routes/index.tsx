@@ -2776,6 +2776,7 @@ function Index() {
   const [mounted, setMounted] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [, setHudTick] = useState(0);
+  const [aiming, setAiming] = useState(false);
   const statsRef = useRef<Stats>(initialStats());
   const keysRef = useKeys();
   const world = WORLDS[worldIdx];
