@@ -2166,12 +2166,15 @@ function Scene({
       gs.setStamina(gs.stamina - 6);
       playShoot();
       const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
+      // Vertical aim from pitch when right-click aiming (0.35 is the neutral pitch).
+      const aimY = k.aim ? Math.max(-1.2, Math.min(1.2, (0.35 - pitchRef.current) * 1.6)) : 0;
+      const horizScale = k.aim ? Math.cos(Math.atan(aimY)) : 1;
       // Spawn slightly in front of the mage and roughly at hand height.
       const spawn = pos.current.clone().add(new THREE.Vector3(fx * 0.6, 1.1, fz * 0.6));
       projectiles.current.push({
         id: nextProjId.current++,
         pos: spawn,
-        vel: new THREE.Vector3(fx * PROJECTILE_SPEED, 0, fz * PROJECTILE_SPEED),
+        vel: new THREE.Vector3(fx * PROJECTILE_SPEED * horizScale, aimY * PROJECTILE_SPEED, fz * PROJECTILE_SPEED * horizScale),
         life: PROJECTILE_LIFE,
       });
       if (projectiles.current.length > MAX_PLAYER_PROJECTILES) projectiles.current.shift();
