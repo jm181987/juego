@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Sky, Stars, Text, useAnimations, useGLTF, useProgress } from "@react-three/drei";
+import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
