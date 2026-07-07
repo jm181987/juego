@@ -983,34 +983,62 @@ function skinFor(kind: Enemy["kind"]): { url: string; scale: number; tint: strin
 function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObject<THREE.Vector3> }) {
   const ref = useRef<THREE.Group>(null!);
   const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
+  const phase = useRef(Math.random() * 10);
   const skin = useMemo(() => skinFor(e.kind), [e.kind]);
   const fbx = useFBX(skin.url) as THREE.Group;
+  const bonesRef = useRef<{
+    leftArm?: THREE.Object3D; rightArm?: THREE.Object3D;
+    leftLeg?: THREE.Object3D; rightLeg?: THREE.Object3D;
+    leftForeArm?: THREE.Object3D; rightForeArm?: THREE.Object3D;
+    spine?: THREE.Object3D; head?: THREE.Object3D;
+    base: Record<string, THREE.Euler>;
+  }>({ base: {} });
+
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(fbx) as THREE.Group;
     const tintCol = new THREE.Color(skin.tint);
+    const b = bonesRef.current;
+    b.base = {};
     c.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) {
         m.castShadow = true;
         m.receiveShadow = true;
         const mats = Array.isArray(m.material) ? m.material : [m.material];
-        m.material = mats.map((raw) => {
+        const remapped = mats.map((raw) => {
           const src = raw as THREE.MeshStandardMaterial | THREE.MeshPhongMaterial;
-          const nm = new THREE.MeshStandardMaterial({
-            color: (src as any).color ? (src as any).color.clone().lerp(tintCol, 0.35) : tintCol.clone(),
+          return new THREE.MeshStandardMaterial({
+            color: (src as any).color ? (src as any).color.clone().lerp(tintCol, 0.3) : tintCol.clone(),
             map: (src as any).map ?? null,
             normalMap: (src as any).normalMap ?? null,
+            skinning: true,
             roughness: 0.85,
             metalness: 0.05,
-          });
-          return nm;
-        }) as any;
-        if ((m.material as any[]).length === 1) m.material = (m.material as any[])[0];
+          } as any);
+        });
+        m.material = remapped.length === 1 ? remapped[0] : (remapped as any);
       }
+      // Match Mixamo naming ("mixamorigLeftArm") and plain rig naming ("LeftArm", "L_UpperArm", etc.)
+      const raw = (o.name || "").replace(/^mixamorig/i, "").replace(/[:_\s]/g, "").toLowerCase();
+      const set = (key: keyof typeof b) => {
+        if (!(b as any)[key]) {
+          (b as any)[key] = o;
+          b.base[key as string] = (o as any).rotation.clone();
+        }
+      };
+      if (raw === "leftarm" || raw === "lupperarm" || raw === "lshoulder" || raw === "leftshoulder") set("leftArm");
+      else if (raw === "rightarm" || raw === "rupperarm" || raw === "rshoulder" || raw === "rightshoulder") set("rightArm");
+      else if (raw === "leftforearm" || raw === "lforearm" || raw === "llowerarm") set("leftForeArm");
+      else if (raw === "rightforearm" || raw === "rforearm" || raw === "rlowerarm") set("rightForeArm");
+      else if (raw === "leftupleg" || raw === "lupleg" || raw === "leftthigh" || raw === "lthigh") set("leftLeg");
+      else if (raw === "rightupleg" || raw === "rupleg" || raw === "rightthigh" || raw === "rthigh") set("rightLeg");
+      else if (raw === "spine" || raw === "spine1") set("spine");
+      else if (raw === "head") set("head");
     });
     return c;
   }, [fbx, skin.tint]);
 
+  // Attempt to play any embedded animation clip; procedural swing runs regardless.
   const { actions, mixer } = useAnimations((fbx as any).animations ?? [], cloned);
   useEffect(() => {
     const names = Object.keys(actions);
@@ -1030,6 +1058,7 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
 
     const dx = e.pos.x - lastPos.current.x;
     const dz = e.pos.z - lastPos.current.z;
+    const speed = Math.hypot(dx, dz) / Math.max(dt, 0.0001);
     if (Math.abs(dx) + Math.abs(dz) > 0.0005) {
       ref.current.rotation.y = Math.atan2(dx, dz) + Math.PI;
     }
@@ -1037,9 +1066,32 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
 
     if (mixer) mixer.update(dt);
 
+    // Procedural walk/idle: swing arms and legs around their bind rotation.
+    const stride = Math.min(1, speed / 3);
+    phase.current += dt * (2.2 + stride * 5);
+    const swing = Math.sin(phase.current) * (0.15 + stride * 0.9);
+    const b = bonesRef.current;
+    const apply = (bone: THREE.Object3D | undefined, key: string, x: number) => {
+      if (!bone) return;
+      const base = b.base[key];
+      if (!base) return;
+      (bone as any).rotation.set(base.x + x, base.y, base.z);
+    };
+    apply(b.leftArm, "leftArm", swing);
+    apply(b.rightArm, "rightArm", -swing);
+    apply(b.leftForeArm, "leftForeArm", Math.abs(swing) * 0.4);
+    apply(b.rightForeArm, "rightForeArm", Math.abs(swing) * 0.4);
+    apply(b.leftLeg, "leftLeg", -swing * 0.9);
+    apply(b.rightLeg, "rightLeg", swing * 0.9);
+    if (b.head && b.base.head) {
+      const base = b.base.head;
+      (b.head as any).rotation.set(base.x, base.y + Math.sin(phase.current * 0.5) * 0.08, base.z);
+    }
+
     const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
     ref.current.scale.setScalar(skin.scale * (1 + flash * 0.08));
   });
+
 
   const invS = 1 / skin.scale;
   return (
