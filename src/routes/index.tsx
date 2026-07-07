@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
-import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
@@ -383,8 +383,6 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
   return false;
 }
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
-useGLTF.preload(soldierAsset.url);
-useGLTF.preload(michelleAsset.url);
 
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
@@ -424,17 +422,18 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const appearanceGender = useGame((s) => s.appearance.gender);
-  // Male: soldier rig. Female: Michelle.
-  // Both share mixamorig* bone naming so the soldier animation clips retarget.
+  // Male loads only the soldier rig. Female additionally loads Michelle while
+  // still reusing the soldier animation clips.
   const soldierGltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const michelleGltf = useGLTF(michelleAsset.url) as unknown as {
+  const modelUrl = appearanceGender === "female" ? michelleAsset.url : soldierAsset.url;
+  const modelGltf = useGLTF(modelUrl) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
+  const gltf = appearanceGender === "female" ? modelGltf : soldierGltf;
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(gltf.scene) as THREE.Group;
     // Keep both genders controlled only by the outer group rotation so movement
@@ -1518,6 +1517,7 @@ function Scene({
   statsRef,
   onDeath,
   onWin,
+  onReady,
   onHudUpdate,
   keysRef,
   checkpointRef,
@@ -1529,6 +1529,7 @@ function Scene({
   statsRef: React.MutableRefObject<Stats>;
   onDeath: () => void;
   onWin: () => void;
+  onReady: () => void;
   onHudUpdate: () => void;
   keysRef: React.MutableRefObject<Keys>;
   checkpointRef: React.MutableRefObject<Vec3>;
@@ -1547,6 +1548,8 @@ function Scene({
   const invuln = useRef(0);
   const { camera } = useThree();
   const camTarget = useRef(new THREE.Vector3());
+
+  useEffect(() => { onReady(); }, [onReady]);
 
   const [, force] = useState(0);
   const rerender = () => force((v) => v + 1);
@@ -2257,6 +2260,7 @@ function Index() {
   const [worldIdx, setWorldIdx] = useState(0);
   const [status, setStatus] = useState<"play" | "dead" | "win" | "victory" | "menu">("menu");
   const [mounted, setMounted] = useState(false);
+  const [sceneReady, setSceneReady] = useState(false);
   const [, setHudTick] = useState(0);
   const statsRef = useRef<Stats>(initialStats());
   const keysRef = useKeys();
@@ -2350,12 +2354,18 @@ function Index() {
   // Only remount the Canvas when the world actually changes. Remounting on every
   // status change (menu→play→win→play) tore down WebGL + reloaded GLBs multiple
   // times per realm transition, freezing the browser.
-  useEffect(() => { setSceneKey((k) => k + 1); }, [worldIdx]);
+  useEffect(() => {
+    setSceneReady(false);
+    setSceneKey((k) => k + 1);
+  }, [worldIdx]);
+
+  const handleSceneReady = useCallback(() => { setSceneReady(true); }, []);
 
   const st = statsRef.current;
 
   const startGame = () => {
     setMenu(null);
+    setSceneReady(false);
     statsRef.current = initialStats();
     setWorldIdx(0);
     checkpointRef.current = WORLDS[0].spawn;
@@ -2437,6 +2447,7 @@ function Index() {
               checkpointRef={checkpointRef}
               onDeath={onDeath}
               onWin={onWin}
+              onReady={handleSceneReady}
               onHudUpdate={() => setHudTick((v) => v + 1)}
               sharedPosRef={sharedPos}
               sharedFacingRef={sharedFacing}
@@ -2542,14 +2553,17 @@ function Index() {
       {status === "dead" && (
         <Overlay title="Has caído" subtitle="La oscuridad reclama al mago" color="#e04040" onClick={startGame} btn="Reintentar" />
       )}
+      {status === "play" && !sceneReady && (
+        <Overlay title="Cargando" subtitle="Preparando el reino..." color="#7ee6ff" />
+      )}
       {status === "menu" && (
         <Overlay
           title="ARCANE REALMS"
           subtitle="Aventura RPG 3D · Tres reinos de sombra te esperan"
           color="#a080ff"
-          onClick={startGame}
-          btn="Comenzar aventura"
-          onCustomize={() => setMenu("character")}
+          onClick={mounted ? startGame : undefined}
+          btn={mounted ? "Comenzar aventura" : undefined}
+          onCustomize={mounted ? () => setMenu("character") : undefined}
         />
       )}
     </div>
