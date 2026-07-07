@@ -425,8 +425,8 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const appearanceGender = useGame((s) => s.appearance.gender);
-  // Male: soldier rig. Female: Michelle (Mixamo) rig. Both use mixamorig*
-  // bone names, so the soldier animation clips retarget cleanly onto either.
+  // Male: soldier rig. Female: Michelle. Jorge: custom uploaded skin.
+  // All share mixamorig* bone naming so the soldier animation clips retarget.
   const soldierGltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
@@ -435,7 +435,13 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
+  const jorgeGltf = useGLTF(jorgeAsset.url) as unknown as {
+    scene: THREE.Group;
+    animations: THREE.AnimationClip[];
+  };
+  const gltf = appearanceGender === "female" ? michelleGltf
+    : appearanceGender === "jorge" ? jorgeGltf
+    : soldierGltf;
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(gltf.scene) as THREE.Group;
     // Keep both genders controlled only by the outer group rotation so movement
