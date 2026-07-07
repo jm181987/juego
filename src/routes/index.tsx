@@ -1962,7 +1962,9 @@ function Scene({
           camYawOffsetRef.current -= e.movementX * 0.0035;
           pitchRef.current = Math.max(-0.4, Math.min(1.2, pitchRef.current + e.movementY * 0.0025));
         } else {
+          // Default: mouse controls yaw AND pitch for free camera look.
           yawRef.current -= e.movementX * 0.0035;
+          pitchRef.current = Math.max(-0.6, Math.min(1.2, pitchRef.current + e.movementY * 0.002));
         }
       } else {
         const rect = canvas.getBoundingClientRect();
@@ -1978,6 +1980,7 @@ function Scene({
           pitchRef.current = Math.max(-0.4, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
         } else {
           yawRef.current -= (dx / rect.width) * 0.08;
+          pitchRef.current = Math.max(-0.6, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
         }
       }
     };
@@ -2465,11 +2468,10 @@ function Scene({
     // Camera follow (third person). Hold Alt to orbit freely (yaw offset + pitch + wheel zoom).
     // While aiming (right mouse), pitch is user-controlled so DO NOT ease it back.
     if (!keysRef.current.camFree && !keysRef.current.aim) {
-      // Ease the free-look offset back to zero so aim re-syncs with view
+      // Ease the free-look yaw offset back to zero so aim re-syncs with view.
       camYawOffsetRef.current *= Math.pow(0.001, dt);
-      pitchRef.current += (0.35 - pitchRef.current) * (1 - Math.pow(0.01, dt));
+      // Pitch is user-controlled by mouse now; do NOT auto-reset.
     } else if (keysRef.current.aim) {
-      // Snap free-look yaw offset to zero while aiming so the reticle matches player facing.
       camYawOffsetRef.current *= Math.pow(0.0001, dt);
     }
     const yaw = yawRef.current + camYawOffsetRef.current;
