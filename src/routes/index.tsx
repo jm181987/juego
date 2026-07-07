@@ -2456,10 +2456,14 @@ function Scene({
     floats.current = floats.current.filter((f) => f.life > 0);
 
     // Camera follow (third person). Hold Alt to orbit freely (yaw offset + pitch + wheel zoom).
-    if (!keysRef.current.camFree) {
+    // While aiming (right mouse), pitch is user-controlled so DO NOT ease it back.
+    if (!keysRef.current.camFree && !keysRef.current.aim) {
       // Ease the free-look offset back to zero so aim re-syncs with view
       camYawOffsetRef.current *= Math.pow(0.001, dt);
       pitchRef.current += (0.35 - pitchRef.current) * (1 - Math.pow(0.01, dt));
+    } else if (keysRef.current.aim) {
+      // Snap free-look yaw offset to zero while aiming so the reticle matches player facing.
+      camYawOffsetRef.current *= Math.pow(0.0001, dt);
     }
     const yaw = yawRef.current + camYawOffsetRef.current;
     const pitch = pitchRef.current;
