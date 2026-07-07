@@ -388,6 +388,9 @@ const PROJECTILE_SPEED = 32;
 const PROJECTILE_LIFE = 1.2;
 const PROJECTILE_RADIUS = 0.35;
 const ENEMY_RENDER_DISTANCE_SQ = 32 * 32;
+const ENEMY_ACTIVE_DISTANCE_SQ = 28 * 28;
+const MAX_PLAYER_PROJECTILES = 8;
+const MAX_ENEMY_PROJECTILES = 14;
 
 /* ---------------- INPUT ---------------- */
 type Keys = {
@@ -827,8 +830,6 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
         {/* target lejano en el eje -Y local (dirección del cabezal) */}
         <object3D ref={spotTargetRef} position={[0, -12, 0]} />
-        {/* halo cercano para no dejar el cuerpo a oscuras */}
-        <pointLight position={[0, -0.24, 0]} color="#ffd89a" intensity={0.9} distance={2.2} decay={2} />
       </group>
 
       {/* Gun — its transform is driven each frame from the right-hand bone.
@@ -913,8 +914,6 @@ function ProjectileMesh({ pr }: { pr: Projectile }) {
           roughness={0.6}
         />
       </mesh>
-      {/* Fire glow */}
-      <pointLight color="#ff8a3a" intensity={2.6} distance={5} decay={2} />
     </group>
   );
 }
@@ -942,7 +941,6 @@ function EnemyProjectileMesh({ pr }: { pr: EnemyProjectile }) {
         <sphereGeometry args={[0.22, 12, 10]} />
         <meshStandardMaterial color="#ff4020" emissive="#ff2000" emissiveIntensity={2.2} transparent opacity={0.7} roughness={0.6} />
       </mesh>
-      <pointLight color="#ff6030" intensity={1.6} distance={3.5} decay={2} />
     </group>
   );
 }
@@ -1617,7 +1615,6 @@ function LavaPool({ pos, size }: { pos: Vec3; size: [number, number] }) {
         <planeGeometry args={size} />
         <meshStandardMaterial color="#ff5010" emissive="#ff2000" emissiveIntensity={1.5} />
       </mesh>
-      <pointLight position={[pos[0], pos[1] + 1, pos[2]]} color="#ff5010" intensity={2} distance={8} />
     </>
   );
 }
@@ -1730,23 +1727,9 @@ function FloatingText({ ft }: { ft: FloatText }) {
 
 /* ---------------- SCARE FX ---------------- */
 function ScareFX({ scare, playerRef }: { scare?: WorldDef["scare"]; playerRef: React.MutableRefObject<THREE.Vector3> }) {
-  const flickerRef = useRef<THREE.PointLight>(null!);
-  const redRef = useRef<THREE.PointLight>(null!);
   const whisperRef = useRef<THREE.Group>(null!);
-  const nextFlickerAt = useRef(0);
   useFrame((state) => {
     const t = state.clock.elapsedTime;
-    if (scare?.flicker && flickerRef.current) {
-      if (t > nextFlickerAt.current) {
-        flickerRef.current.intensity = Math.random() < 0.5 ? 0 : 3 + Math.random() * 4;
-        nextFlickerAt.current = t + 0.05 + Math.random() * 0.35;
-      }
-      flickerRef.current.position.set(playerRef.current.x + Math.sin(t * 0.7) * 6, playerRef.current.y + 4, playerRef.current.z + Math.cos(t * 0.5) * 6);
-    }
-    if (scare?.redLight && redRef.current) {
-      redRef.current.intensity = 1.5 + Math.sin(t * 4) * 1 + Math.random() * 0.5;
-      redRef.current.position.set(playerRef.current.x, playerRef.current.y + 3, playerRef.current.z);
-    }
     if (scare?.whispers && whisperRef.current) {
       whisperRef.current.position.set(playerRef.current.x + Math.sin(t * 0.3) * 8, playerRef.current.y + 2 + Math.sin(t * 0.9) * 1.5, playerRef.current.z + Math.cos(t * 0.4) * 8);
       whisperRef.current.rotation.y = -Math.atan2(whisperRef.current.position.x - playerRef.current.x, whisperRef.current.position.z - playerRef.current.z);
@@ -1756,8 +1739,6 @@ function ScareFX({ scare, playerRef }: { scare?: WorldDef["scare"]; playerRef: R
   });
   return (
     <>
-      {scare?.flicker && <pointLight ref={flickerRef} color="#e0d0ff" intensity={0} distance={20} />}
-      {scare?.redLight && <pointLight ref={redRef} color="#ff1010" intensity={1.5} distance={18} />}
       {scare?.whispers && (
         <group ref={whisperRef}>
           <mesh>
