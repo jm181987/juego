@@ -37,26 +37,63 @@ export function playSwing() {
   src.stop(a.currentTime + dur + 0.02);
 }
 
-/** Magic bolt: quick zappy pew. */
+/** Dark magic bolt: guttural whisper + sub-boom + dissonant screech. Scary. */
 export function playShoot() {
   const a = ac();
   if (!a) return;
   const t0 = a.currentTime;
-  const dur = 0.18;
-  const osc = a.createOscillator();
-  osc.type = "square";
-  osc.frequency.setValueAtTime(1400, t0);
-  osc.frequency.exponentialRampToValueAtTime(220, t0 + dur);
-  const g = a.createGain();
-  g.gain.setValueAtTime(0.0001, t0);
-  g.gain.exponentialRampToValueAtTime(0.28, t0 + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  const dur = 0.55;
+
+  // 1) Sub-bass boom (impact/weight)
+  const sub = a.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(90, t0);
+  sub.frequency.exponentialRampToValueAtTime(28, t0 + 0.35);
+  const subG = a.createGain();
+  subG.gain.setValueAtTime(0.0001, t0);
+  subG.gain.exponentialRampToValueAtTime(0.6, t0 + 0.015);
+  subG.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+  sub.connect(subG).connect(a.destination);
+  sub.start(t0); sub.stop(t0 + 0.5);
+
+  // 2) Dissonant screech (two detuned saws through bandpass)
+  const s1 = a.createOscillator();
+  const s2 = a.createOscillator();
+  s1.type = "sawtooth"; s2.type = "sawtooth";
+  s1.frequency.setValueAtTime(680, t0);
+  s1.frequency.exponentialRampToValueAtTime(140, t0 + dur);
+  s2.frequency.setValueAtTime(710, t0); // slight detune → beating
+  s2.frequency.exponentialRampToValueAtTime(148, t0 + dur);
   const bp = a.createBiquadFilter();
-  bp.type = "lowpass";
-  bp.frequency.value = 2600;
-  osc.connect(bp).connect(g).connect(a.destination);
-  osc.start(t0);
-  osc.stop(t0 + dur + 0.02);
+  bp.type = "bandpass"; bp.Q.value = 6;
+  bp.frequency.setValueAtTime(1400, t0);
+  bp.frequency.exponentialRampToValueAtTime(320, t0 + dur);
+  const sG = a.createGain();
+  sG.gain.setValueAtTime(0.0001, t0);
+  sG.gain.exponentialRampToValueAtTime(0.22, t0 + 0.02);
+  sG.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  s1.connect(bp); s2.connect(bp);
+  bp.connect(sG).connect(a.destination);
+  s1.start(t0); s2.start(t0); s1.stop(t0 + dur); s2.stop(t0 + dur);
+
+  // 3) Whispery noise burst (breath / dark energy)
+  const nDur = 0.35;
+  const nBuf = a.createBuffer(1, Math.floor(a.sampleRate * nDur), a.sampleRate);
+  const nData = nBuf.getChannelData(0);
+  for (let i = 0; i < nData.length; i++) {
+    const env = Math.pow(1 - i / nData.length, 1.4);
+    nData[i] = (Math.random() * 2 - 1) * env;
+  }
+  const nSrc = a.createBufferSource();
+  nSrc.buffer = nBuf;
+  const nFilt = a.createBiquadFilter();
+  nFilt.type = "highpass";
+  nFilt.frequency.value = 900;
+  const nG = a.createGain();
+  nG.gain.setValueAtTime(0.35, t0);
+  nG.gain.exponentialRampToValueAtTime(0.0001, t0 + nDur);
+  nSrc.connect(nFilt).connect(nG).connect(a.destination);
+  nSrc.start(t0); nSrc.stop(t0 + nDur + 0.02);
 }
 
 /** Enemy death vocalization by gender. */
