@@ -725,23 +725,39 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
         <pointLight position={[0, -0.24, 0]} color="#ffd89a" intensity={0.9} distance={2.2} decay={2} />
       </group>
 
-      {/* Sword — its transform is driven each frame from the right-hand bone. */}
+      {/* Gun — its transform is driven each frame from the right-hand bone.
+          Local +Y in this group points along the hand's grip axis (forward),
+          so the barrel extends along +Y and the grip hangs on -Z. */}
       <group ref={swordRef}>
-        <mesh position={[0, -0.15, 0]} castShadow>
-          <cylinderGeometry args={[0.045, 0.045, 0.3, 10]} />
-          <meshStandardMaterial color="#1a0f08" roughness={0.9} />
+        {/* Grip (held in the palm) */}
+        <mesh position={[0, -0.02, -0.08]} rotation={[0.25, 0, 0]} castShadow>
+          <boxGeometry args={[0.06, 0.18, 0.09]} />
+          <meshStandardMaterial color="#1b1d22" roughness={0.6} metalness={0.4} />
         </mesh>
-        <mesh position={[0, 0.02, 0]} castShadow>
-          <boxGeometry args={[0.42, 0.06, 0.08]} />
-          <meshStandardMaterial color="#3a2a12" metalness={0.6} roughness={0.5} />
+        {/* Receiver / body */}
+        <mesh position={[0, 0.08, 0]} castShadow>
+          <boxGeometry args={[0.08, 0.22, 0.12]} />
+          <meshStandardMaterial color="#2b2f36" metalness={0.75} roughness={0.35} />
         </mesh>
-        <mesh position={[0, 0.75, 0]} castShadow>
-          <boxGeometry args={[0.09, 1.4, 0.02]} />
-          <meshStandardMaterial color="#c8ccd4" metalness={0.85} roughness={0.25} emissive="#3a4658" emissiveIntensity={0.15} />
+        {/* Barrel */}
+        <mesh position={[0, 0.32, 0.02]} rotation={[Math.PI / 2, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.035, 0.035, 0.32, 14]} />
+          <meshStandardMaterial color="#3a4048" metalness={0.9} roughness={0.25} />
         </mesh>
-        <mesh position={[0, -0.32, 0]} castShadow>
-          <sphereGeometry args={[0.06, 12, 10]} />
-          <meshStandardMaterial color="#4a3218" metalness={0.7} roughness={0.4} />
+        {/* Muzzle tip (glow) */}
+        <mesh position={[0, 0.5, 0.02]}>
+          <sphereGeometry args={[0.045, 12, 10]} />
+          <meshStandardMaterial color="#7ad6ff" emissive="#4ac6ff" emissiveIntensity={1.8} roughness={0.2} />
+        </mesh>
+        {/* Sight rail */}
+        <mesh position={[0, 0.14, 0.09]} castShadow>
+          <boxGeometry args={[0.04, 0.14, 0.02]} />
+          <meshStandardMaterial color="#0f1114" metalness={0.6} roughness={0.5} />
+        </mesh>
+        {/* Trigger guard */}
+        <mesh position={[0, 0.02, -0.02]} castShadow>
+          <torusGeometry args={[0.045, 0.008, 8, 16, Math.PI]} />
+          <meshStandardMaterial color="#1b1d22" metalness={0.6} roughness={0.5} />
         </mesh>
       </group>
 
