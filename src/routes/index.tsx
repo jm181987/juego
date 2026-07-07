@@ -834,6 +834,34 @@ function ProjectileMesh({ pr }: { pr: Projectile }) {
   );
 }
 
+/* Enemy fireball projectile — smaller, redder than the player's shot. */
+function EnemyProjectileMesh({ pr }: { pr: EnemyProjectile }) {
+  const ref = useRef<THREE.Group>(null!);
+  const flameRef = useRef<THREE.Mesh>(null!);
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    ref.current.position.copy(pr.pos);
+    ref.current.visible = pr.life > 0;
+    if (flameRef.current) {
+      flameRef.current.rotation.x += dt * 8;
+      flameRef.current.rotation.y += dt * 7;
+    }
+  });
+  return (
+    <group ref={ref}>
+      <mesh>
+        <sphereGeometry args={[0.13, 12, 10]} />
+        <meshStandardMaterial color="#ffd080" emissive="#ff8020" emissiveIntensity={3} roughness={0.3} />
+      </mesh>
+      <mesh ref={flameRef}>
+        <sphereGeometry args={[0.22, 12, 10]} />
+        <meshStandardMaterial color="#ff4020" emissive="#ff2000" emissiveIntensity={2.2} transparent opacity={0.7} roughness={0.6} />
+      </mesh>
+      <pointLight color="#ff6030" intensity={1.6} distance={3.5} decay={2} />
+    </group>
+  );
+}
+
 
 
 
