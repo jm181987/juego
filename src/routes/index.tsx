@@ -2800,6 +2800,24 @@ function Index() {
   const marksRef = useRef<CompassMark[]>([]);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Track right-click aim state to show the crosshair overlay.
+  useEffect(() => {
+    const down = (e: MouseEvent) => { if (e.button === 2) setAiming(true); };
+    const up = (e: MouseEvent) => { if (e.button === 2) setAiming(false); };
+    const ctx = (e: MouseEvent) => e.preventDefault();
+    const blur = () => setAiming(false);
+    window.addEventListener("mousedown", down);
+    window.addEventListener("mouseup", up);
+    window.addEventListener("contextmenu", ctx);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("contextmenu", ctx);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
   useEffect(() => { useGame.getState().optimizeForStartup(); }, []);
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
 
