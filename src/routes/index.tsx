@@ -2475,13 +2475,30 @@ function Scene({
     const yaw = yawRef.current + camYawOffsetRef.current;
     const pitch = pitchRef.current;
     const aiming = keysRef.current.aim;
-    const dist = aiming ? Math.min(camDistRef.current, 4.2) : camDistRef.current;
-    const horiz = Math.cos(pitch) * dist;
-    const vert = Math.sin(pitch) * dist + (aiming ? 1.8 : 2.5);
-    const desired = cameraDesiredVec.copy(pos.current).add(targetVec.set(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
-    camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
-    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, aiming ? 1.4 : 1, 0)), 1 - Math.pow(0.001, dt));
-    camera.lookAt(camTarget.current);
+    if (aiming) {
+      // First-person view while aiming.
+      const eyeHeight = 1.6;
+      const fwdX = -Math.sin(yaw);
+      const fwdZ = -Math.cos(yaw);
+      const cosP = Math.cos(pitch);
+      const sinP = Math.sin(pitch);
+      const eye = cameraDesiredVec.copy(pos.current).add(targetVec.set(0, eyeHeight, 0));
+      camera.position.lerp(eye, 1 - Math.pow(0.0001, dt));
+      // Look direction: forward horizontally, pitched vertically. Note: positive pitch = look down.
+      const lookAt = cameraTargetVec.copy(camera.position).add(
+        targetVec.set(fwdX * cosP, -sinP, fwdZ * cosP)
+      );
+      camTarget.current.copy(lookAt);
+      camera.lookAt(camTarget.current);
+    } else {
+      const dist = camDistRef.current;
+      const horiz = Math.cos(pitch) * dist;
+      const vert = Math.sin(pitch) * dist + 2.5;
+      const desired = cameraDesiredVec.copy(pos.current).add(targetVec.set(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
+      camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
+      camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, 1, 0)), 1 - Math.pow(0.001, dt));
+      camera.lookAt(camTarget.current);
+    }
     // Smooth FOV zoom while aiming
     if ((camera as any).isPerspectiveCamera) {
       const pc = camera as THREE.PerspectiveCamera;
