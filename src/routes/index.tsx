@@ -1962,7 +1962,9 @@ function Scene({
           camYawOffsetRef.current -= e.movementX * 0.0035;
           pitchRef.current = Math.max(-0.4, Math.min(1.2, pitchRef.current + e.movementY * 0.0025));
         } else {
+          // Default: mouse controls yaw AND pitch for free camera look.
           yawRef.current -= e.movementX * 0.0035;
+          pitchRef.current = Math.max(-0.6, Math.min(1.2, pitchRef.current + e.movementY * 0.002));
         }
       } else {
         const rect = canvas.getBoundingClientRect();
