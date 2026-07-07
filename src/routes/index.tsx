@@ -2165,16 +2165,20 @@ function Scene({
       attackTimer.current = 1;
       gs.setStamina(gs.stamina - 6);
       playShoot();
-      const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
-      // Vertical aim from pitch when right-click aiming (0.35 is the neutral pitch).
-      const aimY = k.aim ? Math.max(-1.2, Math.min(1.2, (0.35 - pitchRef.current) * 1.6)) : 0;
-      const horizScale = k.aim ? Math.cos(Math.atan(aimY)) : 1;
+      let dirX: number, dirY: number, dirZ: number;
+      if (k.aim) {
+        // Fire exactly where the crosshair (camera) points.
+        const cd = state.camera.getWorldDirection(new THREE.Vector3());
+        dirX = cd.x; dirY = cd.y; dirZ = cd.z;
+      } else {
+        dirX = Math.sin(facing.current); dirY = 0; dirZ = Math.cos(facing.current);
+      }
       // Spawn slightly in front of the mage and roughly at hand height.
-      const spawn = pos.current.clone().add(new THREE.Vector3(fx * 0.6, 1.1, fz * 0.6));
+      const spawn = pos.current.clone().add(new THREE.Vector3(dirX * 0.6, 1.1 + dirY * 0.3, dirZ * 0.6));
       projectiles.current.push({
         id: nextProjId.current++,
         pos: spawn,
-        vel: new THREE.Vector3(fx * PROJECTILE_SPEED * horizScale, aimY * PROJECTILE_SPEED, fz * PROJECTILE_SPEED * horizScale),
+        vel: new THREE.Vector3(dirX * PROJECTILE_SPEED, dirY * PROJECTILE_SPEED, dirZ * PROJECTILE_SPEED),
         life: PROJECTILE_LIFE,
       });
       if (projectiles.current.length > MAX_PLAYER_PROJECTILES) projectiles.current.shift();
