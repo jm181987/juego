@@ -387,6 +387,7 @@ const ATTACK_COOLDOWN = 0.28;
 const PROJECTILE_SPEED = 32;
 const PROJECTILE_LIFE = 1.2;
 const PROJECTILE_RADIUS = 0.35;
+const ENEMY_RENDER_DISTANCE_SQ = 32 * 32;
 
 /* ---------------- INPUT ---------------- */
 type Keys = {
@@ -964,7 +965,7 @@ function EnemyProjectileMesh({ pr }: { pr: EnemyProjectile }) {
 // Realistic enemies reuse the same rigged human GLB as the hero, with
 // per-kind tinting, scale, and a weapon prop. This gives real skeletal
 // animation instead of primitive limbs.
-function EnemyMesh({ e }: { e: Enemy }) {
+function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObject<THREE.Vector3> }) {
   const ref = useRef<THREE.Group>(null!);
   const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
   const leftArm = useRef<THREE.Group>(null!);
@@ -989,7 +990,9 @@ function EnemyMesh({ e }: { e: Enemy }) {
   useFrame((_state, dt) => {
     if (!ref.current) return;
     ref.current.position.copy(e.pos);
-    ref.current.visible = e.alive;
+    const visible = e.alive && e.pos.distanceToSquared(playerRef.current) < ENEMY_RENDER_DISTANCE_SQ;
+    ref.current.visible = visible;
+    if (!visible) return;
 
     const dx = e.pos.x - lastPos.current.x;
     const dz = e.pos.z - lastPos.current.z;
@@ -1026,7 +1029,6 @@ function EnemyMesh({ e }: { e: Enemy }) {
       {/* Tint aura for new kinds so they read distinctly at a glance */}
       {tint && (
         <>
-          <pointLight color={tint} intensity={1.2} distance={2.6} decay={2} position={[0, 1.4, 0]} />
           <mesh position={[0, 1.4, 0]}>
             <sphereGeometry args={[0.55, 12, 10]} />
             <meshBasicMaterial color={tint} transparent opacity={0.12} />
@@ -1253,10 +1255,6 @@ function WraithBody({ s, leftArm, rightArm, leftLeg, rightLeg, head, id }: LimbR
   const hipY = s * 1.25;
   const shoulderY = s * 2.05;
   const headY = s * 2.35;
-  const gemRef = useRef<THREE.PointLight>(null!);
-  useFrame((state) => {
-    if (gemRef.current) gemRef.current.intensity = 0.6 + Math.sin(state.clock.elapsedTime * 3 + id) * 0.2;
-  });
   return (
     <group>
       {/* Legs under long robe (subtle) */}
@@ -1345,7 +1343,6 @@ function WraithBody({ s, leftArm, rightArm, leftLeg, rightLeg, head, id }: LimbR
             <sphereGeometry args={[0.07 * s, 10, 10]} />
             <meshStandardMaterial color={gem} emissive={gem} emissiveIntensity={0.9} roughness={0.2} />
           </mesh>
-          <pointLight ref={gemRef} color={gem} intensity={0.7} distance={3} position={[0, 1.03 * s, 0]} />
         </group>
       </group>
       {/* Head — human female with long hair */}
@@ -1647,7 +1644,6 @@ function PickupMesh({ p }: { p: Pickup }) {
         {cfg.geo}
         <meshStandardMaterial color={cfg.color} emissive={cfg.color} emissiveIntensity={1.5} />
       </mesh>
-      <pointLight color={cfg.color} intensity={0.8} distance={3} />
     </group>
   );
 }
@@ -1664,7 +1660,6 @@ function Goal({ pos }: { pos: Vec3 }) {
         <torusKnotGeometry args={[0.5, 0.15, 64, 8]} />
         <meshStandardMaterial color="#a080ff" emissive="#a080ff" emissiveIntensity={2} />
       </mesh>
-      <pointLight color="#a080ff" intensity={3} distance={10} />
     </group>
   );
 }
@@ -2352,7 +2347,6 @@ function Scene({
         position={[10, 20, 5]}
         intensity={0.6}
         color={world.theme === "cave" ? "#ff8060" : world.theme === "sky" ? "#a090ff" : world.theme === "ice" ? "#a0d0ff" : world.theme === "abyss" ? "#ff2020" : "#e0e0ff"}
-        castShadow
       />
       {world.theme === "sky" && <Stars radius={80} depth={40} count={2000} factor={4} fade />}
       {world.theme === "void" && <Stars radius={60} depth={60} count={3000} factor={2} fade speed={0.3} />}
@@ -2370,7 +2364,7 @@ function Scene({
       ))}
       {/* Enemies */}
       {enemies.current.map((e) => (
-        <EnemyMesh key={e.id} e={e} />
+        <EnemyMesh key={e.id} e={e} playerRef={pos} />
       ))}
       {/* Pickups */}
       {pickups.current.map((p) => (
@@ -2815,7 +2809,7 @@ function Index() {
           key={sceneKey}
           shadows={settings.shadows && settings.quality === "high"}
           camera={{ position: [0, 6, 10], fov: settings.fov }}
-          dpr={[1, 1.25]}
+          dpr={settings.quality === "low" ? [0.6, 0.85] : [0.75, 1]}
           gl={{
             toneMappingExposure: settings.brightness,
             antialias: settings.quality === "high",
