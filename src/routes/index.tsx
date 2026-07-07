@@ -187,34 +187,44 @@ function buildWorlds(): WorldDef[] {
 
   // I - Bosque Maldito
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [20, 1, 8] as Vec3, color: "#2a4a2f" },
       ...genPath(6, 14, 2, 8, 1.5, 4, 2, "#3a5a3a"),
       { pos: [62, 3, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#2a4a2f" },
     ];
+    const br = branches(6, 14, 2, 8, 1.5, 4, "#3a5a3a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "I · Bosque Maldito", theme: "grass", fog: "#0a1810", ground: "#1a2b1e", ambient: 0.35,
       fogNear: 15, fogFar: 55, difficulty: 1, spawn: [0, 2, 0], goal: [62, 5, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "goblin"], [3, "goblin"], [5, "wraith"], [6, "brute"]], path),
-      pickups: mkPickups([[1, "gem"], [3, "gem"], [4, "hp"], [5, "gem"], [6, "checkpoint"]], path),
+      enemies: [
+        ...mkEnemies([[1, "goblin"], [3, "hopper"], [5, "wraith"], [6, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["hopper", "goblin", "archer", "sentinel"]),
+      ],
+      pickups: mkPickups([[1, "gem"], [3, "gem"], [4, "hp"], [5, "gem"], [6, "checkpoint"]], mainPath),
       lava: [{ pos: [26, -1.2, 0], size: [3, 4] }, { pos: [42, -1.2, 0], size: [3, 4] }],
     });
   }
 
   // II - Cementerio Brumoso
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [16, 1, 8] as Vec3, color: "#1a1a20" },
       ...genPath(8, 12, 2, 7, 2, 3.2, 3, "#2a2530"),
       { pos: [70, 4, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#1a1a20" },
     ];
+    const br = branches(8, 12, 2, 7, 2, 3.2, "#2a2530");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "II · Cementerio Brumoso", theme: "grave", fog: "#050508", ground: "#0f0f14", ambient: 0.12,
       fogNear: 8, fogFar: 30, difficulty: 1.3, spawn: [0, 2, 0], goal: [70, 6, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [3, "wraith"], [4, "goblin"], [6, "wraith"], [7, "brute"], [8, "wraith"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "checkpoint"], [5, "hp"], [7, "mp"], [8, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [3, "wraith"], [4, "goblin"], [6, "archer"], [7, "brute"], [8, "wraith"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "wraith", "hopper", "sentinel", "dasher", "archer"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "checkpoint"], [5, "hp"], [7, "mp"], [8, "gem"]], mainPath),
       lava: [],
       scare: { flicker: true, whispers: true },
     });
@@ -222,17 +232,22 @@ function buildWorlds(): WorldDef[] {
 
   // III - Cavernas Ardientes
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [14, 1, 8] as Vec3, color: "#3a1a15" },
       ...genPath(9, 10, 2.5, 6.5, 2, 2.8, 3, "#4a2015"),
       { pos: [70, 6, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#3a1a15" },
     ];
+    const br = branches(9, 10, 2.5, 6.5, 2, 2.8, "#4a2015");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "III · Cavernas Ardientes", theme: "cave", fog: "#1a0808", ground: "#2a1512", ambient: 0.15,
       fogNear: 12, fogFar: 40, difficulty: 1.6, spawn: [0, 2, 0], goal: [70, 8, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [2, "goblin"], [4, "brute"], [6, "wraith"], [7, "brute"], [8, "wraith"], [9, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [3, "mp"], [5, "checkpoint"], [7, "hp"], [9, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [2, "hopper"], [4, "brute"], [6, "archer"], [7, "dasher"], [8, "wraith"], [9, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["dasher", "archer", "hopper", "sentinel", "dasher", "archer", "hopper"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [3, "mp"], [5, "checkpoint"], [7, "hp"], [9, "gem"]], mainPath),
       lava: lavaLine(14, 8, 7, [3, 6]),
       scare: { redLight: true },
     });
@@ -240,17 +255,22 @@ function buildWorlds(): WorldDef[] {
 
   // IV - Cripta de Huesos
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [12, 1, 8] as Vec3, color: "#2a2520" },
       ...genPath(10, 9, 3, 6, 2.5, 2.4, 4, "#3a3025"),
       { pos: [72, 8, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#2a2520" },
     ];
+    const br = branches(10, 9, 3, 6, 2.5, 2.4, "#3a3025");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "IV · Cripta de Huesos", theme: "crypt", fog: "#080605", ground: "#1a1510", ambient: 0.1,
       fogNear: 7, fogFar: 26, difficulty: 2.0, spawn: [0, 2, 0], goal: [72, 10, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "brute"], [3, "wraith"], [4, "brute"], [5, "wraith"], [7, "brute"], [8, "wraith"], [9, "brute"], [10, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "brute"], [3, "archer"], [4, "sentinel"], [5, "wraith"], [7, "dasher"], [8, "wraith"], [9, "brute"], [10, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "hopper", "dasher", "sentinel", "archer", "wraith", "hopper", "dasher"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"]], mainPath),
       lava: lavaLine(12, 6, 9, [4, 7]),
       scare: { flicker: true, whispers: true, redLight: true },
     });
@@ -259,34 +279,44 @@ function buildWorlds(): WorldDef[] {
   // V - Cielos de Sombra
   {
     const base = 10;
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, base, 0] as Vec3, size: [10, 1, 6] as Vec3, color: "#2a2a4a" },
       ...genPath(11, 10, base + 2, 5.5, 3, 2.2, 4, "#2a2a4a"),
       { pos: [72, base + 8, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#2a2a4a" },
     ];
+    const br = branches(11, 10, base + 2, 5.5, 3, 2.2, "#2a2a4a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "V · Cielos de Sombra", theme: "sky", fog: "#0a0a1e", ground: "#151530", ambient: 0.2,
       fogNear: 10, fogFar: 35, difficulty: 2.5, spawn: [0, base + 2, 0], goal: [72, base + 10, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [3, "wraith"], [4, "brute"], [5, "wraith"], [7, "wraith"], [8, "brute"], [9, "wraith"], [10, "wraith"], [11, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [11, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [3, "archer"], [4, "brute"], [5, "wraith"], [7, "archer"], [8, "brute"], [9, "wraith"], [10, "dasher"], [11, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "wraith", "hopper", "dasher", "archer", "wraith", "sentinel", "hopper"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [11, "gem"]], mainPath),
       lava: [],
     });
   }
 
   // VI - Torre del Vacío
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, 0, 0] as Vec3, size: [8, 1, 8] as Vec3, color: "#1a0a2a" },
       ...genPath(13, 8, 3, 5, 3.5, 2, 5, "#25153a"),
       { pos: [74, 12, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#1a0a2a" },
     ];
+    const br = branches(13, 8, 3, 5, 3.5, 2, "#25153a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "VI · Torre del Vacío", theme: "void", fog: "#02020a", ground: "#080810", ambient: 0.08,
       fogNear: 6, fogFar: 22, difficulty: 3.0, spawn: [0, 2, 0], goal: [74, 14, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [2, "brute"], [3, "wraith"], [4, "brute"], [6, "wraith"], [7, "brute"], [8, "wraith"], [9, "brute"], [10, "wraith"], [11, "brute"], [13, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [5, "checkpoint"], [7, "hp"], [9, "mp"], [11, "gem"], [12, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [2, "sentinel"], [3, "archer"], [4, "brute"], [6, "dasher"], [7, "brute"], [8, "wraith"], [9, "hopper"], [10, "archer"], [11, "brute"], [13, "sentinel"]], mainPath),
+        ...enemiesOnBranches(br, ["dasher", "archer", "hopper", "sentinel", "dasher", "archer", "wraith", "hopper", "brute"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [5, "checkpoint"], [7, "hp"], [9, "mp"], [11, "gem"], [12, "gem"]], mainPath),
       lava: [],
       scare: { flicker: true, whispers: true },
     });
@@ -294,17 +324,22 @@ function buildWorlds(): WorldDef[] {
 
   // VII - Infierno Congelado
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [10, 1, 8] as Vec3, color: "#1a2a3a" },
       ...genPath(14, 9, 2, 5, 3, 1.8, 5, "#2a3a4f" ),
       { pos: [76, 6, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#1a2a3a" },
     ];
+    const br = branches(14, 9, 2, 5, 3, 1.8, "#2a3a4f");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "VII · Infierno Congelado", theme: "ice", fog: "#0a0a15", ground: "#1a1f2a", ambient: 0.12,
       fogNear: 8, fogFar: 28, difficulty: 3.6, spawn: [0, 2, 0], goal: [76, 8, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [2, "brute"], [3, "wraith"], [4, "brute"], [5, "wraith"], [7, "brute"], [8, "brute"], [9, "wraith"], [10, "brute"], [11, "wraith"], [12, "brute"], [13, "brute"], [14, "wraith"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [12, "hp"], [14, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "archer"], [2, "brute"], [3, "wraith"], [4, "dasher"], [5, "wraith"], [7, "sentinel"], [8, "brute"], [9, "archer"], [10, "brute"], [11, "hopper"], [12, "dasher"], [13, "brute"], [14, "wraith"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "dasher", "hopper", "sentinel", "archer", "wraith", "dasher", "hopper", "sentinel", "brute"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [12, "hp"], [14, "gem"]], mainPath),
       lava: lavaLine(14, 8, 8, [4, 7]),
       scare: { redLight: true, whispers: true },
     });
@@ -312,21 +347,26 @@ function buildWorlds(): WorldDef[] {
 
   // VIII - Abismo Final
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [10, 1, 8] as Vec3, color: "#20050a" },
       ...genPath(16, 9, 3, 4.5, 4, 1.6, 6, "#35060a"),
       { pos: [80, 10, 0] as Vec3, size: [10, 1, 8] as Vec3, color: "#40080a" },
     ];
+    const br = branches(16, 9, 3, 4.5, 4, 1.6, "#35060a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "VIII · Abismo Final", theme: "abyss", fog: "#08000a", ground: "#180008", ambient: 0.05,
       fogNear: 5, fogFar: 18, difficulty: 4.5, spawn: [0, 2, 0], goal: [80, 12, 0],
       platforms: path,
-      enemies: mkEnemies([
-        [1, "brute"], [2, "wraith"], [3, "brute"], [4, "brute"], [5, "wraith"], [6, "brute"],
-        [7, "brute"], [8, "wraith"], [9, "brute"], [10, "brute"], [11, "wraith"], [12, "brute"],
-        [13, "brute"], [14, "wraith"], [15, "brute"], [16, "brute"],
-      ], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "hp"], [12, "checkpoint"], [14, "mp"], [16, "gem"]], path),
+      enemies: [
+        ...mkEnemies([
+          [1, "brute"], [2, "archer"], [3, "sentinel"], [4, "brute"], [5, "dasher"], [6, "brute"],
+          [7, "hopper"], [8, "wraith"], [9, "archer"], [10, "brute"], [11, "wraith"], [12, "sentinel"],
+          [13, "dasher"], [14, "wraith"], [15, "brute"], [16, "archer"],
+        ], mainPath),
+        ...enemiesOnBranches(br, ["archer", "dasher", "hopper", "sentinel", "archer", "wraith", "dasher", "hopper", "sentinel", "brute", "archer", "dasher"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "hp"], [12, "checkpoint"], [14, "mp"], [16, "gem"]], mainPath),
       lava: lavaLine(12, 10, 8, [5, 8]),
       scare: { flicker: true, whispers: true, redLight: true },
     });
