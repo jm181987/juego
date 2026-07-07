@@ -56,9 +56,16 @@ type Enemy = {
   hp: number;
   maxHp: number;
   vel: THREE.Vector3;
-  kind: "goblin" | "wraith" | "brute";
+  kind: "goblin" | "wraith" | "brute" | "archer" | "hopper" | "sentinel" | "dasher";
   alive: boolean;
   hitFlash: number;
+  // AI state
+  shootTimer?: number;
+  jumpTimer?: number;
+  dashTimer?: number;
+  dashActive?: number;
+  patrolCenter?: THREE.Vector3;
+  patrolDir?: number;
 };
 type Pickup = {
   id: number;
@@ -68,6 +75,7 @@ type Pickup = {
 };
 type FloatText = { id: number; pos: THREE.Vector3; text: string; color: string; life: number };
 type Projectile = { id: number; pos: THREE.Vector3; vel: THREE.Vector3; life: number };
+type EnemyProjectile = { id: number; pos: THREE.Vector3; vel: THREE.Vector3; life: number; dmg: number };
 
 type WorldDef = {
   name: string;
@@ -113,6 +121,41 @@ function genPath(count: number, startX: number, startY: number, jumpX: number, j
   return plats;
 }
 
+/** Generate multiple parallel branch routes offset in Z with varied Y bias.
+ * Produces roughly `count * offsets.length` platforms — many alternative
+ * paths from start to goal. */
+function branches(
+  count: number,
+  startX: number,
+  startY: number,
+  jumpX: number,
+  jumpY: number,
+  width: number,
+  color: string,
+  offsets: number[] = [-13, -8, 8, 13],
+): Platform[] {
+  const out: Platform[] = [];
+  offsets.forEach((zBase, bi) => {
+    const yBias = (bi % 2 === 0 ? 1 : -1) * 1.4 + (bi - 1.5) * 0.4;
+    for (let i = 0; i < count; i++) {
+      const x = startX + i * jumpX + ((bi % 2) * 0.4 + 0.15) * jumpX;
+      const y = startY + yBias + Math.sin(i * 0.55 + bi * 1.7) * jumpY;
+      const z = zBase + Math.sin(i * 0.9 + bi * 0.6) * 1.8;
+      out.push({ pos: [x, y, z], size: [width * 0.75, 0.7, width * 0.75], color });
+      // Occasional stepping stone between branch platforms
+      if (i < count - 1 && (i + bi) % 2 === 0) {
+        out.push({
+          pos: [x + jumpX * 0.5, y + 1.4, z + (bi % 2 === 0 ? 1.6 : -1.6)],
+          size: [width * 0.45, 0.5, width * 0.45],
+          color,
+        });
+      }
+    }
+  });
+  return out;
+}
+
+
 function mkEnemies(defs: [number, Enemy["kind"]][], basePlats: Platform[]): { pos: Vec3; kind: Enemy["kind"] }[] {
   return defs.map(([idx, kind]) => {
     const p = basePlats[idx] ?? basePlats[basePlats.length - 1];
@@ -129,40 +172,59 @@ function lavaLine(startX: number, count: number, spacing: number, size: [number,
   return Array.from({ length: count }, (_, i) => ({ pos: [startX + i * spacing, y, 0] as Vec3, size }));
 }
 
+/** Spawn extra enemies scattered across branch platforms. */
+function enemiesOnBranches(brs: Platform[], kinds: Enemy["kind"][]): { pos: Vec3; kind: Enemy["kind"] }[] {
+  return kinds.map((k, i) => {
+    const p = brs[Math.floor(((i + 1) * brs.length) / (kinds.length + 1))] ?? brs[0];
+    return { pos: [p.pos[0], p.pos[1] + 2, p.pos[2]] as Vec3, kind: k };
+  });
+}
+
+
 /* ---------------- WORLDS ---------------- */
 function buildWorlds(): WorldDef[] {
   const worlds: WorldDef[] = [];
 
   // I - Bosque Maldito
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [20, 1, 8] as Vec3, color: "#2a4a2f" },
       ...genPath(6, 14, 2, 8, 1.5, 4, 2, "#3a5a3a"),
       { pos: [62, 3, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#2a4a2f" },
     ];
+    const br = branches(6, 14, 2, 8, 1.5, 4, "#3a5a3a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "I · Bosque Maldito", theme: "grass", fog: "#0a1810", ground: "#1a2b1e", ambient: 0.35,
       fogNear: 15, fogFar: 55, difficulty: 1, spawn: [0, 2, 0], goal: [62, 5, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "goblin"], [3, "goblin"], [5, "wraith"], [6, "brute"]], path),
-      pickups: mkPickups([[1, "gem"], [3, "gem"], [4, "hp"], [5, "gem"], [6, "checkpoint"]], path),
+      enemies: [
+        ...mkEnemies([[1, "goblin"], [3, "hopper"], [5, "wraith"], [6, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["hopper", "goblin", "archer", "sentinel"]),
+      ],
+      pickups: mkPickups([[1, "gem"], [3, "gem"], [4, "hp"], [5, "gem"], [6, "checkpoint"]], mainPath),
       lava: [{ pos: [26, -1.2, 0], size: [3, 4] }, { pos: [42, -1.2, 0], size: [3, 4] }],
     });
   }
 
   // II - Cementerio Brumoso
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [16, 1, 8] as Vec3, color: "#1a1a20" },
       ...genPath(8, 12, 2, 7, 2, 3.2, 3, "#2a2530"),
       { pos: [70, 4, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#1a1a20" },
     ];
+    const br = branches(8, 12, 2, 7, 2, 3.2, "#2a2530");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "II · Cementerio Brumoso", theme: "grave", fog: "#050508", ground: "#0f0f14", ambient: 0.12,
       fogNear: 8, fogFar: 30, difficulty: 1.3, spawn: [0, 2, 0], goal: [70, 6, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [3, "wraith"], [4, "goblin"], [6, "wraith"], [7, "brute"], [8, "wraith"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "checkpoint"], [5, "hp"], [7, "mp"], [8, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [3, "wraith"], [4, "goblin"], [6, "archer"], [7, "brute"], [8, "wraith"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "wraith", "hopper", "sentinel", "dasher", "archer"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "checkpoint"], [5, "hp"], [7, "mp"], [8, "gem"]], mainPath),
       lava: [],
       scare: { flicker: true, whispers: true },
     });
@@ -170,17 +232,22 @@ function buildWorlds(): WorldDef[] {
 
   // III - Cavernas Ardientes
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [14, 1, 8] as Vec3, color: "#3a1a15" },
       ...genPath(9, 10, 2.5, 6.5, 2, 2.8, 3, "#4a2015"),
       { pos: [70, 6, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#3a1a15" },
     ];
+    const br = branches(9, 10, 2.5, 6.5, 2, 2.8, "#4a2015");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "III · Cavernas Ardientes", theme: "cave", fog: "#1a0808", ground: "#2a1512", ambient: 0.15,
       fogNear: 12, fogFar: 40, difficulty: 1.6, spawn: [0, 2, 0], goal: [70, 8, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [2, "goblin"], [4, "brute"], [6, "wraith"], [7, "brute"], [8, "wraith"], [9, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [3, "mp"], [5, "checkpoint"], [7, "hp"], [9, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [2, "hopper"], [4, "brute"], [6, "archer"], [7, "dasher"], [8, "wraith"], [9, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["dasher", "archer", "hopper", "sentinel", "dasher", "archer", "hopper"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [3, "mp"], [5, "checkpoint"], [7, "hp"], [9, "gem"]], mainPath),
       lava: lavaLine(14, 8, 7, [3, 6]),
       scare: { redLight: true },
     });
@@ -188,17 +255,22 @@ function buildWorlds(): WorldDef[] {
 
   // IV - Cripta de Huesos
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [12, 1, 8] as Vec3, color: "#2a2520" },
       ...genPath(10, 9, 3, 6, 2.5, 2.4, 4, "#3a3025"),
       { pos: [72, 8, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#2a2520" },
     ];
+    const br = branches(10, 9, 3, 6, 2.5, 2.4, "#3a3025");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "IV · Cripta de Huesos", theme: "crypt", fog: "#080605", ground: "#1a1510", ambient: 0.1,
       fogNear: 7, fogFar: 26, difficulty: 2.0, spawn: [0, 2, 0], goal: [72, 10, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "brute"], [3, "wraith"], [4, "brute"], [5, "wraith"], [7, "brute"], [8, "wraith"], [9, "brute"], [10, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "brute"], [3, "archer"], [4, "sentinel"], [5, "wraith"], [7, "dasher"], [8, "wraith"], [9, "brute"], [10, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "hopper", "dasher", "sentinel", "archer", "wraith", "hopper", "dasher"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"]], mainPath),
       lava: lavaLine(12, 6, 9, [4, 7]),
       scare: { flicker: true, whispers: true, redLight: true },
     });
@@ -207,34 +279,44 @@ function buildWorlds(): WorldDef[] {
   // V - Cielos de Sombra
   {
     const base = 10;
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, base, 0] as Vec3, size: [10, 1, 6] as Vec3, color: "#2a2a4a" },
       ...genPath(11, 10, base + 2, 5.5, 3, 2.2, 4, "#2a2a4a"),
       { pos: [72, base + 8, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#2a2a4a" },
     ];
+    const br = branches(11, 10, base + 2, 5.5, 3, 2.2, "#2a2a4a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "V · Cielos de Sombra", theme: "sky", fog: "#0a0a1e", ground: "#151530", ambient: 0.2,
       fogNear: 10, fogFar: 35, difficulty: 2.5, spawn: [0, base + 2, 0], goal: [72, base + 10, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [3, "wraith"], [4, "brute"], [5, "wraith"], [7, "wraith"], [8, "brute"], [9, "wraith"], [10, "wraith"], [11, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [11, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [3, "archer"], [4, "brute"], [5, "wraith"], [7, "archer"], [8, "brute"], [9, "wraith"], [10, "dasher"], [11, "brute"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "wraith", "hopper", "dasher", "archer", "wraith", "sentinel", "hopper"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [11, "gem"]], mainPath),
       lava: [],
     });
   }
 
   // VI - Torre del Vacío
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, 0, 0] as Vec3, size: [8, 1, 8] as Vec3, color: "#1a0a2a" },
       ...genPath(13, 8, 3, 5, 3.5, 2, 5, "#25153a"),
       { pos: [74, 12, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#1a0a2a" },
     ];
+    const br = branches(13, 8, 3, 5, 3.5, 2, "#25153a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "VI · Torre del Vacío", theme: "void", fog: "#02020a", ground: "#080810", ambient: 0.08,
       fogNear: 6, fogFar: 22, difficulty: 3.0, spawn: [0, 2, 0], goal: [74, 14, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [2, "brute"], [3, "wraith"], [4, "brute"], [6, "wraith"], [7, "brute"], [8, "wraith"], [9, "brute"], [10, "wraith"], [11, "brute"], [13, "brute"]], path),
-      pickups: mkPickups([[2, "gem"], [5, "checkpoint"], [7, "hp"], [9, "mp"], [11, "gem"], [12, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "wraith"], [2, "sentinel"], [3, "archer"], [4, "brute"], [6, "dasher"], [7, "brute"], [8, "wraith"], [9, "hopper"], [10, "archer"], [11, "brute"], [13, "sentinel"]], mainPath),
+        ...enemiesOnBranches(br, ["dasher", "archer", "hopper", "sentinel", "dasher", "archer", "wraith", "hopper", "brute"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [5, "checkpoint"], [7, "hp"], [9, "mp"], [11, "gem"], [12, "gem"]], mainPath),
       lava: [],
       scare: { flicker: true, whispers: true },
     });
@@ -242,17 +324,22 @@ function buildWorlds(): WorldDef[] {
 
   // VII - Infierno Congelado
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [10, 1, 8] as Vec3, color: "#1a2a3a" },
       ...genPath(14, 9, 2, 5, 3, 1.8, 5, "#2a3a4f" ),
       { pos: [76, 6, 0] as Vec3, size: [8, 1, 6] as Vec3, color: "#1a2a3a" },
     ];
+    const br = branches(14, 9, 2, 5, 3, 1.8, "#2a3a4f");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "VII · Infierno Congelado", theme: "ice", fog: "#0a0a15", ground: "#1a1f2a", ambient: 0.12,
       fogNear: 8, fogFar: 28, difficulty: 3.6, spawn: [0, 2, 0], goal: [76, 8, 0],
       platforms: path,
-      enemies: mkEnemies([[1, "wraith"], [2, "brute"], [3, "wraith"], [4, "brute"], [5, "wraith"], [7, "brute"], [8, "brute"], [9, "wraith"], [10, "brute"], [11, "wraith"], [12, "brute"], [13, "brute"], [14, "wraith"]], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [12, "hp"], [14, "gem"]], path),
+      enemies: [
+        ...mkEnemies([[1, "archer"], [2, "brute"], [3, "wraith"], [4, "dasher"], [5, "wraith"], [7, "sentinel"], [8, "brute"], [9, "archer"], [10, "brute"], [11, "hopper"], [12, "dasher"], [13, "brute"], [14, "wraith"]], mainPath),
+        ...enemiesOnBranches(br, ["archer", "dasher", "hopper", "sentinel", "archer", "wraith", "dasher", "hopper", "sentinel", "brute"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "gem"], [12, "hp"], [14, "gem"]], mainPath),
       lava: lavaLine(14, 8, 8, [4, 7]),
       scare: { redLight: true, whispers: true },
     });
@@ -260,21 +347,26 @@ function buildWorlds(): WorldDef[] {
 
   // VIII - Abismo Final
   {
-    const path = [
+    const mainPath: Platform[] = [
       { pos: [0, -0.5, 0] as Vec3, size: [10, 1, 8] as Vec3, color: "#20050a" },
       ...genPath(16, 9, 3, 4.5, 4, 1.6, 6, "#35060a"),
       { pos: [80, 10, 0] as Vec3, size: [10, 1, 8] as Vec3, color: "#40080a" },
     ];
+    const br = branches(16, 9, 3, 4.5, 4, 1.6, "#35060a");
+    const path = [...mainPath, ...br];
     worlds.push({
       name: "VIII · Abismo Final", theme: "abyss", fog: "#08000a", ground: "#180008", ambient: 0.05,
       fogNear: 5, fogFar: 18, difficulty: 4.5, spawn: [0, 2, 0], goal: [80, 12, 0],
       platforms: path,
-      enemies: mkEnemies([
-        [1, "brute"], [2, "wraith"], [3, "brute"], [4, "brute"], [5, "wraith"], [6, "brute"],
-        [7, "brute"], [8, "wraith"], [9, "brute"], [10, "brute"], [11, "wraith"], [12, "brute"],
-        [13, "brute"], [14, "wraith"], [15, "brute"], [16, "brute"],
-      ], path),
-      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "hp"], [12, "checkpoint"], [14, "mp"], [16, "gem"]], path),
+      enemies: [
+        ...mkEnemies([
+          [1, "brute"], [2, "archer"], [3, "sentinel"], [4, "brute"], [5, "dasher"], [6, "brute"],
+          [7, "hopper"], [8, "wraith"], [9, "archer"], [10, "brute"], [11, "wraith"], [12, "sentinel"],
+          [13, "dasher"], [14, "wraith"], [15, "brute"], [16, "archer"],
+        ], mainPath),
+        ...enemiesOnBranches(br, ["archer", "dasher", "hopper", "sentinel", "archer", "wraith", "dasher", "hopper", "sentinel", "brute", "archer", "dasher"]),
+      ],
+      pickups: mkPickups([[2, "gem"], [4, "hp"], [6, "checkpoint"], [8, "mp"], [10, "hp"], [12, "checkpoint"], [14, "mp"], [16, "gem"]], mainPath),
       lava: lavaLine(12, 10, 8, [5, 8]),
       scare: { flicker: true, whispers: true, redLight: true },
     });
@@ -826,6 +918,34 @@ function ProjectileMesh({ pr }: { pr: Projectile }) {
   );
 }
 
+/* Enemy fireball projectile — smaller, redder than the player's shot. */
+function EnemyProjectileMesh({ pr }: { pr: EnemyProjectile }) {
+  const ref = useRef<THREE.Group>(null!);
+  const flameRef = useRef<THREE.Mesh>(null!);
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    ref.current.position.copy(pr.pos);
+    ref.current.visible = pr.life > 0;
+    if (flameRef.current) {
+      flameRef.current.rotation.x += dt * 8;
+      flameRef.current.rotation.y += dt * 7;
+    }
+  });
+  return (
+    <group ref={ref}>
+      <mesh>
+        <sphereGeometry args={[0.13, 12, 10]} />
+        <meshStandardMaterial color="#ffd080" emissive="#ff8020" emissiveIntensity={3} roughness={0.3} />
+      </mesh>
+      <mesh ref={flameRef}>
+        <sphereGeometry args={[0.22, 12, 10]} />
+        <meshStandardMaterial color="#ff4020" emissive="#ff2000" emissiveIntensity={2.2} transparent opacity={0.7} roughness={0.6} />
+      </mesh>
+      <pointLight color="#ff6030" intensity={1.6} distance={3.5} decay={2} />
+    </group>
+  );
+}
+
 
 
 
@@ -853,7 +973,18 @@ function EnemyMesh({ e }: { e: Enemy }) {
   const rightLeg = useRef<THREE.Group>(null!);
   const head = useRef<THREE.Group>(null!);
   const phase = useRef(Math.random() * 10);
-  const baseScale = e.kind === "brute" ? 1.15 : e.kind === "wraith" ? 1.0 : 0.95;
+  const baseScale =
+    e.kind === "brute" || e.kind === "sentinel" ? 1.15 :
+    e.kind === "wraith" || e.kind === "archer" ? 1.0 :
+    e.kind === "hopper" ? 0.85 :
+    e.kind === "dasher" ? 0.95 :
+    0.95;
+  const tint =
+    e.kind === "archer" ? "#a060ff" :
+    e.kind === "hopper" ? "#40ff80" :
+    e.kind === "sentinel" ? "#6080ff" :
+    e.kind === "dasher" ? "#ff4060" :
+    null;
 
   useFrame((_state, dt) => {
     if (!ref.current) return;
@@ -887,6 +1018,21 @@ function EnemyMesh({ e }: { e: Enemy }) {
       {e.kind === "goblin" && <GoblinBody {...limbs} />}
       {e.kind === "wraith" && <WraithBody {...limbs} id={e.id} />}
       {e.kind === "brute" && <BruteBody {...limbs} />}
+      {e.kind === "archer" && <WraithBody {...limbs} id={e.id} />}
+      {e.kind === "hopper" && <GoblinBody {...limbs} />}
+      {e.kind === "sentinel" && <BruteBody {...limbs} />}
+      {e.kind === "dasher" && <GoblinBody {...limbs} />}
+
+      {/* Tint aura for new kinds so they read distinctly at a glance */}
+      {tint && (
+        <>
+          <pointLight color={tint} intensity={1.2} distance={2.6} decay={2} position={[0, 1.4, 0]} />
+          <mesh position={[0, 1.4, 0]}>
+            <sphereGeometry args={[0.55, 12, 10]} />
+            <meshBasicMaterial color={tint} transparent opacity={0.12} />
+          </mesh>
+        </>
+      )}
 
       {/* Health bar */}
       {e.alive && e.hp < e.maxHp && (
@@ -1639,16 +1785,30 @@ function Scene({
   const diff = world.difficulty;
   const enemies = useRef<Enemy[]>(
     world.enemies.map((e, i) => {
-      const baseHp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 30 : 20;
+      const baseHp =
+        e.kind === "brute" ? 60 :
+        e.kind === "sentinel" ? 55 :
+        e.kind === "wraith" ? 30 :
+        e.kind === "archer" ? 24 :
+        e.kind === "hopper" ? 22 :
+        e.kind === "dasher" ? 28 :
+        20;
       const hp = Math.round(baseHp * diff);
+      const startPos = new THREE.Vector3(...e.pos);
       return {
         id: i,
-        pos: new THREE.Vector3(...e.pos),
+        pos: startPos,
         hp, maxHp: hp,
         vel: new THREE.Vector3(),
         kind: e.kind,
         alive: true,
         hitFlash: 0,
+        shootTimer: e.kind === "archer" ? 0.8 + Math.random() * 0.8 : 0,
+        jumpTimer: e.kind === "hopper" ? Math.random() * 0.6 : 0,
+        dashTimer: e.kind === "dasher" ? 1 + Math.random() : 0,
+        dashActive: 0,
+        patrolCenter: e.kind === "sentinel" ? startPos.clone() : undefined,
+        patrolDir: e.kind === "sentinel" ? (Math.random() < 0.5 ? 1 : -1) : 0,
       };
     })
   );
@@ -1664,6 +1824,8 @@ function Scene({
   const nextFtId = useRef(0);
   const projectiles = useRef<Projectile[]>([]);
   const nextProjId = useRef(0);
+  const enemyProjectiles = useRef<EnemyProjectile[]>([]);
+  const nextEnemyProjId = useRef(0);
   const spawnFloat = (p: THREE.Vector3, text: string, color: string) => {
     floats.current.push({ id: nextFtId.current++, pos: p.clone().add(new THREE.Vector3(0, 1.5, 0)), text, color, life: 1 });
   };
@@ -1970,28 +2132,111 @@ function Scene({
     for (const e of enemies.current) {
       if (!e.alive) continue;
       if (e.hitFlash > 0) e.hitFlash -= dt;
-      // Simple chase
+
       const toP = pos.current.clone().sub(e.pos);
       const dist = toP.length();
-      if (dist < 12) {
-        const baseSpeed = e.kind === "wraith" ? 4 : e.kind === "brute" ? 2.5 : 3.5;
-        const speed = baseSpeed * (0.9 + diff * 0.15);
-        const dir = toP.normalize();
-        if (e.kind === "wraith") {
-          // Wraiths float toward player
+      const dir = dist > 0.001 ? toP.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      const diffMul = 0.9 + diff * 0.15;
+
+      if (e.kind === "wraith") {
+        if (dist < 14) {
+          const speed = 4 * diffMul;
           e.vel.x = dir.x * speed;
           e.vel.z = dir.z * speed;
           e.vel.y = dir.y * speed * 0.5;
         } else {
+          e.vel.multiplyScalar(0.9);
+        }
+      } else if (e.kind === "archer") {
+        // Kite: keep 6-9 units away, orbit, shoot fireballs.
+        const desiredDist = 7.5;
+        const speed = 3.4 * diffMul;
+        if (dist < 14) {
+          const radial = (dist - desiredDist);
+          const strafe = new THREE.Vector3(-dir.z, 0, dir.x);
+          const move = dir.clone().multiplyScalar(radial * 0.6).add(strafe.multiplyScalar(1.2));
+          if (move.length() > 0) move.normalize();
+          e.vel.x = move.x * speed;
+          e.vel.z = move.z * speed;
+        } else {
+          e.vel.x *= 0.9; e.vel.z *= 0.9;
+        }
+        e.vel.y += GRAVITY * dt;
+        e.shootTimer = (e.shootTimer ?? 1) - dt;
+        if (dist > 3 && dist < 16 && (e.shootTimer ?? 0) <= 0) {
+          e.shootTimer = 1.4 + Math.random() * 0.6;
+          const from = e.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
+          const target = pos.current.clone().add(new THREE.Vector3(0, 0.8, 0));
+          const shootDir = target.sub(from).normalize();
+          enemyProjectiles.current.push({
+            id: nextEnemyProjId.current++,
+            pos: from,
+            vel: shootDir.multiplyScalar(16),
+            life: 1.6,
+            dmg: Math.max(2, Math.round(8 * diff - st.def * 0.4)),
+          });
+        }
+      } else if (e.kind === "hopper") {
+        const speed = 4.5 * diffMul;
+        if (dist < 16) {
+          e.vel.x = dir.x * speed;
+          e.vel.z = dir.z * speed;
+        } else { e.vel.x *= 0.9; e.vel.z *= 0.9; }
+        e.vel.y += GRAVITY * dt;
+        e.jumpTimer = (e.jumpTimer ?? 0) - dt;
+        // Simple ground check for the enemy
+        const gy = aabb(e.pos.x, e.pos.y - 0.05, e.pos.z, 0.35, 1.4, world.platforms);
+        if (gy !== null && (e.jumpTimer ?? 0) <= 0 && dist < 18) {
+          e.vel.y = 13;
+          e.jumpTimer = 0.5 + Math.random() * 0.4;
+        }
+      } else if (e.kind === "sentinel") {
+        // Patrol left/right around patrolCenter; if player close, charge.
+        const center = e.patrolCenter ?? e.pos;
+        const speed = 2.4 * diffMul;
+        if (dist < 5) {
+          e.vel.x = dir.x * speed * 1.6;
+          e.vel.z = dir.z * speed * 1.6;
+        } else {
+          const offset = e.pos.x - center.x;
+          if (offset > 5) e.patrolDir = -1;
+          else if (offset < -5) e.patrolDir = 1;
+          e.vel.x = (e.patrolDir ?? 1) * speed;
+          e.vel.z = 0;
+        }
+        e.vel.y += GRAVITY * dt;
+      } else if (e.kind === "dasher") {
+        const speed = 3 * diffMul;
+        if (dist < 16) {
+          e.vel.x = dir.x * speed;
+          e.vel.z = dir.z * speed;
+        } else { e.vel.x *= 0.9; e.vel.z *= 0.9; }
+        e.dashTimer = (e.dashTimer ?? 2) - dt;
+        e.dashActive = (e.dashActive ?? 0) - dt;
+        if ((e.dashTimer ?? 0) <= 0 && dist < 14) {
+          e.dashActive = 0.28;
+          e.dashTimer = 1.8 + Math.random() * 0.8;
+        }
+        if ((e.dashActive ?? 0) > 0) {
+          e.vel.x = dir.x * 16;
+          e.vel.z = dir.z * 16;
+        }
+        e.vel.y += GRAVITY * dt;
+      } else {
+        // brute / goblin default chase
+        if (dist < 12) {
+          const baseSpeed = e.kind === "brute" ? 2.5 : 3.5;
+          const speed = baseSpeed * diffMul;
           e.vel.x = dir.x * speed;
           e.vel.z = dir.z * speed;
           e.vel.y += GRAVITY * dt;
           if (grounded.current && Math.random() < 0.005) e.vel.y = 8;
+        } else {
+          e.vel.x *= 0.9; e.vel.z *= 0.9;
+          e.vel.y += GRAVITY * dt;
         }
-      } else {
-        e.vel.x *= 0.9; e.vel.z *= 0.9;
-        if (e.kind !== "wraith") e.vel.y += GRAVITY * dt;
       }
+
       // Integrate
       const enx = e.pos.x + e.vel.x * dt;
       if (!blocked(enx, e.pos.y, e.pos.z, 0.35, 1.4, world.platforms)) e.pos.x = enx;
@@ -2021,6 +2266,30 @@ function Scene({
         onHudUpdate();
         if (st.hp <= 0) { onDeath(); return; }
       }
+    }
+
+    // Enemy projectiles (fireballs from archers)
+    {
+      const before = enemyProjectiles.current.length;
+      for (const ep of enemyProjectiles.current) {
+        if (ep.life <= 0) continue;
+        ep.pos.x += ep.vel.x * dt;
+        ep.pos.y += ep.vel.y * dt;
+        ep.pos.z += ep.vel.z * dt;
+        ep.life -= dt;
+        if (blocked(ep.pos.x, ep.pos.y, ep.pos.z, 0.1, 0.1, world.platforms)) { ep.life = 0; continue; }
+        const d2 = ep.pos.distanceTo(pos.current.clone().add(new THREE.Vector3(0, 0.8, 0)));
+        if (d2 < 0.7 && invuln.current <= 0) {
+          st.hp -= ep.dmg;
+          invuln.current = 0.6;
+          spawnFloat(pos.current, `-${ep.dmg}`, "#ff8040");
+          onHudUpdate();
+          ep.life = 0;
+          if (st.hp <= 0) { onDeath(); return; }
+        }
+      }
+      enemyProjectiles.current = enemyProjectiles.current.filter((p) => p.life > 0);
+      if (enemyProjectiles.current.length !== before) rerender();
     }
 
     // Pickups
@@ -2114,6 +2383,10 @@ function Scene({
       {/* Projectiles */}
       {projectiles.current.map((pr) => (
         <ProjectileMesh key={pr.id} pr={pr} />
+      ))}
+      {/* Enemy projectiles */}
+      {enemyProjectiles.current.map((pr) => (
+        <EnemyProjectileMesh key={pr.id} pr={pr} />
       ))}
       {/* Floating texts */}
       {floats.current.map((f) => (

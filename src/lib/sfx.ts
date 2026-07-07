@@ -116,6 +116,6 @@ export function playDeath(gender: "male" | "female") {
 }
 
 /** Gender mapping by enemy kind. */
-export function genderFor(kind: "goblin" | "wraith" | "brute"): "male" | "female" {
-  return kind === "wraith" ? "female" : "male";
+export function genderFor(kind: string): "male" | "female" {
+  return kind === "wraith" || kind === "archer" ? "female" : "male";
 }
