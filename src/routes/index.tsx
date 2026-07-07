@@ -2325,9 +2325,7 @@ function Index() {
       setStatus("dead");
     } else {
       st.hp = st.maxHp;
-      setHudTick((v) => v + 1);
       setStatus("play");
-      setWorldIdx((i) => i);
       setHudTick((v) => v + 1);
     }
   };
@@ -2346,7 +2344,10 @@ function Index() {
   };
 
   const [sceneKey, setSceneKey] = useState(0);
-  useEffect(() => { setSceneKey((k) => k + 1); }, [worldIdx, status]);
+  // Only remount the Canvas when the world actually changes. Remounting on every
+  // status change (menu→play→win→play) tore down WebGL + reloaded GLBs multiple
+  // times per realm transition, freezing the browser.
+  useEffect(() => { setSceneKey((k) => k + 1); }, [worldIdx]);
 
   const st = statsRef.current;
 
