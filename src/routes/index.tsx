@@ -1790,61 +1790,88 @@ function Scene({
       }
     }
 
-    // Attack
+    // Attack — fire a projectile in the facing direction.
     if (attackCd.current > 0) attackCd.current -= dt;
     if (attackTimer.current > 0) attackTimer.current -= dt * 4;
-    if (k.attack && attackCd.current <= 0 && gs.stamina >= 12) {
+    if (k.attack && attackCd.current <= 0 && gs.stamina >= 6) {
       attackCd.current = ATTACK_COOLDOWN;
       attackTimer.current = 1;
-      gs.setStamina(gs.stamina - 12);
-      playSwing();
+      gs.setStamina(gs.stamina - 6);
+      playShoot();
       const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
+      // Spawn slightly in front of the mage and roughly at hand height.
+      const spawn = pos.current.clone().add(new THREE.Vector3(fx * 0.6, 1.1, fz * 0.6));
+      projectiles.current.push({
+        id: nextProjId.current++,
+        pos: spawn,
+        vel: new THREE.Vector3(fx * PROJECTILE_SPEED, 0, fz * PROJECTILE_SPEED),
+        life: PROJECTILE_LIFE,
+      });
+    }
+
+    // Projectiles: move, expire, and damage enemies on hit.
+    for (const pr of projectiles.current) {
+      if (pr.life <= 0) continue;
+      pr.life -= dt;
+      pr.pos.x += pr.vel.x * dt;
+      pr.pos.y += pr.vel.y * dt;
+      pr.pos.z += pr.vel.z * dt;
+      // Block on world geometry.
+      if (blocked(pr.pos.x, pr.pos.y, pr.pos.z, 0.1, 0.1, world.platforms)) {
+        pr.life = 0;
+        continue;
+      }
       for (const e of enemies.current) {
         if (!e.alive) continue;
-        const d = e.pos.clone().sub(pos.current);
-        const dist = d.length();
-        if (dist < ATTACK_RANGE) {
-          // dot with facing
-          const dn = d.clone().normalize();
-          if (dn.x * fx + dn.z * fz > 0.3) {
-            const dmg = 15 + st.str + Math.floor(Math.random() * 8);
-            e.hp -= dmg;
-            e.hitFlash = 0.15;
-            e.vel.x += fx * 6; e.vel.z += fz * 6; e.vel.y = 4;
-            spawnFloat(e.pos, `-${dmg}`, "#ffe040");
-            if (e.hp <= 0) {
-              e.alive = false;
-              playDeath(genderFor(e.kind));
-              gs.recordKill(e.kind);
+        const dx = e.pos.x - pr.pos.x;
+        const dy = (e.pos.y + 0.9) - pr.pos.y;
+        const dz = e.pos.z - pr.pos.z;
+        if (dx * dx + dy * dy + dz * dz < (PROJECTILE_RADIUS + 0.5) * (PROJECTILE_RADIUS + 0.5)) {
+          const dmg = 18 + st.str + Math.floor(Math.random() * 8);
+          e.hp -= dmg;
+          e.hitFlash = 0.15;
+          const kbx = pr.vel.x, kbz = pr.vel.z;
+          const len = Math.hypot(kbx, kbz) || 1;
+          e.vel.x += (kbx / len) * 5; e.vel.z += (kbz / len) * 5; e.vel.y = 3;
+          spawnFloat(e.pos, `-${dmg}`, "#80d8ff");
+          pr.life = 0;
+          if (e.hp <= 0) {
+            e.alive = false;
+            playDeath(genderFor(e.kind));
+            gs.recordKill(e.kind);
 
-              const xp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 40 : 25;
-              const gold = e.kind === "brute" ? 20 : e.kind === "wraith" ? 12 : 6;
-              st.xp += xp; st.gold += gold;
-              spawnFloat(e.pos, `+${xp} XP  +${gold}g`, "#a0ff40");
-              while (st.xp >= st.xpNext) {
-                st.xp -= st.xpNext;
-                st.level++;
-                st.xpNext = Math.floor(st.xpNext * 1.4);
-                st.maxHp += 20; st.hp = st.maxHp;
-                st.maxMp += 10; st.mp = st.maxMp;
-                st.str += 3; st.def += 1;
-                spawnFloat(pos.current, `LEVEL ${st.level}!`, "#ff80ff");
-              }
-              // Random drop
-              if (Math.random() < 0.4) {
-                pickups.current.push({
-                  id: 9000 + pickups.current.length,
-                  pos: e.pos.clone(),
-                  kind: Math.random() < 0.5 ? "hp" : "mp",
-                  taken: false,
-                });
-              }
-              onHudUpdate();
+            const xp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 40 : 25;
+            const gold = e.kind === "brute" ? 20 : e.kind === "wraith" ? 12 : 6;
+            st.xp += xp; st.gold += gold;
+            spawnFloat(e.pos, `+${xp} XP  +${gold}g`, "#a0ff40");
+            while (st.xp >= st.xpNext) {
+              st.xp -= st.xpNext;
+              st.level++;
+              st.xpNext = Math.floor(st.xpNext * 1.4);
+              st.maxHp += 20; st.hp = st.maxHp;
+              st.maxMp += 10; st.mp = st.maxMp;
+              st.str += 3; st.def += 1;
+              spawnFloat(pos.current, `LEVEL ${st.level}!`, "#ff80ff");
             }
+            // Random drop
+            if (Math.random() < 0.4) {
+              pickups.current.push({
+                id: 9000 + pickups.current.length,
+                pos: e.pos.clone(),
+                kind: Math.random() < 0.5 ? "hp" : "mp",
+                taken: false,
+              });
+            }
+            onHudUpdate();
           }
+          break;
         }
       }
     }
+    const beforeProj = projectiles.current.length;
+    projectiles.current = projectiles.current.filter((p) => p.life > 0);
+    const projChanged = projectiles.current.length !== beforeProj;
+
 
     // Potions
     if (k.pot1 && !potPrev.current.q && st.potHp > 0 && st.hp < st.maxHp) {
