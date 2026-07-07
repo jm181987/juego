@@ -780,21 +780,48 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 const MageMemo = React.memo(Mage);
 
-/* ---------------- PROJECTILE ---------------- */
+/* ---------------- PROJECTILE (Fireball) ---------------- */
 function ProjectileMesh({ pr }: { pr: Projectile }) {
   const ref = useRef<THREE.Group>(null!);
-  useFrame(() => {
+  const coreRef = useRef<THREE.Mesh>(null!);
+  const flameRef = useRef<THREE.Mesh>(null!);
+  useFrame((_, dt) => {
     if (!ref.current) return;
     ref.current.position.copy(pr.pos);
     ref.current.visible = pr.life > 0;
+    const t = performance.now() * 0.01;
+    if (coreRef.current) {
+      const s = 1 + Math.sin(t) * 0.08;
+      coreRef.current.scale.setScalar(s);
+    }
+    if (flameRef.current) {
+      flameRef.current.rotation.x += dt * 6;
+      flameRef.current.rotation.y += dt * 5;
+      const s = 1 + Math.sin(t * 1.7) * 0.15;
+      flameRef.current.scale.setScalar(s);
+    }
   });
   return (
     <group ref={ref}>
-      <mesh castShadow>
-        <sphereGeometry args={[0.18, 12, 10]} />
-        <meshStandardMaterial color="#a8e6ff" emissive="#4ac6ff" emissiveIntensity={2.4} roughness={0.2} />
+      {/* Bright hot core */}
+      <mesh ref={coreRef} castShadow>
+        <sphereGeometry args={[0.16, 14, 12]} />
+        <meshStandardMaterial color="#fff2b0" emissive="#ffde66" emissiveIntensity={3.2} roughness={0.3} />
       </mesh>
-      <pointLight color="#7ad6ff" intensity={1.6} distance={4} decay={2} />
+      {/* Outer flame shell */}
+      <mesh ref={flameRef}>
+        <sphereGeometry args={[0.28, 14, 12]} />
+        <meshStandardMaterial
+          color="#ff7a1a"
+          emissive="#ff4a08"
+          emissiveIntensity={2.4}
+          transparent
+          opacity={0.75}
+          roughness={0.6}
+        />
+      </mesh>
+      {/* Fire glow */}
+      <pointLight color="#ff8a3a" intensity={2.6} distance={5} decay={2} />
     </group>
   );
 }
