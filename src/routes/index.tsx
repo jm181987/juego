@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Sky, Stars, Text, useAnimations, useGLTF } from "@react-three/drei";
+import { Sky, Stars, Text, useAnimations, useGLTF, useProgress } from "@react-three/drei";
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
@@ -383,8 +383,6 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
   return false;
 }
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
-useGLTF.preload(soldierAsset.url);
-useGLTF.preload(michelleAsset.url);
 
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
@@ -424,17 +422,18 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const appearanceGender = useGame((s) => s.appearance.gender);
-  // Male: soldier rig. Female: Michelle.
-  // Both share mixamorig* bone naming so the soldier animation clips retarget.
+  // Male loads only the soldier rig. Female additionally loads Michelle while
+  // still reusing the soldier animation clips.
   const soldierGltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const michelleGltf = useGLTF(michelleAsset.url) as unknown as {
+  const modelUrl = appearanceGender === "female" ? michelleAsset.url : soldierAsset.url;
+  const modelGltf = useGLTF(modelUrl) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
+  const gltf = appearanceGender === "female" ? modelGltf : soldierGltf;
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(gltf.scene) as THREE.Group;
     // Keep both genders controlled only by the outer group rotation so movement
