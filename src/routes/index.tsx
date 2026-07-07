@@ -2036,6 +2036,10 @@ function Scene({
       <Goal pos={world.goal} />
       {/* Mage */}
       <MageMemo posRef={pos} facingRef={facing} attackingRef={attackTimer} walkPhaseRef={walkPhase} />
+      {/* Projectiles */}
+      {projectiles.current.map((pr) => (
+        <ProjectileMesh key={pr.id} pr={pr} />
+      ))}
       {/* Floating texts */}
       {floats.current.map((f) => (
         <FloatingText key={f.id} ft={f} />
