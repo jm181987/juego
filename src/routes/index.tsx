@@ -1035,10 +1035,15 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
       else if (raw === "rightforearm" || raw === "rforearm" || raw === "rlowerarm") set("rightForeArm");
       else if (raw === "leftupleg" || raw === "lupleg" || raw === "leftthigh" || raw === "lthigh") set("leftLeg");
       else if (raw === "rightupleg" || raw === "rupleg" || raw === "rightthigh" || raw === "rthigh") set("rightLeg");
-      else if (raw === "spine" || raw === "spine1") set("spine");
+      else if (raw === "leftleg" || raw === "lshin" || raw === "leftshin" || raw === "lcalf") set("leftLowerLeg");
+      else if (raw === "rightleg" || raw === "rshin" || raw === "rightshin" || raw === "rcalf") set("rightLowerLeg");
+      else if (raw === "spine" || raw === "spine1" || raw === "spine2") set("spine");
       else if (raw === "head") set("head");
+      else if (raw === "hips" || raw === "pelvis" || raw === "root") set("hips");
     });
+    if (bonesRef.current.hips) bonesRef.current.baseHipY = (bonesRef.current.hips as any).position.y;
     return c;
+
   }, [fbx, skin.tint]);
 
   // Attempt to play any embedded animation clip; procedural swing runs regardless.
