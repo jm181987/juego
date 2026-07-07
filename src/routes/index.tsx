@@ -1041,17 +1041,18 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
     ref.current.scale.setScalar(skin.scale * (1 + flash * 0.08));
   });
 
+  const invS = 1 / skin.scale;
   return (
     <group ref={ref} scale={skin.scale}>
       <primitive object={cloned} />
       {e.alive && e.hp < e.maxHp && (
-        <group position={[0, 3 / skin.scale * 0.02, 0]}>
+        <group position={[0, 150, 0]}>
           <mesh>
-            <planeGeometry args={[1 / skin.scale * 0.02, 0.12 / skin.scale * 0.02]} />
+            <planeGeometry args={[invS, invS * 0.12]} />
             <meshBasicMaterial color="#200" />
           </mesh>
-          <mesh position={[-(1 - e.hp / e.maxHp) / 2 / skin.scale * 0.02, 0, 0.01]}>
-            <planeGeometry args={[e.hp / e.maxHp / skin.scale * 0.02, 0.1 / skin.scale * 0.02]} />
+          <mesh position={[-(1 - e.hp / e.maxHp) * invS / 2, 0, 0.01]}>
+            <planeGeometry args={[(e.hp / e.maxHp) * invS, invS * 0.1]} />
             <meshBasicMaterial color="#e04040" />
           </mesh>
         </group>
