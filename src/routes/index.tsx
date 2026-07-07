@@ -972,27 +972,54 @@ function EnemyProjectileMesh({ pr }: { pr: EnemyProjectile }) {
 // Realistic enemies reuse the same rigged human GLB as the hero, with
 // per-kind tinting, scale, and a weapon prop. This gives real skeletal
 // animation instead of primitive limbs.
+function skinFor(kind: Enemy["kind"]): { url: string; scale: number; tint: string } {
+  // Map each enemy archetype to one of the three uploaded Mixamo skins.
+  if (kind === "wraith" || kind === "archer") return { url: vampireAsset.url, scale: 0.019, tint: "#c8b8ff" };
+  if (kind === "hopper" || kind === "dasher") return { url: medeaAsset.url, scale: 0.018, tint: "#ffd0e0" };
+  // goblin / brute / sentinel share the skeleton-zombie mesh.
+  return { url: skeletonzombieAsset.url, scale: kind === "brute" || kind === "sentinel" ? 0.022 : 0.018, tint: "#c0ffb0" };
+}
+
 function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObject<THREE.Vector3> }) {
   const ref = useRef<THREE.Group>(null!);
   const lastPos = useRef(new THREE.Vector3(e.pos.x, e.pos.y, e.pos.z));
-  const leftArm = useRef<THREE.Group>(null!);
-  const rightArm = useRef<THREE.Group>(null!);
-  const leftLeg = useRef<THREE.Group>(null!);
-  const rightLeg = useRef<THREE.Group>(null!);
-  const head = useRef<THREE.Group>(null!);
-  const phase = useRef(Math.random() * 10);
-  const baseScale =
-    e.kind === "brute" || e.kind === "sentinel" ? 1.15 :
-    e.kind === "wraith" || e.kind === "archer" ? 1.0 :
-    e.kind === "hopper" ? 0.85 :
-    e.kind === "dasher" ? 0.95 :
-    0.95;
-  const tint =
-    e.kind === "archer" ? "#a060ff" :
-    e.kind === "hopper" ? "#40ff80" :
-    e.kind === "sentinel" ? "#6080ff" :
-    e.kind === "dasher" ? "#ff4060" :
-    null;
+  const skin = useMemo(() => skinFor(e.kind), [e.kind]);
+  const fbx = useFBX(skin.url) as THREE.Group;
+  const cloned = useMemo(() => {
+    const c = SkeletonUtils.clone(fbx) as THREE.Group;
+    const tintCol = new THREE.Color(skin.tint);
+    c.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+        const mats = Array.isArray(m.material) ? m.material : [m.material];
+        m.material = mats.map((raw) => {
+          const src = raw as THREE.MeshStandardMaterial | THREE.MeshPhongMaterial;
+          const nm = new THREE.MeshStandardMaterial({
+            color: (src as any).color ? (src as any).color.clone().lerp(tintCol, 0.35) : tintCol.clone(),
+            map: (src as any).map ?? null,
+            normalMap: (src as any).normalMap ?? null,
+            roughness: 0.85,
+            metalness: 0.05,
+          });
+          return nm;
+        }) as any;
+        if ((m.material as any[]).length === 1) m.material = (m.material as any[])[0];
+      }
+    });
+    return c;
+  }, [fbx, skin.tint]);
+
+  const { actions, mixer } = useAnimations((fbx as any).animations ?? [], cloned);
+  useEffect(() => {
+    const names = Object.keys(actions);
+    if (names.length > 0) {
+      const a = actions[names[0]];
+      a?.reset().setEffectiveWeight(1).play();
+    }
+    return () => { Object.values(actions).forEach((a) => a?.stop()); };
+  }, [actions]);
 
   useFrame((_state, dt) => {
     if (!ref.current) return;
@@ -1003,55 +1030,28 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
 
     const dx = e.pos.x - lastPos.current.x;
     const dz = e.pos.z - lastPos.current.z;
-    const speed = Math.hypot(dx, dz) / Math.max(dt, 0.0001);
     if (Math.abs(dx) + Math.abs(dz) > 0.0005) {
       ref.current.rotation.y = Math.atan2(dx, dz) + Math.PI;
     }
     lastPos.current.set(e.pos.x, e.pos.y, e.pos.z);
 
-    const stride = Math.min(1, speed / 3);
-    phase.current += dt * (2 + stride * 5);
-    const swing = Math.sin(phase.current) * (0.15 + stride * 0.7);
-    if (leftArm.current) leftArm.current.rotation.x = swing;
-    if (rightArm.current) rightArm.current.rotation.x = -swing;
-    if (leftLeg.current) leftLeg.current.rotation.x = -swing * 0.9;
-    if (rightLeg.current) rightLeg.current.rotation.x = swing * 0.9;
-    if (head.current) head.current.rotation.z = Math.sin(phase.current * 0.5) * 0.04;
+    if (mixer) mixer.update(dt);
 
     const flash = Math.max(0, Math.min(1, e.hitFlash / 0.15));
-    ref.current.scale.setScalar(baseScale * (1 + flash * 0.08));
+    ref.current.scale.setScalar(skin.scale * (1 + flash * 0.08));
   });
 
-  const limbs = { s: 1, leftArm, rightArm, leftLeg, rightLeg, head };
   return (
-    <group ref={ref} scale={baseScale}>
-      {e.kind === "goblin" && <GoblinBody {...limbs} />}
-      {e.kind === "wraith" && <WraithBody {...limbs} id={e.id} />}
-      {e.kind === "brute" && <BruteBody {...limbs} />}
-      {e.kind === "archer" && <WraithBody {...limbs} id={e.id} />}
-      {e.kind === "hopper" && <GoblinBody {...limbs} />}
-      {e.kind === "sentinel" && <BruteBody {...limbs} />}
-      {e.kind === "dasher" && <GoblinBody {...limbs} />}
-
-      {/* Tint aura for new kinds so they read distinctly at a glance */}
-      {tint && (
-        <>
-          <mesh position={[0, 1.4, 0]}>
-            <sphereGeometry args={[0.55, 12, 10]} />
-            <meshBasicMaterial color={tint} transparent opacity={0.12} />
-          </mesh>
-        </>
-      )}
-
-      {/* Health bar */}
+    <group ref={ref} scale={skin.scale}>
+      <primitive object={cloned} />
       {e.alive && e.hp < e.maxHp && (
-        <group position={[0, 3, 0]}>
+        <group position={[0, 3 / skin.scale * 0.02, 0]}>
           <mesh>
-            <planeGeometry args={[1, 0.12]} />
+            <planeGeometry args={[1 / skin.scale * 0.02, 0.12 / skin.scale * 0.02]} />
             <meshBasicMaterial color="#200" />
           </mesh>
-          <mesh position={[-(1 - e.hp / e.maxHp) / 2, 0, 0.01]}>
-            <planeGeometry args={[e.hp / e.maxHp, 0.1]} />
+          <mesh position={[-(1 - e.hp / e.maxHp) / 2 / skin.scale * 0.02, 0, 0.01]}>
+            <planeGeometry args={[e.hp / e.maxHp / skin.scale * 0.02, 0.1 / skin.scale * 0.02]} />
             <meshBasicMaterial color="#e04040" />
           </mesh>
         </group>
@@ -1059,6 +1059,11 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
     </group>
   );
 }
+
+useFBX.preload(vampireAsset.url);
+useFBX.preload(medeaAsset.url);
+useFBX.preload(skeletonzombieAsset.url);
+
 
 /* ---- Enemy body variants: near-human anatomy ---- */
 type LimbRefs = {
