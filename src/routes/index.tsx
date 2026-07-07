@@ -2752,6 +2752,9 @@ function Index() {
     st.lives--;
     if (st.lives <= 0) {
       st.lives = 0;
+      // Release pointer lock so the retry overlay is clickable.
+      try { document.exitPointerLock?.(); } catch { /* noop */ }
+      document.body.style.cursor = "auto";
       setStatus("dead");
     } else {
       setStatus("play");
@@ -3002,7 +3005,8 @@ function Overlay({ title, subtitle, color, onClick, btn, onCustomize }: {
       position: "absolute", inset: 0, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       background: "radial-gradient(ellipse at center, #1a0838ee, #000f)",
-      color: "#fff", textAlign: "center", padding: 20, zIndex: 50,
+      color: "#fff", textAlign: "center", padding: 20, zIndex: 200,
+      pointerEvents: "auto", cursor: "auto",
     }}>
       <h1 style={{ fontSize: 56, margin: 0, color, textShadow: `0 0 30px ${color}, 0 0 60px ${color}88`, letterSpacing: 4 }}>{title}</h1>
       <p style={{ fontSize: 16, color: "#ccc", marginTop: 12 }}>{subtitle}</p>
