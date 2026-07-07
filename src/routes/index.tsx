@@ -2130,6 +2130,30 @@ function Scene({
       }
     }
 
+    // Enemy projectiles (fireballs from archers)
+    {
+      const before = enemyProjectiles.current.length;
+      for (const ep of enemyProjectiles.current) {
+        if (ep.life <= 0) continue;
+        ep.pos.x += ep.vel.x * dt;
+        ep.pos.y += ep.vel.y * dt;
+        ep.pos.z += ep.vel.z * dt;
+        ep.life -= dt;
+        if (blocked(ep.pos.x, ep.pos.y, ep.pos.z, 0.1, 0.1, world.platforms)) { ep.life = 0; continue; }
+        const d2 = ep.pos.distanceTo(pos.current.clone().add(new THREE.Vector3(0, 0.8, 0)));
+        if (d2 < 0.7 && invuln.current <= 0) {
+          st.hp -= ep.dmg;
+          invuln.current = 0.6;
+          spawnFloat(pos.current, `-${ep.dmg}`, "#ff8040");
+          onHudUpdate();
+          ep.life = 0;
+          if (st.hp <= 0) { onDeath(); return; }
+        }
+      }
+      enemyProjectiles.current = enemyProjectiles.current.filter((p) => p.life > 0);
+      if (enemyProjectiles.current.length !== before) rerender();
+    }
+
     // Pickups
     for (const p of pickups.current) {
       if (p.taken) continue;
