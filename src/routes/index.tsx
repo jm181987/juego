@@ -121,6 +121,39 @@ function genPath(count: number, startX: number, startY: number, jumpX: number, j
   return plats;
 }
 
+/** Generate multiple parallel branch routes offset in Z with varied Y bias.
+ * Produces roughly `count * offsets.length` platforms — many alternative
+ * paths from start to goal. */
+function branches(
+  count: number,
+  startX: number,
+  startY: number,
+  jumpX: number,
+  jumpY: number,
+  width: number,
+  color: string,
+  offsets: number[] = [-13, -8, 8, 13],
+): Platform[] {
+  const out: Platform[] = [];
+  offsets.forEach((zBase, bi) => {
+    const yBias = (bi % 2 === 0 ? 1 : -1) * 1.4 + (bi - 1.5) * 0.4;
+    for (let i = 0; i < count; i++) {
+      const x = startX + i * jumpX + ((bi % 2) * 0.4 + 0.15) * jumpX;
+      const y = startY + yBias + Math.sin(i * 0.55 + bi * 1.7) * jumpY;
+      const z = zBase + Math.sin(i * 0.9 + bi * 0.6) * 1.8;
+      out.push({ pos: [x, y, z], size: [width * 0.75, 0.7, width * 0.75], color });
+      // Occasional stepping stone between branch platforms
+      if (i < count - 1 && (i + bi) % 2 === 0) {
+        out.push({
+          pos: [x + jumpX * 0.5, y + 1.4, z + (bi % 2 === 0 ? 1.6 : -1.6)],
+          size: [width * 0.45, 0.5, width * 0.45],
+          color,
+        });
+      }
+    }
+  });
+  return out;
+
 function mkEnemies(defs: [number, Enemy["kind"]][], basePlats: Platform[]): { pos: Vec3; kind: Enemy["kind"] }[] {
   return defs.map(([idx, kind]) => {
     const p = basePlats[idx] ?? basePlats[basePlats.length - 1];
