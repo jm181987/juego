@@ -1664,6 +1664,54 @@ function Goal({ pos }: { pos: Vec3 }) {
   );
 }
 
+function PlatformField({ platforms }: { platforms: Platform[] }) {
+  const groups = useMemo(() => {
+    const byColor = new Map<string, Platform[]>();
+    for (const p of platforms) {
+      const color = p.color ?? "#444";
+      const list = byColor.get(color);
+      if (list) list.push(p);
+      else byColor.set(color, [p]);
+    }
+    return Array.from(byColor.entries());
+  }, [platforms]);
+
+  return (
+    <>
+      {groups.map(([color, items]) => (
+        <PlatformInstances key={color} color={color} platforms={items} />
+      ))}
+    </>
+  );
+}
+
+function PlatformInstances({ color, platforms }: { color: string; platforms: Platform[] }) {
+  const ref = useRef<THREE.InstancedMesh>(null!);
+  const matrix = useMemo(() => new THREE.Matrix4(), []);
+  const position = useMemo(() => new THREE.Vector3(), []);
+  const quaternion = useMemo(() => new THREE.Quaternion(), []);
+  const scale = useMemo(() => new THREE.Vector3(), []);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    platforms.forEach((p, i) => {
+      position.set(p.pos[0], p.pos[1], p.pos[2]);
+      scale.set(p.size[0], p.size[1], p.size[2]);
+      matrix.compose(position, quaternion, scale);
+      ref.current.setMatrixAt(i, matrix);
+    });
+    ref.current.instanceMatrix.needsUpdate = true;
+    ref.current.computeBoundingSphere();
+  }, [matrix, platforms, position, quaternion, scale]);
+
+  return (
+    <instancedMesh ref={ref} args={[undefined, undefined, platforms.length]} receiveShadow>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshStandardMaterial color={color} roughness={0.85} />
+    </instancedMesh>
+  );
+}
+
 /* ---------------- FLOATING TEXT ---------------- */
 function FloatingText({ ft }: { ft: FloatText }) {
   const ref = useRef<THREE.Group>(null!);
@@ -2352,12 +2400,7 @@ function Scene({
       {world.theme === "void" && <Stars radius={60} depth={60} count={3000} factor={2} fade speed={0.3} />}
       <ScareFX scare={world.scare} playerRef={pos} />
       {/* Platforms */}
-      {world.platforms.map((p, i) => (
-        <mesh key={i} position={p.pos} castShadow receiveShadow>
-          <boxGeometry args={p.size} />
-          <meshStandardMaterial color={p.color ?? "#444"} roughness={0.85} />
-        </mesh>
-      ))}
+      <PlatformField platforms={world.platforms} />
       {/* Lava */}
       {world.lava.map((l, i) => (
         <LavaPool key={i} pos={l.pos} size={l.size} />
@@ -2809,7 +2852,7 @@ function Index() {
           key={sceneKey}
           shadows={settings.shadows && settings.quality === "high"}
           camera={{ position: [0, 6, 10], fov: settings.fov }}
-          dpr={settings.quality === "low" ? [0.6, 0.85] : [0.75, 1]}
+          dpr={settings.quality === "low" ? [0.45, 0.65] : [0.55, 0.8]}
           gl={{
             toneMappingExposure: settings.brightness,
             antialias: settings.quality === "high",
