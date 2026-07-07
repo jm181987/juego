@@ -1952,8 +1952,13 @@ function Scene({
     let locked = false;
     const onMove = (e: MouseEvent) => {
       const free = keysRef.current.camFree;
+      const aim = keysRef.current.aim;
       if (locked && document.pointerLockElement === canvas) {
-        if (free) {
+        if (aim) {
+          // Free aim: mouse rotates player yaw and tilts pitch for vertical aim.
+          yawRef.current -= e.movementX * 0.0025;
+          pitchRef.current = Math.max(-0.9, Math.min(1.2, pitchRef.current + e.movementY * 0.002));
+        } else if (free) {
           camYawOffsetRef.current -= e.movementX * 0.0035;
           pitchRef.current = Math.max(-0.4, Math.min(1.2, pitchRef.current + e.movementY * 0.0025));
         } else {
@@ -1965,7 +1970,10 @@ function Scene({
         const cy = rect.top + rect.height / 2;
         const dx = e.clientX - cx;
         const dy = e.clientY - cy;
-        if (free) {
+        if (aim) {
+          yawRef.current -= (dx / rect.width) * 0.06;
+          pitchRef.current = Math.max(-0.9, Math.min(1.2, 0.35 + (dy / rect.height) * 1.4));
+        } else if (free) {
           camYawOffsetRef.current -= (dx / rect.width) * 0.08;
           pitchRef.current = Math.max(-0.4, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
         } else {
@@ -2158,12 +2166,15 @@ function Scene({
       gs.setStamina(gs.stamina - 6);
       playShoot();
       const fx = Math.sin(facing.current), fz = Math.cos(facing.current);
+      // Vertical aim from pitch when right-click aiming (0.35 is the neutral pitch).
+      const aimY = k.aim ? Math.max(-1.2, Math.min(1.2, (0.35 - pitchRef.current) * 1.6)) : 0;
+      const horizScale = k.aim ? Math.cos(Math.atan(aimY)) : 1;
       // Spawn slightly in front of the mage and roughly at hand height.
       const spawn = pos.current.clone().add(new THREE.Vector3(fx * 0.6, 1.1, fz * 0.6));
       projectiles.current.push({
         id: nextProjId.current++,
         pos: spawn,
-        vel: new THREE.Vector3(fx * PROJECTILE_SPEED, 0, fz * PROJECTILE_SPEED),
+        vel: new THREE.Vector3(fx * PROJECTILE_SPEED * horizScale, aimY * PROJECTILE_SPEED, fz * PROJECTILE_SPEED * horizScale),
         life: PROJECTILE_LIFE,
       });
       if (projectiles.current.length > MAX_PLAYER_PROJECTILES) projectiles.current.shift();
@@ -2448,10 +2459,14 @@ function Scene({
     floats.current = floats.current.filter((f) => f.life > 0);
 
     // Camera follow (third person). Hold Alt to orbit freely (yaw offset + pitch + wheel zoom).
-    if (!keysRef.current.camFree) {
+    // While aiming (right mouse), pitch is user-controlled so DO NOT ease it back.
+    if (!keysRef.current.camFree && !keysRef.current.aim) {
       // Ease the free-look offset back to zero so aim re-syncs with view
       camYawOffsetRef.current *= Math.pow(0.001, dt);
       pitchRef.current += (0.35 - pitchRef.current) * (1 - Math.pow(0.01, dt));
+    } else if (keysRef.current.aim) {
+      // Snap free-look yaw offset to zero while aiming so the reticle matches player facing.
+      camYawOffsetRef.current *= Math.pow(0.0001, dt);
     }
     const yaw = yawRef.current + camYawOffsetRef.current;
     const pitch = pitchRef.current;
