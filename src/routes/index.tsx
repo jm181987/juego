@@ -1974,15 +1974,24 @@ function Scene({
       }
     };
     const onDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      if (!locked) {
-        try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
+      if (e.button === 0) {
+        if (!locked) {
+          try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
+        }
+        keysRef.current.attack = true;
+      } else if (e.button === 2) {
+        keysRef.current.aim = true;
+        if (!locked) {
+          try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
+        }
+        e.preventDefault();
       }
-      keysRef.current.attack = true;
     };
     const onUp = (e: MouseEvent) => {
       if (e.button === 0) keysRef.current.attack = false;
+      else if (e.button === 2) keysRef.current.aim = false;
     };
+    const onContextMenu = (e: MouseEvent) => { e.preventDefault(); };
     const onWheel = (e: WheelEvent) => {
       if (!keysRef.current.camFree) return;
       camDistRef.current = Math.max(4, Math.min(18, camDistRef.current + e.deltaY * 0.01));
@@ -1991,12 +2000,14 @@ function Scene({
     const onLockChange = () => { locked = document.pointerLockElement === canvas; };
     document.addEventListener("mousemove", onMove);
     canvas.addEventListener("mousedown", onDown as any);
+    canvas.addEventListener("contextmenu", onContextMenu as any);
     canvas.addEventListener("wheel", onWheel as any, { passive: false });
     window.addEventListener("mouseup", onUp);
     document.addEventListener("pointerlockchange", onLockChange);
     return () => {
       document.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mousedown", onDown as any);
+      canvas.removeEventListener("contextmenu", onContextMenu as any);
       canvas.removeEventListener("wheel", onWheel as any);
       window.removeEventListener("mouseup", onUp);
       document.removeEventListener("pointerlockchange", onLockChange);
