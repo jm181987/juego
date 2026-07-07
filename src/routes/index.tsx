@@ -889,7 +889,18 @@ function EnemyMesh({ e }: { e: Enemy }) {
   const rightLeg = useRef<THREE.Group>(null!);
   const head = useRef<THREE.Group>(null!);
   const phase = useRef(Math.random() * 10);
-  const baseScale = e.kind === "brute" ? 1.15 : e.kind === "wraith" ? 1.0 : 0.95;
+  const baseScale =
+    e.kind === "brute" || e.kind === "sentinel" ? 1.15 :
+    e.kind === "wraith" || e.kind === "archer" ? 1.0 :
+    e.kind === "hopper" ? 0.85 :
+    e.kind === "dasher" ? 0.95 :
+    0.95;
+  const tint =
+    e.kind === "archer" ? "#a060ff" :
+    e.kind === "hopper" ? "#40ff80" :
+    e.kind === "sentinel" ? "#6080ff" :
+    e.kind === "dasher" ? "#ff4060" :
+    null;
 
   useFrame((_state, dt) => {
     if (!ref.current) return;
