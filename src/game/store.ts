@@ -63,7 +63,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sfxVol: 0.85,
   brightness: 1.0,
   fov: 60,
-  quality: "medium",
+  quality: "low",
   shadows: false,
   postFx: false,
   hudVisible: true,
@@ -215,7 +215,7 @@ const startupSafeSettings = (settings?: Partial<Settings>): Settings => {
   return {
     ...next,
     // Heavy effects were causing startup hangs on weaker/mobile previews.
-    quality: next.quality === "low" ? "low" : "medium",
+    quality: "low",
     shadows: false,
     postFx: false,
   };
