@@ -934,6 +934,21 @@ function EnemyMesh({ e }: { e: Enemy }) {
       {e.kind === "goblin" && <GoblinBody {...limbs} />}
       {e.kind === "wraith" && <WraithBody {...limbs} id={e.id} />}
       {e.kind === "brute" && <BruteBody {...limbs} />}
+      {e.kind === "archer" && <WraithBody {...limbs} id={e.id} />}
+      {e.kind === "hopper" && <GoblinBody {...limbs} />}
+      {e.kind === "sentinel" && <BruteBody {...limbs} />}
+      {e.kind === "dasher" && <GoblinBody {...limbs} />}
+
+      {/* Tint aura for new kinds so they read distinctly at a glance */}
+      {tint && (
+        <>
+          <pointLight color={tint} intensity={1.2} distance={2.6} decay={2} position={[0, 1.4, 0]} />
+          <mesh position={[0, 1.4, 0]}>
+            <sphereGeometry args={[0.55, 12, 10]} />
+            <meshBasicMaterial color={tint} transparent opacity={0.12} />
+          </mesh>
+        </>
+      )}
 
       {/* Health bar */}
       {e.alive && e.hp < e.maxHp && (
