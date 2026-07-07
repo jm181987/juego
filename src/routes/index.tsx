@@ -2320,11 +2320,13 @@ function Index() {
 
   const onDeath = () => {
     const st = statsRef.current;
+    // Always restore hp so useFrame doesn't retrigger onDeath every frame.
+    st.hp = st.maxHp;
     st.lives--;
     if (st.lives <= 0) {
+      st.lives = 0;
       setStatus("dead");
     } else {
-      st.hp = st.maxHp;
       setStatus("play");
       setHudTick((v) => v + 1);
     }
