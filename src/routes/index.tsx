@@ -1952,8 +1952,13 @@ function Scene({
     let locked = false;
     const onMove = (e: MouseEvent) => {
       const free = keysRef.current.camFree;
+      const aim = keysRef.current.aim;
       if (locked && document.pointerLockElement === canvas) {
-        if (free) {
+        if (aim) {
+          // Free aim: mouse rotates player yaw and tilts pitch for vertical aim.
+          yawRef.current -= e.movementX * 0.0025;
+          pitchRef.current = Math.max(-0.9, Math.min(1.2, pitchRef.current + e.movementY * 0.002));
+        } else if (free) {
           camYawOffsetRef.current -= e.movementX * 0.0035;
           pitchRef.current = Math.max(-0.4, Math.min(1.2, pitchRef.current + e.movementY * 0.0025));
         } else {
@@ -1965,7 +1970,10 @@ function Scene({
         const cy = rect.top + rect.height / 2;
         const dx = e.clientX - cx;
         const dy = e.clientY - cy;
-        if (free) {
+        if (aim) {
+          yawRef.current -= (dx / rect.width) * 0.06;
+          pitchRef.current = Math.max(-0.9, Math.min(1.2, 0.35 + (dy / rect.height) * 1.4));
+        } else if (free) {
           camYawOffsetRef.current -= (dx / rect.width) * 0.08;
           pitchRef.current = Math.max(-0.4, Math.min(1.2, 0.35 + (dy / rect.height) * 1.2));
         } else {
