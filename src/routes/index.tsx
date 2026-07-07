@@ -138,7 +138,7 @@ function branches(
   jumpY: number,
   width: number,
   color: string,
-  offsets: number[] = [-13, -8, 8, 13],
+  offsets: number[] = [-20, -14, -8, 8, 14, 20],
 ): Platform[] {
   const out: Platform[] = [];
   offsets.forEach((zBase, bi) => {
