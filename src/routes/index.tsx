@@ -2246,6 +2246,10 @@ function Scene({
       {projectiles.current.map((pr) => (
         <ProjectileMesh key={pr.id} pr={pr} />
       ))}
+      {/* Enemy projectiles */}
+      {enemyProjectiles.current.map((pr) => (
+        <EnemyProjectileMesh key={pr.id} pr={pr} />
+      ))}
       {/* Floating texts */}
       {floats.current.map((f) => (
         <FloatingText key={f.id} ft={f} />
