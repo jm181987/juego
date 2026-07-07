@@ -111,11 +111,17 @@ function genPath(count: number, startX: number, startY: number, jumpX: number, j
       const midZ = -z * 0.6 + Math.cos(i * 1.7) * (zSwing + 1.5);
       plats.push({ pos: [midX, midY, midZ], size: [width * 0.55, 0.6, width * 0.55], color });
     }
-    // Tall pillar side-platform every few steps
+    // Tall pillar side-platform every few steps (both sides for lateral variety)
     if (i % 2 === 1) {
       const sideZ = z + (i % 4 === 1 ? 1 : -1) * (zSwing + 2.5);
       const sideY = y + 2.4;
       plats.push({ pos: [x, sideY, sideZ], size: [width * 0.6, 0.5, width * 0.6], color });
+      plats.push({ pos: [x, sideY + 1.2, -sideZ], size: [width * 0.5, 0.5, width * 0.5], color });
+    }
+    // Extra low lateral catwalks so there are always side routes
+    if (i % 3 === 0) {
+      plats.push({ pos: [x + jumpX * 0.25, y - 0.8, z + zSwing + 4], size: [width * 0.7, 0.5, width * 0.4], color });
+      plats.push({ pos: [x + jumpX * 0.25, y - 0.8, z - zSwing - 4], size: [width * 0.7, 0.5, width * 0.4], color });
     }
   }
   return plats;
