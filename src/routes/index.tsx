@@ -1647,16 +1647,30 @@ function Scene({
   const diff = world.difficulty;
   const enemies = useRef<Enemy[]>(
     world.enemies.map((e, i) => {
-      const baseHp = e.kind === "brute" ? 60 : e.kind === "wraith" ? 30 : 20;
+      const baseHp =
+        e.kind === "brute" ? 60 :
+        e.kind === "sentinel" ? 55 :
+        e.kind === "wraith" ? 30 :
+        e.kind === "archer" ? 24 :
+        e.kind === "hopper" ? 22 :
+        e.kind === "dasher" ? 28 :
+        20;
       const hp = Math.round(baseHp * diff);
+      const startPos = new THREE.Vector3(...e.pos);
       return {
         id: i,
-        pos: new THREE.Vector3(...e.pos),
+        pos: startPos,
         hp, maxHp: hp,
         vel: new THREE.Vector3(),
         kind: e.kind,
         alive: true,
         hitFlash: 0,
+        shootTimer: e.kind === "archer" ? 0.8 + Math.random() * 0.8 : 0,
+        jumpTimer: e.kind === "hopper" ? Math.random() * 0.6 : 0,
+        dashTimer: e.kind === "dasher" ? 1 + Math.random() : 0,
+        dashActive: 0,
+        patrolCenter: e.kind === "sentinel" ? startPos.clone() : undefined,
+        patrolDir: e.kind === "sentinel" ? (Math.random() < 0.5 ? 1 : -1) : 0,
       };
     })
   );
