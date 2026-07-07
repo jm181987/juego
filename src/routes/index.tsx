@@ -402,13 +402,13 @@ const MAX_ENEMY_PROJECTILES = 14;
 type Keys = {
   fwd: boolean; back: boolean; left: boolean; right: boolean;
   jump: boolean; attack: boolean; pot1: boolean; pot2: boolean;
-  camFree: boolean; run: boolean;
+  camFree: boolean; run: boolean; aim: boolean;
 };
 function useKeys() {
   const keys = useRef<Keys>({
     fwd: false, back: false, left: false, right: false,
     jump: false, attack: false, pot1: false, pot2: false,
-    camFree: false, run: false,
+    camFree: false, run: false, aim: false,
   });
   useEffect(() => {
     const map = (e: KeyboardEvent, v: boolean) => {
@@ -1974,15 +1974,24 @@ function Scene({
       }
     };
     const onDown = (e: MouseEvent) => {
-      if (e.button !== 0) return;
-      if (!locked) {
-        try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
+      if (e.button === 0) {
+        if (!locked) {
+          try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
+        }
+        keysRef.current.attack = true;
+      } else if (e.button === 2) {
+        keysRef.current.aim = true;
+        if (!locked) {
+          try { canvas.requestPointerLock?.(); } catch { /* iframe may block */ }
+        }
+        e.preventDefault();
       }
-      keysRef.current.attack = true;
     };
     const onUp = (e: MouseEvent) => {
       if (e.button === 0) keysRef.current.attack = false;
+      else if (e.button === 2) keysRef.current.aim = false;
     };
+    const onContextMenu = (e: MouseEvent) => { e.preventDefault(); };
     const onWheel = (e: WheelEvent) => {
       if (!keysRef.current.camFree) return;
       camDistRef.current = Math.max(4, Math.min(18, camDistRef.current + e.deltaY * 0.01));
@@ -1991,12 +2000,14 @@ function Scene({
     const onLockChange = () => { locked = document.pointerLockElement === canvas; };
     document.addEventListener("mousemove", onMove);
     canvas.addEventListener("mousedown", onDown as any);
+    canvas.addEventListener("contextmenu", onContextMenu as any);
     canvas.addEventListener("wheel", onWheel as any, { passive: false });
     window.addEventListener("mouseup", onUp);
     document.addEventListener("pointerlockchange", onLockChange);
     return () => {
       document.removeEventListener("mousemove", onMove);
       canvas.removeEventListener("mousedown", onDown as any);
+      canvas.removeEventListener("contextmenu", onContextMenu as any);
       canvas.removeEventListener("wheel", onWheel as any);
       window.removeEventListener("mouseup", onUp);
       document.removeEventListener("pointerlockchange", onLockChange);
@@ -2444,13 +2455,22 @@ function Scene({
     }
     const yaw = yawRef.current + camYawOffsetRef.current;
     const pitch = pitchRef.current;
-    const dist = camDistRef.current;
+    const aiming = keysRef.current.aim;
+    const dist = aiming ? Math.min(camDistRef.current, 4.2) : camDistRef.current;
     const horiz = Math.cos(pitch) * dist;
-    const vert = Math.sin(pitch) * dist + 2.5;
+    const vert = Math.sin(pitch) * dist + (aiming ? 1.8 : 2.5);
     const desired = cameraDesiredVec.copy(pos.current).add(targetVec.set(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
-    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, 1, 0)), 1 - Math.pow(0.001, dt));
+    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, aiming ? 1.4 : 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
+    // Smooth FOV zoom while aiming
+    if ((camera as any).isPerspectiveCamera) {
+      const pc = camera as THREE.PerspectiveCamera;
+      const baseFov = useGame.getState().settings.fov;
+      const targetFov = aiming ? baseFov * 0.7 : baseFov;
+      pc.fov += (targetFov - pc.fov) * (1 - Math.pow(0.005, dt));
+      pc.updateProjectionMatrix();
+    }
 
 
     // Only rerender React tree when the floats list actually changes,
@@ -2756,6 +2776,7 @@ function Index() {
   const [mounted, setMounted] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [, setHudTick] = useState(0);
+  const [aiming, setAiming] = useState(false);
   const statsRef = useRef<Stats>(initialStats());
   const keysRef = useKeys();
   const world = WORLDS[worldIdx];
@@ -2779,6 +2800,24 @@ function Index() {
   const marksRef = useRef<CompassMark[]>([]);
 
   useEffect(() => { setMounted(true); }, []);
+
+  // Track right-click aim state to show the crosshair overlay.
+  useEffect(() => {
+    const down = (e: MouseEvent) => { if (e.button === 2) setAiming(true); };
+    const up = (e: MouseEvent) => { if (e.button === 2) setAiming(false); };
+    const ctx = (e: MouseEvent) => e.preventDefault();
+    const blur = () => setAiming(false);
+    window.addEventListener("mousedown", down);
+    window.addEventListener("mouseup", up);
+    window.addEventListener("contextmenu", ctx);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("mousedown", down);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("contextmenu", ctx);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
   useEffect(() => { useGame.getState().optimizeForStartup(); }, []);
   useEffect(() => { checkpointRef.current = world.spawn; }, [worldIdx, world.spawn]);
 
@@ -2958,6 +2997,27 @@ function Index() {
       {/* HUD */}
       {status === "play" && hudVisible && (
         <>
+          {/* Aim crosshair (right-click to aim) */}
+          {aiming && (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute", inset: 0, pointerEvents: "none",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                zIndex: 60,
+              }}
+            >
+              <svg width="56" height="56" viewBox="0 0 56 56" style={{ filter: "drop-shadow(0 0 4px #ff4040cc)" }}>
+                <circle cx="28" cy="28" r="14" fill="none" stroke="#ff5555" strokeWidth="1.5" opacity="0.9" />
+                <circle cx="28" cy="28" r="1.8" fill="#ff5555" />
+                <line x1="28" y1="4"  x2="28" y2="18" stroke="#ff5555" strokeWidth="1.5" />
+                <line x1="28" y1="38" x2="28" y2="52" stroke="#ff5555" strokeWidth="1.5" />
+                <line x1="4"  y1="28" x2="18" y2="28" stroke="#ff5555" strokeWidth="1.5" />
+                <line x1="38" y1="28" x2="52" y2="28" stroke="#ff5555" strokeWidth="1.5" />
+              </svg>
+            </div>
+          )}
+
           {/* Top-left: stats panel */}
           <div style={{
             position: "absolute", top: 12, left: 12, padding: 12,
