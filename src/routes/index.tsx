@@ -2455,13 +2455,22 @@ function Scene({
     }
     const yaw = yawRef.current + camYawOffsetRef.current;
     const pitch = pitchRef.current;
-    const dist = camDistRef.current;
+    const aiming = keysRef.current.aim;
+    const dist = aiming ? Math.min(camDistRef.current, 4.2) : camDistRef.current;
     const horiz = Math.cos(pitch) * dist;
-    const vert = Math.sin(pitch) * dist + 2.5;
+    const vert = Math.sin(pitch) * dist + (aiming ? 1.8 : 2.5);
     const desired = cameraDesiredVec.copy(pos.current).add(targetVec.set(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
-    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, 1, 0)), 1 - Math.pow(0.001, dt));
+    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, aiming ? 1.4 : 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
+    // Smooth FOV zoom while aiming
+    if ((camera as any).isPerspectiveCamera) {
+      const pc = camera as THREE.PerspectiveCamera;
+      const baseFov = useGame.getState().settings.fov;
+      const targetFov = aiming ? baseFov * 0.7 : baseFov;
+      pc.fov += (targetFov - pc.fov) * (1 - Math.pow(0.005, dt));
+      pc.updateProjectionMatrix();
+    }
 
 
     // Only rerender React tree when the floats list actually changes,
