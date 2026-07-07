@@ -153,6 +153,8 @@ function branches(
     }
   });
   return out;
+}
+
 
 function mkEnemies(defs: [number, Enemy["kind"]][], basePlats: Platform[]): { pos: Vec3; kind: Enemy["kind"] }[] {
   return defs.map(([idx, kind]) => {
