@@ -8,7 +8,7 @@ import soldierAsset from "@/assets/soldier.glb.asset.json";
 import michelleAsset from "@/assets/michelle.glb.asset.json";
 
 
-import { playSwing, playDeath, genderFor } from "@/lib/sfx";
+import { playSwing, playShoot, playDeath, genderFor } from "@/lib/sfx";
 import { useGame, type SaveSlot } from "@/game/store";
 import { StatBar, BatteryPill } from "@/components/hud/Bars";
 import { Minimap, type MiniBlip } from "@/components/hud/Minimap";
