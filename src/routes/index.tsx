@@ -96,6 +96,19 @@ function genPath(count: number, startX: number, startY: number, jumpX: number, j
     const y = startY + Math.sin(i * 0.7) * jumpY;
     const z = Math.sin(i * 1.3) * zSwing;
     plats.push({ pos: [x, y, z], size: [width, 1, width], color });
+    // Secondary smaller floating platform between main ones for extra jumping
+    if (i < count - 1) {
+      const midX = x + jumpX * 0.5;
+      const midY = y + 1.6 + Math.cos(i * 0.9) * 0.8;
+      const midZ = -z * 0.6 + Math.cos(i * 1.7) * (zSwing + 1.5);
+      plats.push({ pos: [midX, midY, midZ], size: [width * 0.55, 0.6, width * 0.55], color });
+    }
+    // Tall pillar side-platform every few steps
+    if (i % 2 === 1) {
+      const sideZ = z + (i % 4 === 1 ? 1 : -1) * (zSwing + 2.5);
+      const sideY = y + 2.4;
+      plats.push({ pos: [x, sideY, sideZ], size: [width * 0.6, 0.5, width * 0.6], color });
+    }
   }
   return plats;
 }
