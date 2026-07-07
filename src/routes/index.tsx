@@ -990,9 +990,12 @@ function EnemyMesh({ e, playerRef }: { e: Enemy; playerRef: React.MutableRefObje
     leftArm?: THREE.Object3D; rightArm?: THREE.Object3D;
     leftLeg?: THREE.Object3D; rightLeg?: THREE.Object3D;
     leftForeArm?: THREE.Object3D; rightForeArm?: THREE.Object3D;
-    spine?: THREE.Object3D; head?: THREE.Object3D;
+    leftLowerLeg?: THREE.Object3D; rightLowerLeg?: THREE.Object3D;
+    spine?: THREE.Object3D; head?: THREE.Object3D; hips?: THREE.Object3D;
     base: Record<string, THREE.Euler>;
+    baseHipY?: number;
   }>({ base: {} });
+
 
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(fbx) as THREE.Group;
