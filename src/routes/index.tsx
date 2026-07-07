@@ -1850,6 +1850,13 @@ function Scene({
   const nextProjId = useRef(0);
   const enemyProjectiles = useRef<EnemyProjectile[]>([]);
   const nextEnemyProjId = useRef(0);
+  const toPlayerVec = useRef(new THREE.Vector3()).current;
+  const dirVec = useRef(new THREE.Vector3()).current;
+  const strafeVec = useRef(new THREE.Vector3()).current;
+  const moveVec = useRef(new THREE.Vector3()).current;
+  const targetVec = useRef(new THREE.Vector3()).current;
+  const cameraDesiredVec = useRef(new THREE.Vector3()).current;
+  const cameraTargetVec = useRef(new THREE.Vector3()).current;
   const spawnFloat = (p: THREE.Vector3, text: string, color: string) => {
     floats.current.push({ id: nextFtId.current++, pos: p.clone().add(new THREE.Vector3(0, 1.5, 0)), text, color, life: 1 });
   };
@@ -2071,6 +2078,7 @@ function Scene({
         vel: new THREE.Vector3(fx * PROJECTILE_SPEED, 0, fz * PROJECTILE_SPEED),
         life: PROJECTILE_LIFE,
       });
+      if (projectiles.current.length > MAX_PLAYER_PROJECTILES) projectiles.current.shift();
     }
 
     // Projectiles: move, expire, and damage enemies on hit.
@@ -2157,10 +2165,16 @@ function Scene({
       if (!e.alive) continue;
       if (e.hitFlash > 0) e.hitFlash -= dt;
 
-      const toP = pos.current.clone().sub(e.pos);
-      const dist = toP.length();
-      const dir = dist > 0.001 ? toP.clone().normalize() : new THREE.Vector3(1, 0, 0);
+      toPlayerVec.subVectors(pos.current, e.pos);
+      const distSq = toPlayerVec.lengthSq();
+      const dist = Math.sqrt(distSq);
+      const dir = dist > 0.001 ? dirVec.copy(toPlayerVec).multiplyScalar(1 / dist) : dirVec.set(1, 0, 0);
       const diffMul = 0.9 + diff * 0.15;
+
+      if (distSq > ENEMY_ACTIVE_DISTANCE_SQ) {
+        e.vel.multiplyScalar(0.88);
+        continue;
+      }
 
       if (e.kind === "wraith") {
         if (dist < 14) {
@@ -2177,8 +2191,8 @@ function Scene({
         const speed = 3.4 * diffMul;
         if (dist < 14) {
           const radial = (dist - desiredDist);
-          const strafe = new THREE.Vector3(-dir.z, 0, dir.x);
-          const move = dir.clone().multiplyScalar(radial * 0.6).add(strafe.multiplyScalar(1.2));
+          const strafe = strafeVec.set(-dir.z, 0, dir.x);
+          const move = moveVec.copy(dir).multiplyScalar(radial * 0.6).add(strafe.multiplyScalar(1.2));
           if (move.length() > 0) move.normalize();
           e.vel.x = move.x * speed;
           e.vel.z = move.z * speed;
@@ -2190,8 +2204,7 @@ function Scene({
         if (dist > 3 && dist < 16 && (e.shootTimer ?? 0) <= 0) {
           e.shootTimer = 1.4 + Math.random() * 0.6;
           const from = e.pos.clone().add(new THREE.Vector3(0, 1.4, 0));
-          const target = pos.current.clone().add(new THREE.Vector3(0, 0.8, 0));
-          const shootDir = target.sub(from).normalize();
+          const shootDir = targetVec.copy(pos.current).add(new THREE.Vector3(0, 0.8, 0)).sub(from).normalize();
           enemyProjectiles.current.push({
             id: nextEnemyProjId.current++,
             pos: from,
@@ -2199,6 +2212,7 @@ function Scene({
             life: 1.6,
             dmg: Math.max(2, Math.round(8 * diff - st.def * 0.4)),
           });
+          if (enemyProjectiles.current.length > MAX_ENEMY_PROJECTILES) enemyProjectiles.current.shift();
         }
       } else if (e.kind === "hopper") {
         const speed = 4.5 * diffMul;
@@ -2283,7 +2297,7 @@ function Scene({
         invuln.current = 0.8;
         spawnFloat(pos.current, `-${dmg}`, "#ff4040");
         // Knockback
-        const kb = pos.current.clone().sub(e.pos).normalize();
+        const kb = targetVec.subVectors(pos.current, e.pos).normalize();
         vel.current.x += kb.x * 8;
         vel.current.z += kb.z * 8;
         vel.current.y = 6;
@@ -2302,7 +2316,7 @@ function Scene({
         ep.pos.z += ep.vel.z * dt;
         ep.life -= dt;
         if (blocked(ep.pos.x, ep.pos.y, ep.pos.z, 0.1, 0.1, world.platforms)) { ep.life = 0; continue; }
-        const d2 = ep.pos.distanceTo(pos.current.clone().add(new THREE.Vector3(0, 0.8, 0)));
+        const d2 = ep.pos.distanceTo(targetVec.copy(pos.current).add(new THREE.Vector3(0, 0.8, 0)));
         if (d2 < 0.7 && invuln.current <= 0) {
           st.hp -= ep.dmg;
           invuln.current = 0.6;
@@ -2356,9 +2370,9 @@ function Scene({
     const dist = camDistRef.current;
     const horiz = Math.cos(pitch) * dist;
     const vert = Math.sin(pitch) * dist + 2.5;
-    const desired = pos.current.clone().add(new THREE.Vector3(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
+    const desired = cameraDesiredVec.copy(pos.current).add(targetVec.set(Math.sin(yaw) * horiz, vert, Math.cos(yaw) * horiz));
     camera.position.lerp(desired, 1 - Math.pow(0.001, dt));
-    camTarget.current.lerp(pos.current.clone().add(new THREE.Vector3(0, 1, 0)), 1 - Math.pow(0.001, dt));
+    camTarget.current.lerp(cameraTargetVec.copy(pos.current).add(targetVec.set(0, 1, 0)), 1 - Math.pow(0.001, dt));
     camera.lookAt(camTarget.current);
 
 
