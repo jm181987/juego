@@ -402,13 +402,13 @@ const MAX_ENEMY_PROJECTILES = 14;
 type Keys = {
   fwd: boolean; back: boolean; left: boolean; right: boolean;
   jump: boolean; attack: boolean; pot1: boolean; pot2: boolean;
-  camFree: boolean; run: boolean;
+  camFree: boolean; run: boolean; aim: boolean;
 };
 function useKeys() {
   const keys = useRef<Keys>({
     fwd: false, back: false, left: false, right: false,
     jump: false, attack: false, pot1: false, pot2: false,
-    camFree: false, run: false,
+    camFree: false, run: false, aim: false,
   });
   useEffect(() => {
     const map = (e: KeyboardEvent, v: boolean) => {
