@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import soldierAsset from "@/assets/soldier.glb.asset.json";
 import michelleAsset from "@/assets/michelle.glb.asset.json";
-import jorgeAsset from "@/assets/jorge.glb.asset.json";
+
 
 import { playSwing, playDeath, genderFor } from "@/lib/sfx";
 import { useGame, type SaveSlot } from "@/game/store";
@@ -385,7 +385,6 @@ function blocked(px: number, py: number, pz: number, r: number, h: number, plats
 /* ---------------- HERO (rigged 3D GLB with skeletal animations) ---------------- */
 useGLTF.preload(soldierAsset.url);
 useGLTF.preload(michelleAsset.url);
-useGLTF.preload(jorgeAsset.url);
 
 function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
   posRef: React.MutableRefObject<THREE.Vector3>;
@@ -425,8 +424,8 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
 
 
   const appearanceGender = useGame((s) => s.appearance.gender);
-  // Male: soldier rig. Female: Michelle. Jorge: custom uploaded skin.
-  // All share mixamorig* bone naming so the soldier animation clips retarget.
+  // Male: soldier rig. Female: Michelle.
+  // Both share mixamorig* bone naming so the soldier animation clips retarget.
   const soldierGltf = useGLTF(soldierAsset.url) as unknown as {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
@@ -435,13 +434,7 @@ function Mage({ posRef, facingRef, attackingRef, walkPhaseRef }: {
     scene: THREE.Group;
     animations: THREE.AnimationClip[];
   };
-  const jorgeGltf = useGLTF(jorgeAsset.url) as unknown as {
-    scene: THREE.Group;
-    animations: THREE.AnimationClip[];
-  };
-  const gltf = appearanceGender === "female" ? michelleGltf
-    : appearanceGender === "jorge" ? jorgeGltf
-    : soldierGltf;
+  const gltf = appearanceGender === "female" ? michelleGltf : soldierGltf;
   const cloned = useMemo(() => {
     const c = SkeletonUtils.clone(gltf.scene) as THREE.Group;
     // Keep both genders controlled only by the outer group rotation so movement
