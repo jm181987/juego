@@ -3141,14 +3141,15 @@ function Index() {
                 zIndex: 60,
               }}
             >
-              <svg width="56" height="56" viewBox="0 0 56 56" style={{ filter: "drop-shadow(0 0 4px #ff4040cc)" }}>
-                <circle cx="28" cy="28" r="14" fill="none" stroke="#ff5555" strokeWidth="1.5" opacity="0.9" />
-                <circle cx="28" cy="28" r="1.8" fill="#ff5555" />
-                <line x1="28" y1="4"  x2="28" y2="18" stroke="#ff5555" strokeWidth="1.5" />
-                <line x1="28" y1="38" x2="28" y2="52" stroke="#ff5555" strokeWidth="1.5" />
-                <line x1="4"  y1="28" x2="18" y2="28" stroke="#ff5555" strokeWidth="1.5" />
-                <line x1="38" y1="28" x2="52" y2="28" stroke="#ff5555" strokeWidth="1.5" />
+              <svg width="40" height="40" viewBox="0 0 40 40" style={{ filter: "drop-shadow(0 0 3px #ff3030dd)" }}>
+                <circle cx="20" cy="20" r="9" fill="none" stroke="#ff4444" strokeWidth="1" opacity="0.55" />
+                <circle cx="20" cy="20" r="1.2" fill="#ff5555" />
+                <line x1="20" y1="4"  x2="20" y2="12" stroke="#ff5555" strokeWidth="1.2" />
+                <line x1="20" y1="28" x2="20" y2="36" stroke="#ff5555" strokeWidth="1.2" />
+                <line x1="4"  y1="20" x2="12" y2="20" stroke="#ff5555" strokeWidth="1.2" />
+                <line x1="28" y1="20" x2="36" y2="20" stroke="#ff5555" strokeWidth="1.2" />
               </svg>
+
             </div>
           )}
 
