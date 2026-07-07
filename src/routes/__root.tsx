@@ -77,14 +77,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Arcane Realms 3D - Aventura RPG del Mago" },
+      { name: "description", content: "Plataformero RPG 3D con cámara en tercera persona. Explora tres reinos oscuros, combate enemigos con espada y sube de nivel." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Arcane Realms 3D - Aventura RPG del Mago" },
+      { property: "og:description", content: "Plataformero RPG 3D con cámara en tercera persona. Explora tres reinos oscuros, combate enemigos con espada y sube de nivel." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Arcane Realms 3D - Aventura RPG del Mago" },
+      { name: "twitter:description", content: "Plataformero RPG 3D con cámara en tercera persona. Explora tres reinos oscuros, combate enemigos con espada y sube de nivel." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/69bjeI7KuhcMVRDyEVsDPvjMqNh1/social-images/social-1783429248566-knj_logo.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/69bjeI7KuhcMVRDyEVsDPvjMqNh1/social-images/social-1783429248566-knj_logo.webp" },
     ],
     links: [
       {
