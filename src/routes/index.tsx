@@ -2752,6 +2752,9 @@ function Index() {
     st.lives--;
     if (st.lives <= 0) {
       st.lives = 0;
+      // Release pointer lock so the retry overlay is clickable.
+      try { document.exitPointerLock?.(); } catch { /* noop */ }
+      document.body.style.cursor = "auto";
       setStatus("dead");
     } else {
       setStatus("play");
