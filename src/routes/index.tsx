@@ -1996,7 +1996,7 @@ function Scene({
 
     // Only rerender React tree when the floats list actually changes,
     // otherwise mesh refs update the scene each frame without React work.
-    if (floats.current.length !== beforeLen) rerender();
+    if (floats.current.length !== beforeLen || projChanged) rerender();
   });
 
   return (
