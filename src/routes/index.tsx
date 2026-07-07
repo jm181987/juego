@@ -172,6 +172,15 @@ function lavaLine(startX: number, count: number, spacing: number, size: [number,
   return Array.from({ length: count }, (_, i) => ({ pos: [startX + i * spacing, y, 0] as Vec3, size }));
 }
 
+/** Spawn extra enemies scattered across branch platforms. */
+function enemiesOnBranches(brs: Platform[], kinds: Enemy["kind"][]): { pos: Vec3; kind: Enemy["kind"] }[] {
+  return kinds.map((k, i) => {
+    const p = brs[Math.floor(((i + 1) * brs.length) / (kinds.length + 1))] ?? brs[0];
+    return { pos: [p.pos[0], p.pos[1] + 2, p.pos[2]] as Vec3, kind: k };
+  });
+}
+
+
 /* ---------------- WORLDS ---------------- */
 function buildWorlds(): WorldDef[] {
   const worlds: WorldDef[] = [];
